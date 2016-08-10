@@ -16,7 +16,7 @@ class DaflClient(object):
         self.response = None
         self.individual_state = ''
 
-    def send_request(self, method, url, json={}):
+    def send_request(self, method, url, json_cfg={}):
         if method not in ["POST", "GET"]:
             logger.error("Only supported methods are POST, GET")
             return None
@@ -24,14 +24,19 @@ class DaflClient(object):
             if method == "GET":
                 self.request = requests.get(url)
             elif method == "POST":
-                self.request = requests.post(url, json=json)
-                if request.status_code != 200:
-                    logger.error("Error in getting %s: %s" %(url, request.reason))
-                    return None
+                self.request = requests.post(url, json=json_cfg)
+            if self.request.status_code != 200:
+                logger.error("Error in getting %s: %s" %(url, self.request.reason))
+                t  = json.loads(self.request.text)
+                if "error" in t:
+                    print(t['error'])
+                else:
+                    print(t[t.find("<pre>Trace"):t.find("</body>")])
+                return None
         except requests.ConnectionError:
             logger.error(sys.exc_info()[1])
             return None
-        return request
+        return self.request
 
     @staticmethod
     def return_response(response):
@@ -42,6 +47,7 @@ class DaflClient(object):
     @property
     def state(self, ):
         content = self.send_request("GET", self.url + "state")
+        logger.info(content)
         if content is None:
             return
 
@@ -50,22 +56,22 @@ class DaflClient(object):
         return content["global_state"]
 
     def initialize(self, cfg={}):
-        response = self.send_request("POST", self.url + 'state/initialize', json=cfg)
+        response = self.send_request("POST", self.url + 'state/initialize', json_cfg=cfg)
         return self.return_response(response)
 
     def configure(self, cfg={}):
-        response = self.send_request("POST", self.url + 'state/configure', json=cfg)
+        response = self.send_request("POST", self.url + 'state/configure', json_cfg=cfg)
         return self.return_response(response)
     
     def open(self, cfg={}):
-        response = self.send_request("POST", self.url + 'state/open', json=cfg)
+        response = self.send_request("POST", self.url + 'state/open', json_cfg=cfg)
         return self.return_response(response)
 
     def close(self, cfg={}):
-        response = self.send_request("POST", self.url + 'state/close', json=cfg)
+        response = self.send_request("POST", self.url + 'state/close', json_cfg=cfg)
         return self.return_response(response)
 
     def reset(self, cfg={}):
-        response = self.send_request("POST", self.url + 'state/reset', json=cfg)
+        response = self.send_request("POST", self.url + 'state/reset', json_cfg=cfg)
         return self.return_response(response)
 
