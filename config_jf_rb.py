@@ -52,23 +52,33 @@ mpi_size = comm.Get_size()
 rank = mpi_rank
 size = mpi_size - 2
 
+RECEIVER_RANKS = [0, ]
+SENDERS_RANKS = [1, ]
+
 print(rank, size)
-supported_mpi_sizes = [3, ]
-if mpi_size not in supported_mpi_sizes:
-    raise ValueError("mpi size (number of mpi processes) must be in %s" % supported_mpi_sizes)
+#supported_mpi_sizes = [3, ]
+#if mpi_size not in supported_mpi_sizes:
+#    raise ValueError("mpi size (number of mpi processes) must be in %s" % supported_mpi_sizes)
 
 c.BulletinBoardClient.prefix = u'backend'
 c.BulletinBoardClient.postfix = str(rank)
 #c.DataFlow.maxelements = 42
-c.DataFlow.log_level = 'DEBUG'
-c.DataFlow.nodelist = [
-                           ('RECV', 'module_receiver_rb.ModuleReceiver'),
-                           ('ZMQ', 'module_receiver_rb.ZMQSender')
-                           ]
-c.DataFlow.targets_per_node = { 'RECV' : ['ZMQ', ]}
+c.DataFlow.log_level = 'INFO'
 
-c.ModuleReceiver.ip = "192.168.10.10"
-c.ZMQSender.uri = "tcp://192.168.10.10:9999"
+if rank in RECEIVER_RANKS:
+    c.DataFlow.nodelist = [
+        ('RECV', 'module_receiver_rb.ModuleReceiver'),
+    ]
+    c.DataFlow.targets_per_node = { 'RECV' : []}
+
+    c.ModuleReceiver.ip = "192.168.10.10"
+
+elif rank in SENDERS_RANKS:
+    c.DataFlow.nodelist = [
+        ('ZMQ', 'module_receiver_rb.ZMQSender'),
+    ]
+    c.DataFlow.targets_per_node = { 'ZMQ' : []}
+    c.ZMQSender.uri = "tcp://192.168.10.10:9999"
 
 #c.DataFlow.maxitterations = 20
 
