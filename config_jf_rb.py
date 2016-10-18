@@ -39,6 +39,7 @@ c.DataFlow.log_level = 'INFO'
 
 c.ModuleReceiver.geometry = (1, 1)  # number of modules, x and y 
 c.ModuleReceiver.bit_depth = 32
+c.ZMQSender.bit_depth = 32
 
 n_modules = c.ModuleReceiver.geometry[0] * c.ModuleReceiver.geometry[1]
 receiver_ips = 2 * ["10.0.30.200"] + 2 * ["10.0.40.200"]
@@ -46,11 +47,15 @@ receiver_ports = [50001, 50002, 50004, 50003] #[50001 + i for i in range(4 * n_m
 submodule_index = n_modules * [0, 1, 2, 3]
 rb_writers_id = range(len(RECEIVER_RANKS))
 rb_followers_id = SENDERS_RANKS
+c.ModuleReceiver.create_and_delete_ringbuffer_header = False
 
 if rank in RECEIVER_RANKS:
     c.DataFlow.nodelist = [
         ('RECV', 'module_receiver_rb.ModuleReceiver'),
     ]
+    if rank == 0:
+        c.ModuleReceiver.create_and_delete_ringbuffer_header = True
+
     c.DataFlow.targets_per_node = { 'RECV' : []}
     c.ModuleReceiver.ip = receiver_ips[rank]
     c.ModuleReceiver.port = receiver_ports[rank]
@@ -60,11 +65,12 @@ if rank in RECEIVER_RANKS:
 
 elif rank in SENDERS_RANKS:
     c.DataFlow.nodelist = [
-        ('ZMQ', 'module_receiver_rb.ZMQSender'),
+        ('ZMQ', 'module_zmq.ZMQSender'),
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
     c.ZMQSender.uri = "tcp://192.168.10.10:9999"
-
+    c.ZMQSender.rb_id = rank
+    c.ZMQSender.ModuleReceiver.rb_followers = rb_writers_id
 
     
 
