@@ -68,7 +68,7 @@ elif rank in SENDERS_RANKS:
         ('ZMQ', 'module_zmq.ZMQSender'),
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
-    c.ZMQSender.uri = "tcp://192.168.10.10:9999"
+    c.ZMQSender.uri = "tcp://10.0.30.200:9999"
     c.ZMQSender.rb_id = rank
     c.ZMQSender.ModuleReceiver.rb_followers = rb_writers_id
 

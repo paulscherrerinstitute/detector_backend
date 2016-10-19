@@ -42,6 +42,18 @@ class HEADER(ctypes.Structure):
 header = HEADER("      ".encode(), ctypes.c_uint64(), ctypes.c_uint64(),  np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 6 - 8 - 8, dtype=np.uint8)))
 
 
+def send_array(socket, A, flags=0, copy=True, track=False, frame=-1):
+    """send a numpy array with metadata"""
+    md = dict(
+        htype=["array-1.0", ],
+        type=str(A.dtype),
+        shape=A.shape,
+        frame=frame
+    )
+    socket.send_json(md, flags | zmq.SNDMORE)
+    return socket.send(A, flags, copy=copy, track=track)
+
+
 
 class ZMQSender(DataFlowNode):
 
@@ -69,9 +81,9 @@ class ZMQSender(DataFlowNode):
         print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * 512 * 512))
         rb.adjust_nslots(self.rb_header_id);
         
-        #self.context = zmq.Context()
-        #self.skt = self.context.socket(zmq.__getattribute__(self.socket_type))
-        #self.skt.bind(self.uri)
+        self.context = zmq.Context()
+        self.skt = self.context.socket(zmq.__getattribute__(self.socket_type))
+        self.skt.bind(self.uri)
 
         self.rb_current_slot = -1
 
@@ -98,10 +110,7 @@ class ZMQSender(DataFlowNode):
                    
             entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
             data = np.ctypeslib.as_array(pointer, (entry_size_in_bytes / (self.bit_depth / 8), ), )
-            print(data.shape, data.sum())
-            plt.figure()
-            plt.imshow(data.reshape(512, -1))
-            plt.show()
+            send_array(self.skt, data.reshape(MODULE_SIZE[0], -1), frame=pointerh.contents.framenum)
             if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                 print("CANNOT COMMIT SLOT")
             
