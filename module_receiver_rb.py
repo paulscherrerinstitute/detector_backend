@@ -1,6 +1,6 @@
 from __future__ import print_function, division, unicode_literals
 from dafl.application import XblLoggingConfigurable
-from dafl.traits import Int, Unicode, Float, List, Bool
+from dafl.traits import Int, Unicode, Float, List, Bool, Unicode
 from dafl.dataflow import DataFlowNode, DataFlow
 from dafl.application import XblBaseApplication
 
@@ -28,9 +28,6 @@ RB_IMGHEAD_FILE = "rb_image_header.dat"
 RB_IMGDATA_FILE = "rb_image_data.dat"
 
 MODULE_SIZE = (512, 512)
-
-
-
 
 
 class PACKET_STRUCT(ctypes.Structure):
@@ -99,12 +96,15 @@ class ModuleReceiver(DataFlowNode):
     rb_id = Int(0, config=True, reconfig=True, help="")
     rb_followers = List([1, ], config=True, reconfig=True, help="")
     create_and_delete_ringbuffer_header = Bool(False, config=True, reconfig=True, help="Index within the module, with NW=0 and SE=3")
+    rb_head_file = Unicode('', config=True, reconfig=True, help="")
+    rb_imghead_file = Unicode('', config=True, reconfig=True, help="")
+    rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
 
-
+        
     def _prepare_ringbuffer_header_files(self):
         
-        files = [RB_HEAD_FILE, ]
-        print("MPI,", self.mpi_rank, self.create_and_delete_ringbuffer_header)
+        files = [self.rb_head_file, ]
+        #print("MPI,", self.mpi_rank, self.create_and_delete_ringbuffer_header)
         if self.create_and_delete_ringbuffer_header is True:
             self.log.debug("create ringbuffer header files")
             for f in files:
@@ -122,6 +122,11 @@ class ModuleReceiver(DataFlowNode):
     
     def __init__(self, **kwargs):
         super(ModuleReceiver, self).__init__(**kwargs)
+        #self.rb_head_file = RB_HEAD_FILE
+        #self.rb_imghead_file = RB_IMGHEAD_FILE
+        #self.rb_imgdata_file = RB_IMGDATA_FILE
+
+
         app = XblBaseApplication.instance()
         self.worker_communicator = app.worker_communicator
 
@@ -131,28 +136,31 @@ class ModuleReceiver(DataFlowNode):
                              socket.SOCK_DGRAM) # UDP
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2000 * 1024 * 1024)
         self.sock.bind((self.ip, self.port))
-        # ringbuffer
-        rb.set_buffer_slot_dtype(dtype=ctypes.c_uint32)
+        # ringbuffer FIXME
+        rb.set_buffer_slot_dtype(dtype=ctypes.c_uint16)
         #if self.rb_id == 0:
         #    _ = rb.create_header_file(RB_HEAD_FILE)
-        self.rb_header_id = rb.open_header_file(RB_HEAD_FILE)
+        self.rb_header_id = rb.open_header_file(self.rb_head_file)
         #print(rb.print_header(self.rb_header_id))
         self.rb_writer_id = rb.create_writer(self.rb_header_id, self.rb_id, self.rb_followers)
-        self.rb_hbuffer_id = rb.attach_buffer_to_header(RB_IMGHEAD_FILE, self.rb_header_id, 0)
-        self.rb_dbuffer_id = rb.attach_buffer_to_header(RB_IMGDATA_FILE, self.rb_header_id, 0)
+        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
+        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
 
-        print(rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64))
+        #print(rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64))
         print("Receiver ID:", self.rb_id)
         #print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, 2 * 512 * 1024))
-        print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * 512 * 512))
-        rb.adjust_nslots(self.rb_header_id);
+        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * 512 * 512)
+        #self.worker_communicator.barrier()
+        #if self.create_and_delete_ringbuffer_header is True:
+        #    self.log.debug("adjust ringbuffer nslots")
+        rb.adjust_nslots(self.rb_header_id)
         self.rb_current_slot = -1
 
         self.new_frame = True
 
         self.n_elements_line = int(8 * 4096 / self.bit_depth)
-        self.n_packets_frame = int(MODULE_SIZE[0] * MODULE_SIZE[1] / 4 / self.n_elements_line)
-        print(self.n_elements_line, self.n_packets_frame)
+        self.n_packets_frame = 2 * int(MODULE_SIZE[0] * MODULE_SIZE[1] / 4 / self.n_elements_line)
+        #print(self.n_elements_line, self.n_packets_frame)
         
     def send(self, data):
 
@@ -194,16 +202,18 @@ class ModuleReceiver(DataFlowNode):
                 packet = UdpPacket()
                 rdata, sender = self.sock.recvfrom(2000 * 1024 * 1024)
                 data_size = len(rdata)
-                print("DATA_SIZE", data_size, counter)
+                #print("DATA_SIZE", data_size, counter)
                 
                 if data_size == 48:
                     if counter == 0:
                         counter += 1
                         continue
                     #print("TESTL", packet.framenum, pointerh.contents.framenum)
-                    
-                    if total_packets != 64 or packet.packetnum != 63:
-                        print("[WARNING] missing packets for frame %d (got %d)" % (packet.framenum, total_packets))
+                    if self.mpi_rank == 0:
+                        print("Total recv for frame", packet.framenum, ": ", total_packets)
+                    #if total_packets != 64 or packet.packetnum != 63:
+                    #    print("[WARNING] missing packets for frame %d (got %d)" % (packet.framenum, total_packets))
+                        
                         
                     framenum_last = packet.framenum
                     total_packets = 1
@@ -211,7 +221,7 @@ class ModuleReceiver(DataFlowNode):
                     if not rb.commit_slot(self.rb_writer_id, self.rb_current_slot):
                         print("CANNOT COMMIT SLOT")
                     self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
-                    #print("self.rb_current_slot", self.rb_current_slot)
+                    #print("WRITER: self.rb_current_slot", self.rb_current_slot)
                     pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
                     header.framenum = packet.framenum
                     # see https://docs.python.org/3/library/ctypes.html#ctypes-pointers
@@ -220,12 +230,13 @@ class ModuleReceiver(DataFlowNode):
                     # this changes the pointer
                     #ph.contents = header
                     
-                    if counter % 1 == 0:
+                    if packet.framenum % 100 == 0:
                         print("Computed frame rate: %.2f Hz" % (100. / (time() - t_i)))
                         t_i = time()
                 else:
                     packet.framenum, packet.packetnum, packet.data = unpack_data(rdata, self.bit_depth)
-                    print("framenum, packetnum, shape:", packet.framenum, packet.packetnum, packet.data.shape)
+                    #if packet.packetnum == 1:
+                        #print("framenum, packetnum, shape:", packet.framenum, packet.packetnum, packet.data.shape)
                     
                     #if nbytes == -1:
                     #    continue
@@ -239,8 +250,8 @@ class ModuleReceiver(DataFlowNode):
                     if pointerh.contents.framenum == 0:
                         header.framenum = packet.framenum
                         pointerh[0] = header
-                        print("setup first header")
-                        print("TESTS", packet.framenum, pointerh.contents.framenum)
+                        #print("setup first header")
+                        #print("TESTS", packet.framenum, pointerh.contents.framenum)
 
                     #line = np.frombuffer(packet.data, np.uint16)[:1024]
                     line = packet.data  # np.frombuffer(packet.data, np.uint16)

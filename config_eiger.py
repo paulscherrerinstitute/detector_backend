@@ -25,7 +25,7 @@ rank = mpi_rank
 size = mpi_size - 2
 
 RECEIVER_RANKS = [0, 1, 2, 3]
-SENDERS_RANKS = [4, ]
+SENDERS_RANKS = []
 
 print(rank, size)
 #supported_mpi_sizes = [3, ]
@@ -38,15 +38,23 @@ c.BulletinBoardClient.postfix = str(rank)
 c.DataFlow.log_level = 'INFO'
 
 c.ModuleReceiver.geometry = (1, 1)  # number of modules, x and y 
-c.ModuleReceiver.bit_depth = 32
-c.ZMQSender.bit_depth = 32
+c.ModuleReceiver.bit_depth = 16
+c.ZMQSender.bit_depth = 16
 
 n_modules = c.ModuleReceiver.geometry[0] * c.ModuleReceiver.geometry[1]
 receiver_ips = 2 * ["10.0.30.200"] + 2 * ["10.0.40.200"]
 receiver_ports = [50001, 50002, 50004, 50003] #[50001 + i for i in range(4 * n_modules)]
 submodule_index = n_modules * [0, 1, 2, 3]
+
+# Ring Buffers settings
 rb_writers_id = range(len(RECEIVER_RANKS))
-rb_followers_id = SENDERS_RANKS
+#rb_followers_id = SENDERS_RANKS
+rb_followers_id = []
+rb_fdir = "/dev/shm/eiger/"
+rb_head_file = rb_fdir + "rb_header.dat"
+rb_imghead_file = rb_fdir + "rb_image_header.dat"
+rb_imgdata_file = rb_fdir + "rb_image_data.dat"
+
 c.ModuleReceiver.create_and_delete_ringbuffer_header = False
 
 if rank in RECEIVER_RANKS:
@@ -62,6 +70,9 @@ if rank in RECEIVER_RANKS:
     c.ModuleReceiver.submodule_index = submodule_index[rank]
     c.ModuleReceiver.rb_id = rb_writers_id[rank]
     c.ModuleReceiver.rb_followers = rb_followers_id
+    c.ModuleReceiver.rb_head_file = rb_head_file
+    c.ModuleReceiver.rb_imghead_file = rb_imghead_file
+    c.ModuleReceiver.rb_imgdata_file = rb_imgdata_file    
 
 elif rank in SENDERS_RANKS:
     c.DataFlow.nodelist = [
@@ -69,8 +80,12 @@ elif rank in SENDERS_RANKS:
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
     c.ZMQSender.uri = "tcp://10.0.30.200:9999"
+    c.ZMQSender.socket_type = "PUB"
     c.ZMQSender.rb_id = rank
     c.ZMQSender.ModuleReceiver.rb_followers = rb_writers_id
+    c.ZMQSender.rb_head_file = rb_head_file
+    c.ZMQSender.rb_imghead_file = rb_imghead_file
+    c.ZMQSender.rb_imgdata_file = rb_imgdata_file    
 
     
 

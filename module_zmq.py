@@ -1,6 +1,6 @@
 from __future__ import print_function, division, unicode_literals
 from dafl.application import XblLoggingConfigurable
-from dafl.traits import Int, Unicode, Float, List, Bool
+from dafl.traits import Int, Unicode, Float, List, Bool, Unicode
 from dafl.dataflow import DataFlowNode, DataFlow
 from dafl.application import XblBaseApplication
 import matplotlib.pyplot as plt
@@ -24,9 +24,9 @@ HEADER_ARRAY = ctypes.c_char * 6
 
 CACHE_LINE_SIZE = 64
 
-RB_HEAD_FILE = "rb_header.dat"
-RB_IMGHEAD_FILE = "rb_image_header.dat"
-RB_IMGDATA_FILE = "rb_image_data.dat"
+#RB_HEAD_FILE = "rb_header.dat"
+#RB_IMGHEAD_FILE = "rb_image_header.dat"
+#RB_IMGDATA_FILE = "rb_image_data.dat"
 
 MODULE_SIZE = (512, 512)
 
@@ -59,12 +59,16 @@ class ZMQSender(DataFlowNode):
 
     #filename = Unicode(u'data.txt', config=True, reconfig=True, help='output filename with optional path')
     uri = Unicode('tcp://192.168.10.1:9999', config=True, reconfig=True, help="URI which binds for ZMQ")
-    socket_type = Unicode('PUSH', config=True, reconfig=True, help="ZMQ socket type")
+    socket_type = Unicode('PUB', config=True, reconfig=True, help="ZMQ socket type")
     send_rate = Float(1, config=True, reconfig=True, help="Frame fraction to be sent")
 
     rb_id = Int(0, config=True, reconfig=True, help="")
     rb_followers = List([1, ], config=True, reconfig=True, help="")
     bit_depth = Int(32, config=True, reconfig=True, help="")
+
+    rb_head_file = Unicode('', config=True, reconfig=True, help="")
+    rb_imghead_file = Unicode('', config=True, reconfig=True, help="")
+    rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
 
     def __init__(self, **kwargs):
         super(ZMQSender, self).__init__(**kwargs)
@@ -72,10 +76,10 @@ class ZMQSender(DataFlowNode):
         self.worker_communicator = app.worker_communicator
         self.worker_communicator.barrier()
         
-        self.rb_header_id = rb.open_header_file(RB_HEAD_FILE)
+        self.rb_header_id = rb.open_header_file(self.rb_head_file)
         self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
-        self.rb_hbuffer_id = rb.attach_buffer_to_header(RB_IMGHEAD_FILE, self.rb_header_id, 0)
-        self.rb_dbuffer_id = rb.attach_buffer_to_header(RB_IMGDATA_FILE, self.rb_header_id, 0)
+        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
+        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
         print(rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64))
 
         print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * 512 * 512))
@@ -101,11 +105,11 @@ class ZMQSender(DataFlowNode):
         while True:
             self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
             if self.rb_current_slot == -1:
-                sleep(0.1)
+                sleep(0.001)
                 continue
-            print("self.rb_current_slot", self.rb_current_slot)
+            print("READER: self.rb_current_slot", self.rb_current_slot)
             pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
-            print("pointerh.contents.framenum", pointerh.contents.framenum)
+            print("READER: pointerh.contents.framenum", pointerh.contents.framenum)
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
                    
             entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
