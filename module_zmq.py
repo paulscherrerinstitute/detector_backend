@@ -24,13 +24,6 @@ HEADER_ARRAY = ctypes.c_char * 6
 
 CACHE_LINE_SIZE = 64
 
-#RB_HEAD_FILE = "rb_header.dat"
-#RB_IMGHEAD_FILE = "rb_image_header.dat"
-#RB_IMGDATA_FILE = "rb_image_data.dat"
-
-MODULE_SIZE = (512, 512)
-
-
 class HEADER(ctypes.Structure):
     _fields_ = [
         ("emptyheader", HEADER_ARRAY),
@@ -61,6 +54,7 @@ class ZMQSender(DataFlowNode):
     uri = Unicode('tcp://192.168.10.1:9999', config=True, reconfig=True, help="URI which binds for ZMQ")
     socket_type = Unicode('PUB', config=True, reconfig=True, help="ZMQ socket type")
     send_rate = Float(1, config=True, reconfig=True, help="Frame fraction to be sent")
+    module_size = List((512, 1024), config=True, reconfig=True)
 
     rb_id = Int(0, config=True, reconfig=True, help="")
     rb_followers = List([1, ], config=True, reconfig=True, help="")
@@ -93,35 +87,25 @@ class ZMQSender(DataFlowNode):
 
         print("READER:",)
         
-    def send(self, data):
-        #send_array(self.skt, data[1], copy=False, track=True, frame=data[0])
-        #print("0MQ data:", data)
-        #self.pass_on(1)
-        #self.log.debug("send() got %s" % (data))
-        #print(self.ip)
-        #self.pass_on(data)
-        #return(1)
-    
+    def send(self, data):    
         while True:
-            self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
-            if self.rb_current_slot == -1:
-                sleep(0.001)
-                continue
-            print("READER: self.rb_current_slot", self.rb_current_slot)
-            pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
-            print("READER: pointerh.contents.framenum", pointerh.contents.framenum)
-            pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-                   
-            entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
-            data = np.ctypeslib.as_array(pointer, (entry_size_in_bytes / (self.bit_depth / 8), ), )
-            send_array(self.skt, data.reshape(MODULE_SIZE[0], -1), frame=pointerh.contents.framenum)
-            if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
-                print("CANNOT COMMIT SLOT")
-            
+            try:
+                self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
+                if self.rb_current_slot == -1:
+                    continue
+                self.log.debug("READER: self.rb_current_slot", self.rb_current_slot)
+                pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
+                pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
+
+                entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
+                data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
+                send_array(self.skt, data.reshape(module_size), frame=pointerh.contents.framenum)
+                if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
+                    print("CANNOT COMMIT SLOT")
+            except KeyboardInterrupt:
+                break
+     
         self.pass_on(1)
-        #self.log.debug("send() got %s" % (data))
-        #print(self.ip)
-        #self.pass_on(data)
         return(1)
     
     def reset(self):

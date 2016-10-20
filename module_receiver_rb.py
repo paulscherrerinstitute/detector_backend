@@ -27,8 +27,6 @@ RB_HEAD_FILE = "rb_header.dat"
 RB_IMGHEAD_FILE = "rb_image_header.dat"
 RB_IMGDATA_FILE = "rb_image_data.dat"
 
-MODULE_SIZE = (512, 512)
-
 
 class PACKET_STRUCT(ctypes.Structure):
     _pack_ = 2
@@ -80,7 +78,44 @@ def unpack_data(x, bit_depth=16):
     x1, x2, x3 = struct.unpack('<HIH', x[-8:])
     return x1 | (x2 << 16), x3, data
 
-    
+
+def select_quadrant2(MODULE_SIZE, quadrant_index):
+    #MODULE_SIZE = np.array(MODULE_SIZE)[::-1]
+    if quadrant_index == 0 or quadrant_index == 1:
+        if quadrant_index == 0:
+            idx_s = [i for i in range(int(MODULE_SIZE[0] / 2 ))]
+        else:
+            idx_s = [int(i + MODULE_SIZE[1] / 2) for i in range(int(MODULE_SIZE[0] / 2))]
+        idx = idx_s
+        for x in range(int(MODULE_SIZE[0] / 2 - 1)):
+            idx = idx + [i + (x + 1) * MODULE_SIZE[1] for i in idx_s]
+    elif quadrant_index == 2 or quadrant_index == 3:
+        if quadrant_index == 2:
+            idx_s = [int(i + MODULE_SIZE[1]*MODULE_SIZE[0]/2)  for i in range(int(MODULE_SIZE[0] / 2))]
+        else:
+            idx_s = [int(i +  MODULE_SIZE[1] / 2  + MODULE_SIZE[1]*MODULE_SIZE[0]/2)  for i in range(int(MODULE_SIZE[0] / 2))]         
+        idx = idx_s
+        for x in range(int(MODULE_SIZE[1] / 2 - 1)):
+            idx = idx + [i + (x + 1) * MODULE_SIZE[1] for i in idx_s]
+    return np.array(idx)
+
+
+def select_quadrant(total_size, quadrant_index):
+    #MODULE_SIZE = np.array(MODULE_SIZE)[::-1]
+    idx_s = [i for i in range(int(total_size[1] / 2 ))]
+    idx = idx_s
+    for x in range(int(total_size[0] / 2 - 1)):  
+        idx = idx + [i + (x + 1) * total_size[1] for i in idx_s]
+    if quadrant_index == 1:
+        idx = [x + total_size[0] for x in idx]
+    elif quadrant_index == 2:
+        idx = [x + (total_size[0] * total_size[1] / 2) for x in idx]
+    elif quadrant_index == 3:
+        idx = [x + total_size[0] + (total_size[0] * total_size[1] / 2) for x in idx]
+        
+    return np.array(idx, dtype=int)
+
+
 class ModuleReceiver(DataFlowNode):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -90,9 +125,11 @@ class ModuleReceiver(DataFlowNode):
     #filename = Unicode(u'data.txt', config=True, reconfig=True, help='output filename with optional path')
     ip = Unicode('192.168.10.10', config=True, reconfig=True, help="Ip to listen to for UDP packets")
     port = Int(9000, config=True, reconfig=True, help="Port to listen to for UDP packets")
+    module_size = List((512, 1024), config=True, reconfig=True)
     submodule_index = Int(0, config=True, reconfig=True, help="Index within the module, with NW=0 and SE=3")
     bit_depth = Int(32, config=True, reconfig=True, help="")
     n_frames = Int(-1, config=True, reconfig=True, help="Frames to receive")
+    
     rb_id = Int(0, config=True, reconfig=True, help="")
     rb_followers = List([1, ], config=True, reconfig=True, help="")
     create_and_delete_ringbuffer_header = Bool(False, config=True, reconfig=True, help="Index within the module, with NW=0 and SE=3")
@@ -116,50 +153,42 @@ class ModuleReceiver(DataFlowNode):
         else:
             self.log.debug("wait for ringbuffer header files to become available")
             self.worker_communicator.barrier()
-            for f in files:   
+            for f in files:
                 if not os.path.exists(f) :
                     raise RuntimeError("file %s not available " % (f,))
     
     def __init__(self, **kwargs):
         super(ModuleReceiver, self).__init__(**kwargs)
-        #self.rb_head_file = RB_HEAD_FILE
-        #self.rb_imghead_file = RB_IMGHEAD_FILE
-        #self.rb_imgdata_file = RB_IMGDATA_FILE
 
-
+        # for setting up barriers
         app = XblBaseApplication.instance()
         self.worker_communicator = app.worker_communicator
-
         self._prepare_ringbuffer_header_files()
 
         self.sock = socket.socket(socket.AF_INET, # Internet
                              socket.SOCK_DGRAM) # UDP
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2000 * 1024 * 1024)
         self.sock.bind((self.ip, self.port))
-        # ringbuffer FIXME
-        rb.set_buffer_slot_dtype(dtype=ctypes.c_uint16)
-        #if self.rb_id == 0:
-        #    _ = rb.create_header_file(RB_HEAD_FILE)
+
+        # setting the correct data pointer type
+        rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__('c_uint' + str(self.bit_depth)))
+
         self.rb_header_id = rb.open_header_file(self.rb_head_file)
-        #print(rb.print_header(self.rb_header_id))
         self.rb_writer_id = rb.create_writer(self.rb_header_id, self.rb_id, self.rb_followers)
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
 
-        #print(rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64))
-        print("Receiver ID:", self.rb_id)
+        self.log.debug("Receiver ID: %d" % self.rb_id)
         #print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, 2 * 512 * 1024))
-        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * 512 * 512)
-        #self.worker_communicator.barrier()
-        #if self.create_and_delete_ringbuffer_header is True:
-        #    self.log.debug("adjust ringbuffer nslots")
-        rb.adjust_nslots(self.rb_header_id)
+        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.module_size[0] * self.module_size[1])
+        nslots = rb.adjust_nslots(self.rb_header_id)
+        self.log.debug("RB slots: %d" % nslots)
         self.rb_current_slot = -1
 
-        self.new_frame = True
-
         self.n_elements_line = int(8 * 4096 / self.bit_depth)
-        self.n_packets_frame = 2 * int(MODULE_SIZE[0] * MODULE_SIZE[1] / 4 / self.n_elements_line)
+        self.n_packets_frame = int(self.module_size[0] * self.module_size[1] / 4 / self.n_elements_line)
+        self.log.info("Elements per line: %d" % self.n_elements_line)
+        self.log.info("Packets per frame: %d" % self.n_packets_frame)
         #print(self.n_elements_line, self.n_packets_frame)
         
     def send(self, data):
@@ -170,23 +199,7 @@ class ModuleReceiver(DataFlowNode):
         framenum_last = -1
         t_i = time()
 
-        if self.submodule_index == 0 or self.submodule_index == 1:
-            if self.submodule_index == 0:
-                idx_s = [i for i in range(int(MODULE_SIZE[0] / 2 ))]
-            else:
-                idx_s = [int(i + MODULE_SIZE[1] / 2) for i in range(int(MODULE_SIZE[0] / 2))]
-            idx = idx_s
-            for x in range(int(MODULE_SIZE[1] / 2 - 1)):
-                idx = idx + [i + (x + 1) * MODULE_SIZE[1] for i in idx_s]
-        elif self.submodule_index == 2 or self.submodule_index == 3:
-            if self.submodule_index == 2:
-                idx_s = [int(i + MODULE_SIZE[1]*MODULE_SIZE[0]/2)  for i in range(int(MODULE_SIZE[0] / 2))]
-            else:
-                idx_s = [int(i +  MODULE_SIZE[1] / 2  + MODULE_SIZE[1]*MODULE_SIZE[0]/2)  for i in range(int(MODULE_SIZE[0] / 2))]         
-            idx = idx_s
-            for x in range(int(MODULE_SIZE[1] / 2 - 1)):
-                idx = idx + [i + (x + 1) * MODULE_SIZE[1] for i in idx_s]
-        idx = np.array(idx)
+        idx = select_quadrant(self.module_size, self.submodule_index)
         print(idx.shape)
         print(idx)
         if self.rb_current_slot == -1:
@@ -210,18 +223,22 @@ class ModuleReceiver(DataFlowNode):
                         continue
                     #print("TESTL", packet.framenum, pointerh.contents.framenum)
                     if self.mpi_rank == 0:
-                        print("Total recv for frame", packet.framenum, ": ", total_packets)
-                    #if total_packets != 64 or packet.packetnum != 63:
-                    #    print("[WARNING] missing packets for frame %d (got %d)" % (packet.framenum, total_packets))
+                        self.log.debug("Total recv for frame %d: %d" % (packet.framenum, total_packets))
+                    if total_packets != self.n_packets_frame:
+                        self.log.warn("missing packets for frame %d (got %d)" % (packet.framenum, total_packets))
                         
                         
                     framenum_last = packet.framenum
-                    total_packets = 1
+                    total_packets = 0
                     
                     if not rb.commit_slot(self.rb_writer_id, self.rb_current_slot):
                         print("CANNOT COMMIT SLOT")
                     self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
-                    #print("WRITER: self.rb_current_slot", self.rb_current_slot)
+                    self.log.debug("WRITER: self.rb_current_slot %d" % self.rb_current_slot)
+                    if self.rb_current_slot == -1:
+                        while self.rb_current_slot == -1:
+                            self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
+
                     pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
                     header.framenum = packet.framenum
                     # see https://docs.python.org/3/library/ctypes.html#ctypes-pointers
@@ -235,11 +252,8 @@ class ModuleReceiver(DataFlowNode):
                         t_i = time()
                 else:
                     packet.framenum, packet.packetnum, packet.data = unpack_data(rdata, self.bit_depth)
-                    #if packet.packetnum == 1:
-                        #print("framenum, packetnum, shape:", packet.framenum, packet.packetnum, packet.data.shape)
-                    
-                    #if nbytes == -1:
-                    #    continue
+                    self.log.debug("Frame, packet, size, sender: %d %d %d %s" % (packet.framenum, packet.packetnum, len(packet.data), sender))
+
                     if framenum_last == -1:
                         framenum_last = packet.framenum
 
@@ -250,16 +264,12 @@ class ModuleReceiver(DataFlowNode):
                     if pointerh.contents.framenum == 0:
                         header.framenum = packet.framenum
                         pointerh[0] = header
-                        #print("setup first header")
-                        #print("TESTS", packet.framenum, pointerh.contents.framenum)
 
                     #line = np.frombuffer(packet.data, np.uint16)[:1024]
                     line = packet.data  # np.frombuffer(packet.data, np.uint16)
-                                       
                     pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-                   
                     entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
-                    data = np.ctypeslib.as_array(pointer, (entry_size_in_bytes / (self.bit_depth / 8), ), )
+                    data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
                     
                     # dependng on submodule index, lines are sent in different order
                     if self.submodule_index % 2 == 0:
@@ -267,11 +277,8 @@ class ModuleReceiver(DataFlowNode):
                     else:
                         idxn = idx.reshape(self.n_packets_frame, -1)[self.n_packets_frame - packet.packetnum].ravel()
                    
-                    #if self.submodule_index == 2:
-                        #line = 42939842400 * np.ones(line.shape)
+                    self.log.debug("data.shape, idxn.shape, max_index, line.shape: %s %s %d %s" % (data.shape, idxn.shape, idxn.max(), line.shape))
                     np.put(data, idxn, line)
-                    #for ii, ix in enumerate(idxn):
-                    #    data[ix] = line[ii]
                     
             except KeyboardInterrupt:
                 break

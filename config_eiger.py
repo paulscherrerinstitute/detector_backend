@@ -25,7 +25,7 @@ rank = mpi_rank
 size = mpi_size - 2
 
 RECEIVER_RANKS = [0, 1, 2, 3]
-SENDERS_RANKS = []
+SENDERS_RANKS = [4, ]
 
 print(rank, size)
 #supported_mpi_sizes = [3, ]
@@ -48,8 +48,8 @@ submodule_index = n_modules * [0, 1, 2, 3]
 
 # Ring Buffers settings
 rb_writers_id = range(len(RECEIVER_RANKS))
-#rb_followers_id = SENDERS_RANKS
-rb_followers_id = []
+rb_followers_id = SENDERS_RANKS
+#rb_followers_id = []
 rb_fdir = "/dev/shm/eiger/"
 rb_head_file = rb_fdir + "rb_header.dat"
 rb_imghead_file = rb_fdir + "rb_image_header.dat"
@@ -85,7 +85,7 @@ elif rank in SENDERS_RANKS:
     c.ZMQSender.ModuleReceiver.rb_followers = rb_writers_id
     c.ZMQSender.rb_head_file = rb_head_file
     c.ZMQSender.rb_imghead_file = rb_imghead_file
-    c.ZMQSender.rb_imgdata_file = rb_imgdata_file    
+    c.ZMQSender.rb_imgdata_file = rb_imgdata_file
 
     
 
@@ -100,18 +100,18 @@ info  = dict(level='INFO')
 undef = dict(level=0)
 
 log_config = dict( loggers =
-                    {
-                     'RestGWApplication' :           undef,
-                     'RPCDataflowApplication' :      undef,
-                     #'RPCBulletinBoardApplication' : info,
-                     #'MPIReceivingConnection' :      debug,
-                     #'MPISendingConnection' :        debug,
-                     #'MPIRPCConnection' :            debug,
-                     'DataFlow' :                    undef,
-                     #'NumberGenerator':              debug,
-                     'NumberWriter':                 undef,
-                    }
-                 )
+                   {
+                       'RestGWApplication' :           undef,
+                       'RPCDataflowApplication' :      undef,
+                       #'RPCBulletinBoardApplication' : info,
+                       #'MPIReceivingConnection' :      debug,
+                       #'MPISendingConnection' :        debug,
+                       #'MPIRPCConnection' :            debug,
+                       'DataFlow' :                    undef,
+                       'ZMQSender':                    info,
+                       'ModuleReceiver':                 info,
+                   }
+)
 
 #c.XblBaseApplication.log_level = logging.DEBUG
 c.XblBaseApplication.log_config = log_config
