@@ -13,7 +13,7 @@ import logging
 c = get_config()  # @UndefinedVariable
 
 
-c.RestGWApplication.rest_port = 8080
+c.RestGWApplication.rest_port = 8081
 c.RestGWApplication.rest_host = u'0.0.0.0'   # pass u'0.0.0.0' to listen on all interfaces
 c.RestGWApplication.trace_rest = True
 c.RPCBulletinBoardApplication.trace_metrics = True
