@@ -36,6 +36,21 @@ def send_array(socket, A, flags=0, copy=True, track=False, frame=-1):
     return socket.send(A, flags, copy=copy, track=track)
 
 
+fmt = "IHBB1024IQ"
+
+def read_frame():
+    fh = f.read(48)
+    for i, data in enumerate(iter(lambda: f.read(4112), '')):
+        print(i)
+        print(unpack48(data[-8:]))
+        if i == 63:
+            break
+    #f.close()
+
+def unpack48(x):
+    x1, x2, x3 = struct.unpack('<HIH', x)
+    return x1 | (x2 << 16), x3
+
 
 class PACKET_STRUCT(ctypes.Structure):
     _pack_ = 2
@@ -52,6 +67,11 @@ get_message = _mod.get_message
 get_message.argtypes = (ctypes.c_int, ctypes.POINTER(PACKET_STRUCT))
 get_message.restype = ctypes.c_int
 
+
+class UdpPacket(object):
+    framenum = -1
+    packetnum = -1
+    data = None
 
 class ModuleReceiver(DataFlowNode):
 
@@ -96,9 +116,15 @@ class ModuleReceiver(DataFlowNode):
             try:
                 if self.n_frames > 0  and counter > self.n_frames:
                     break
-                
+
+                packet = UdpPacket()
                 # call the C code to get the frames
-                nbytes = get_message(self.sock.fileno(), ctypes.byref(packet))
+                #nbytes = get_message(self.sock.fileno(), ctypes.byref(packet))
+                data, sender = self.sock.recvfrom(2000 * 1024 * 1024)
+                data_size = len(data)
+                print(data_size)
+                if data_size == 48:
+                    new_frame = True
                 
                 if nbytes == -1:
                     continue
@@ -108,9 +134,9 @@ class ModuleReceiver(DataFlowNode):
                 total_packets += 1
 
                 # reconstruct and ship the image
-                if packet.framenum != framenum_last:
+                if new_frame:
                     total_packets -= 1
-                    if total_packets != 128 or packet.packetnum != 127:
+                    if total_packets != 64 or packet.packetnum != 63:
                         #print(packet.framenum, packet.packetnum)
                         print("[WARNING] missing packets for frame %d (got %d)" % (packet.framenum, total_packets))
                         #error_counter += 1
@@ -121,7 +147,7 @@ class ModuleReceiver(DataFlowNode):
                         self.pass_on([packet.framenum, image])
                         #send_array(writer_socket, image, copy=False, track=True, frame=packet.framenum)
                         framenum_last = packet.framenum
-                        image = np.zeros((512, 1024), dtype=np.uint16)
+                        image = np.zeros((512, 512), dtype=np.uint16)
                         total_packets = 1
                         counter += 1
                         if counter % 100 == 0:
