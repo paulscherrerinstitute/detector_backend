@@ -11,7 +11,7 @@
 #include <inttypes.h>
 
 
-#define BUFFER_LENGTH    8214
+#define BUFFER_LENGTH    4096
 
 //Jungfrau
 //Memory packing (see: https://msdn.microsoft.com/en-us/library/2e70t5y1.aspx)
@@ -28,15 +28,12 @@ typedef struct _jungfraujtb_packet{
 //Jungfrau
 #pragma pack(push)
 #pragma pack(2)
-
 typedef struct _jungfrau_packet{
   char emptyheader[6];
   uint32_t reserved;
   char packetnum2;
   char framenum2[3];
   uint64_t bunchid;
-  /* uint64_t framenum;   //  modified dec 15 */
-  /* uint64_t packetnum;     */
   uint16_t data[BUFFER_LENGTH];
   uint16_t framenum;
   uint8_t packetnum;
@@ -81,7 +78,7 @@ int get_message_jtb(int sd, jungfraujtb_packet * packet){
 
 //simple routine to get data from UDP socket
 int get_message(int sd, jungfrau_packet * packet){
-        ssize_t nbytes = recv(sd, packet, sizeof(*packet) - 16 - 8, MSG_DONTWAIT);
+        ssize_t nbytes = recv(sd, packet, sizeof(*packet) - 2 - 1, MSG_DONTWAIT);
         packet->framenum = (((int)(packet->framenum2[2])&0xff)<<16) + (((int)(packet->framenum2[1])&0xff)<<8) +((int)(packet->framenum2[0])&0xff);
 
         // does not work

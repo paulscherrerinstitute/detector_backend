@@ -1,10 +1,11 @@
 """
-mpirun -n 4 mpi-dafld --config-file config_mpi.py
+mpirun -n 4 mpi-dafld --config-file config_jf_rb.py
 """
 
 
 import sys
-new_path = '/home/l_det/code/dafl.jungfrau'
+#new_path = '/home/l_det/code/dafl.jungfrau'
+new_path = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau"
 if new_path not in sys.path:
     sys.path.append(new_path)
 
@@ -12,6 +13,11 @@ if new_path not in sys.path:
 import logging
 c = get_config()  # @UndefinedVariable
 
+
+rb_fdir = "/dev/shm/eiger/"
+rb_head_file = rb_fdir + "rb_header.dat"
+rb_imghead_file = rb_fdir + "rb_image_header.dat"
+rb_imgdata_file = rb_fdir + "rb_image_data.dat"
 
 c.RestGWApplication.rest_port = 8081
 c.RestGWApplication.rest_host = u'0.0.0.0'   # pass u'0.0.0.0' to listen on all interfaces
@@ -27,14 +33,9 @@ log_config = dict( loggers =
                     {
                      'RestGWApplication' :           undef,
                      'RPCDataflowApplication' :      undef,
-                     #'RPCBulletinBoardApplication' : info,
-                     #'MPIReceivingConnection' :      debug,
-                     #'MPISendingConnection' :        debug,
-                     #'MPIRPCConnection' :            debug,
-                     'DataFlow' :                    undef,
-                     #'NumberGenerator':              debug,
-                     'NumberWriter':                 undef,
-                    }
+                     #'ModuleReceiver': debug
+                    'ZMQSender': debug
+                     }
                  )
 
 #c.XblBaseApplication.log_level = logging.DEBUG
@@ -66,20 +67,37 @@ c.BulletinBoardClient.postfix = str(rank)
 c.DataFlow.log_level = 'INFO'
 
 if rank in RECEIVER_RANKS:
+    if rank == 0:
+        c.ModuleReceiver.create_and_delete_ringbuffer_header = True
+
     c.DataFlow.nodelist = [
         ('RECV', 'module_receiver_rb.ModuleReceiver'),
     ]
     c.DataFlow.targets_per_node = { 'RECV' : []}
 
-    c.ModuleReceiver.ip = "192.168.10.10"
+    #c.ModuleReceiver.ip = "192.168.10.10"
+    c.ModuleReceiver.ip = "127.0.0.1"
+
+    c.ModuleReceiver.rb_id = rank
+    c.ModuleReceiver.rb_followers = SENDERS_RANKS
+    c.ModuleReceiver.rb_head_file = rb_head_file
+    c.ModuleReceiver.rb_imghead_file = rb_imghead_file
+    c.ModuleReceiver.rb_imgdata_file = rb_imgdata_file
 
 elif rank in SENDERS_RANKS:
     c.DataFlow.nodelist = [
-        ('ZMQ', 'module_receiver_rb.ZMQSender'),
+        ('ZMQ', 'module_zmq.ZMQSender'),
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
-    c.ZMQSender.uri = "tcp://192.168.10.10:9999"
+    #c.ZMQSender.uri = "tcp://192.168.10.10:9999"
+    c.ZMQSender.uri = "tcp://127.0.0.1:9999"
+    c.ZMQSender.socket_type = "PUSH"
 
+    c.ZMQSender.rb_id = rank
+    c.ZMQSender.rb_followers = [0, ]
+    c.ZMQSender.rb_head_file = rb_head_file
+    c.ZMQSender.rb_imghead_file = rb_imghead_file
+    c.ZMQSender.rb_imgdata_file = rb_imgdata_file
 #c.DataFlow.maxitterations = 20
 
 #c.aliases = dict(maxitterations='DataFlow.maxitterations',

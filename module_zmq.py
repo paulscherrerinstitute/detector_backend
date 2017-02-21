@@ -18,8 +18,8 @@ import zmq
 
 from time import time, sleep
 
-BUFFER_LENGTH = 1024
-DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint32))  # ctypes.c_uint16 * BUFFER_LENGTH
+BUFFER_LENGTH = 4096
+DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
 HEADER_ARRAY = ctypes.c_char * 6
 
 CACHE_LINE_SIZE = 64
@@ -27,12 +27,12 @@ CACHE_LINE_SIZE = 64
 class HEADER(ctypes.Structure):
     _fields_ = [
         ("emptyheader", HEADER_ARRAY),
-        ("framenum", ctypes.c_uint64),
-        ("packetnum", ctypes.c_uint64),
-        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 6 - 8 - 8))
+        ("framenum", ctypes.c_uint16),
+        ("packetnum", ctypes.c_uint8),
+        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 6 - 2 - 1))
         ]
 
-header = HEADER("      ".encode(), ctypes.c_uint64(), ctypes.c_uint64(),  np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 6 - 8 - 8, dtype=np.uint8)))
+header = HEADER("      ".encode(), ctypes.c_uint16(), ctypes.c_uint8(),  np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 6 - 2 - 1, dtype=np.uint8)))
 
 
 def send_array(socket, A, flags=0, copy=True, track=False, frame=-1):
@@ -58,7 +58,7 @@ class ZMQSender(DataFlowNode):
 
     rb_id = Int(0, config=True, reconfig=True, help="")
     rb_followers = List([1, ], config=True, reconfig=True, help="")
-    bit_depth = Int(32, config=True, reconfig=True, help="")
+    bit_depth = Int(16, config=True, reconfig=True, help="")
 
     rb_head_file = Unicode('', config=True, reconfig=True, help="")
     rb_imghead_file = Unicode('', config=True, reconfig=True, help="")
@@ -76,7 +76,7 @@ class ZMQSender(DataFlowNode):
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
         print(rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64))
 
-        print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * 512 * 512))
+        print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * 512 * 1024))
         rb.adjust_nslots(self.rb_header_id);
         
         self.context = zmq.Context()
@@ -91,15 +91,19 @@ class ZMQSender(DataFlowNode):
         while True:
             try:
                 self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
+
                 if self.rb_current_slot == -1:
                     continue
-                self.log.debug("READER: self.rb_current_slot", self.rb_current_slot)
+                self.log.debug("READER: self.rb_current_slot" + str(self.rb_current_slot))
+
                 pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
+                print("WRITER" +  str(pointerh.contents.framenum))
+
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
-                send_array(self.skt, data.reshape(module_size), frame=pointerh.contents.framenum)
+                send_array(self.skt, data.reshape(self.module_size), frame=pointerh.contents.framenum)
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     print("CANNOT COMMIT SLOT")
             except KeyboardInterrupt:
