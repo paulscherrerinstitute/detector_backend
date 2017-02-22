@@ -10,10 +10,23 @@
 // for uint64 printing
 #include <inttypes.h>
 
+#include <ring_buffer.h>
+// for serveraddr
+#include <arpa/inet.h>
 
 #define BUFFER_LENGTH    4096
-
+#define YSIZE 1024
+#define XSIZE 512
 //Jungfrau
+
+// header struct for RB
+typedef struct _jungfrau_header{
+  uint16_t framenum;
+  uint8_t packetnum;
+  int8_t padding[64 - 2 - 1];
+} jungfrau_header;
+
+
 //Memory packing (see: https://msdn.microsoft.com/en-us/library/2e70t5y1.aspx)
 #pragma pack(push)
 #pragma pack(2)
@@ -85,10 +98,6 @@ int get_message(int sd, jungfrau_packet * packet){
         //packet->framenum =  (uint16_t)(packet->framenum2)&0x00ffffff;
         packet->packetnum =  (uint8_t)((packet->packetnum2));
 
-        //if(nbytes >= 0)
-        //  printf("%c %d %d\n", packet->packetnum2, packet->packetnum, packet->framenum);
-
-
 #ifdef DEBUG
         if(nbytes >= 0){
            printf("+ C ");
@@ -132,6 +141,106 @@ int get_message_gotthard(int sd, gotthard_packet * packet){
 	return nbytes1 + nbytes2;
 }
 
+
+int put_data_in_memory(int sd, jungfrau_packet * packet, int n_entries, uint16_t * p1, jungfrau_header * ph, int32_t * idx){
+  int i, data_len;
+  jungfrau_header header;
+  int packets_frame;
+
+  data_len = get_message(sd, packet);
+  //return data_len;
+  packets_frame = 127;
+
+  if(data_len > 0){
+    for(i=0; i < (sizeof(packet->data) / sizeof(uint16_t)); i++){
+      	p1[idx[i + n_entries * (packets_frame - packet->packetnum)]] = packet->data[i];
+    }
+
+    if(packet->packetnum == 127){
+      header.framenum = packet->framenum;
+      //if(ph->framenum != packet->framenum){
+      	memcpy(ph, &header, sizeof(header));
+      printf("DONE\n");
+      //}
+    }
+  }
+  else{
+  packet->framenum = 65535;
+  }
+
+  return data_len;
+}
+
+
+// generic routine to save data from UDP socket in Ringbuffer
+int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int32_t * idx){
+
+  int data_len;
+  int i, j;
+  jungfrau_header * ph;
+  int n_entries;
+  //int rb_current_slot;
+  jungfrau_packet packet;
+  uint16_t * p1;
+  jungfrau_header header;
+  int packets_frame;
+  int *ret;
+
+  //ret = malloc(sizeof(int) * 2);
+  //rb_current_slot = -1;
+
+  n_entries = BUFFER_LENGTH; // / (bit_depth / 8);
+  //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
+
+  data_len = get_message(sock, &packet);
+  //return data_len;
+  packets_frame = 127;
+
+  if(data_len > 0){
+    if(packet.packetnum == 127){
+      //printf("pn %d\n", packet.packetnum);
+      //printf("cs %d\n", rb_current_slot);
+      //this means a new frame
+      if(rb_current_slot != -1)
+	rb_commit_slot(rb_writer_id, rb_current_slot);
+      rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      //printf("cs %d\n", rb_current_slot);
+
+    }
+
+    rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
+    rb_adjust_nslots(rb_header_id);
+
+    ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
+    //printf("cs %d\n", rb_current_slot);
+    p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+    //printf(p1);
+    //printf("\n");
+    //printf("a\n");
+    for(i=0; i < (sizeof(packet.data) / sizeof(uint16_t)); i++){
+      //printf("%d\n", i);
+      //printf("%d\n", idx[i + n_entries * (packets_frame - packet.packetnum)]);
+      //printf("A %d\n", i + n_entries * (packets_frame - packet.packetnum));
+      //p1[0] = packet.data[i];
+      p1[idx[i + n_entries * (packets_frame - packet.packetnum)]] = packet.data[i];
+    }
+    header.framenum = packet.framenum;
+    //printf("cs %d\n", rb_current_slot);
+
+    if(ph->framenum != packet.framenum){
+      memcpy(ph, &header, sizeof(header));
+    }
+
+    //printf("b\n");
+
+    return rb_current_slot;
+  }
+  else
+    return -1;
+  //ret[0] = rb_current_slot;
+  //ret[1] = packet.framenum;
+  
+}
 /*
 int main(){
 	int ret;

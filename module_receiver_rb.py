@@ -15,11 +15,12 @@ import numpy as np
 import os
 import zmq
 
-from time import time
+from time import time, sleep
 
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
 HEADER_ARRAY = ctypes.c_char * 6
+INDEX_ARRAY = np.ctypeslib.as_ctypes(np.zeros(1024 * 512, dtype=np.int32))
 
 CACHE_LINE_SIZE = 64
 
@@ -51,18 +52,54 @@ _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 get_message = _mod.get_message
 get_message.argtypes = (ctypes.c_int, ctypes.POINTER(PACKET_STRUCT))
 get_message.restype = ctypes.c_int
+put_udp_in_rb = _mod.put_udp_in_rb
+put_udp_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32))
+put_udp_in_rb.restype = ctypes.c_int
 
 
 class HEADER(ctypes.Structure):
     _fields_ = [
-        ("emptyheader", HEADER_ARRAY),
         ("framenum", ctypes.c_uint16),
         ("packetnum", ctypes.c_uint8),
-        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 6 - 2 - 1))
+        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 2 - 1))
         ]
 
-header = HEADER("      ", ctypes.c_uint16(), ctypes.c_uint8(),
-                np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 6 - 2 - 1, dtype=np.uint8)))
+header = HEADER(ctypes.c_uint16(), ctypes.c_uint8(),
+                np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 2 - 1, dtype=np.uint8)))
+
+
+def define_quadrant(total_size, geometry, quadrant_index, index_axis=0):
+    """
+    Geometry is the module placement (e.g. 3x2)
+    """
+    L, H = total_size
+    m, n = geometry
+    if L % m != 0 or H % n != 0:
+        print("not supported")
+        return None
+    # get the base module
+    module_size = (int(L / m), int(H / n))
+    line = [x for x in range(module_size[1])]
+    # fills the base module
+    base_q = line
+    base_q = np.ndarray(module_size[0] * module_size[1], dtype=np.int64).reshape(module_size[0], module_size[1])
+    for i in range(0, module_size[0]):
+        base_q[i] = np.array(line) + i * H
+    # get the module index
+    # module index grows on the first index
+    if index_axis == 0:
+        module_indices = np.arange(m * n).reshape(np.array(geometry)[::-1]).T
+    else:
+        module_indices = np.arange(m * n).reshape(geometry)
+    module_index = np.argwhere(module_indices == quadrant_index)
+    if len(module_index) == 0:
+        print("wrong module index, can me max: ", module_indices, quadrant_index)
+        return None
+    h_i, l_i = module_index[0]
+    # do the required translations
+    base_q = [x + module_size[1] * l_i + module_size[0] * h_i * H for x in base_q.ravel()]
+    q_idx = base_q
+    return np.array(q_idx,  dtype=np.int32, order="C")
 
 
 
@@ -76,7 +113,9 @@ class ModuleReceiver(DataFlowNode):
     ip = Unicode('192.168.10.10', config=True, reconfig=True, help="Ip to listen to for UDP packets")
     port = Int(9000, config=True, reconfig=True, help="Port to listen to for UDP packets")
     module_size = List((512, 1024), config=True, reconfig=True)
-    submodule_index = Int(0, config=True, reconfig=True, help="Index within the module, with NW=0 and SE=3")
+    geometry = List((1, 1), config=True, reconfig=True)
+    module_index = Int(0, config=True, reconfig=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
+
     bit_depth = Int(16, config=True, reconfig=True, help="")
     n_frames = Int(-1, config=True, reconfig=True, help="Frames to receive")
     
@@ -108,6 +147,7 @@ class ModuleReceiver(DataFlowNode):
     
     def __init__(self, **kwargs):
         super(ModuleReceiver, self).__init__(**kwargs)
+        self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
 
         # for setting up barriers
         app = XblBaseApplication.instance()
@@ -129,14 +169,17 @@ class ModuleReceiver(DataFlowNode):
 
         self.log.debug("Receiver ID: %d" % self.rb_id)
         #print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, 2 * 512 * 1024))
-        print(rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64))
-        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.module_size[0] * self.module_size[1])
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64)
+        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
         self.log.debug("RB slots: %d" % nslots)
         self.rb_current_slot = -1
 
         self.n_packets_frame = 128
         self.log.info("Packets per frame: %d" % self.n_packets_frame)
+        idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
+        self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
+        print(self.INDEX_ARRAY[0], idx[0])
         #print(self.n_elements_line, self.n_packets_frame)
         
     def send(self, data):
@@ -146,12 +189,10 @@ class ModuleReceiver(DataFlowNode):
         total_packets = 0
         framenum_last = -1
         t_i = time()
+        n_recv_frames = 0
 
-        #idx = select_quadrant(self.module_size, self.submodule_index)
-        #print(idx.shape)
-        #print(idx)
-        if self.rb_current_slot == -1:
-            self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
+        #if self.rb_current_slot == -1:
+        #    self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
         
         while True:
             try:
@@ -159,87 +200,77 @@ class ModuleReceiver(DataFlowNode):
                     break
                 
                 # call the C code to get the frames
-                nbytes = get_message(self.sock.fileno(), ctypes.byref(packet))
-                #packet = UdpPacket()
-                #rdata, sender = self.sock.recvfrom(2000 * 1024 * 1024)
-                #data_size = len(rdata)
-                #print("DATA_SIZE", data_size, counter)
-                if nbytes == -1:
+                #nbytes = get_message(self.sock.fileno(), ctypes.byref(packet))
+                ret = put_udp_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY)
+
+                if ret == -1:
                     continue
+
+                self.rb_current_slot = ret  # , framenum = np.ctypeslib.as_array(ret, (2, ), )
+                pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
+                                       type(ctypes.pointer(header)))
+                framenum = pointerh.contents.framenum
                 if framenum_last == -1:
-                    framenum_last = packet.framenum
-
-                #print("packet num, nbytes: %d %d" % (packet.framenum, nbytes))
-                #print("-" + str(packet.framenum2))
+                    framenum_last = framenum
                 total_packets += 1
-
+                
                 # reconstruct and ship the image
-                if packet.framenum != framenum_last:
+                if framenum != framenum_last or total_packets == self.n_packets_frame:
+                    self.log.debug("%d %d" % (0, framenum))
 
                     if self.mpi_rank == 0:
-                        self.log.debug("Total recv for frame %d: %d" % (packet.framenum, total_packets))
+                        self.log.debug("Total recv for frame %d: %d" % (framenum_last, total_packets))
                     if total_packets != self.n_packets_frame:
-                        self.log.warn("missing packets for frame %d (got %d)" % (packet.framenum, total_packets))
-
-                    framenum_last = packet.framenum
+                        self.log.warn("missing packets for frame %d (got %d)" % (framenum_last, total_packets))
+                    if total_packets == self.n_packets_frame:
+                        framenum_last = -1
+                    else:
+                        framenum_last = framenum
                     total_packets = 0
+                    n_recv_frames += 1
                     
-                    if not rb.commit_slot(self.rb_writer_id, self.rb_current_slot):
-                        print("CANNOT COMMIT SLOT")
-                    self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
-                    self.log.debug("WRITER: self.rb_current_slot %d" % self.rb_current_slot)
-                    if self.rb_current_slot == -1:
-                        while self.rb_current_slot == -1:
-                            self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
+                    #if not rb.commit_slot(self.rb_writer_id, self.rb_current_slot):
+                    #    self.log.error("CANNOT COMMIT SLOT")
+                    #self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
+                    #self.log.debug("WRITER: self.rb_current_slot %d" % self.rb_current_slot)
+                    #if self.rb_current_slot == -1:
+                    #    while self.rb_current_slot == -1:
+                    #        self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
 
-                    pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
-                    header.framenum = packet.framenum
+                    #pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
+                    #header.framenum = packet.framenum
                     # see https://docs.python.org/3/library/ctypes.html#ctypes-pointers
                     # this copies data 
-                    pointerh[0] = header
+                    #pointerh[0] = header
                     # this changes the pointer
                     #ph.contents = header
                     
-                    if packet.framenum % 100 == 0:
+                    if framenum % 100 == 0:
                         print("Computed frame rate: %.2f Hz" % (100. / (time() - t_i)))
                         t_i = time()
 
-                #packet.framenum, packet.packetnum, packet.data = unpack_data(rdata, self.bit_depth)
-                self.log.debug("Frame, packet, size, sender: %d %d %d" % (packet.framenum, packet.packetnum, len(packet.data)))
+                #self.log.debug("Frame, packet, size, sender: %d %d %d" % (packet.framenum, packet.packetnum, len(packet.data)))
 
-                if framenum_last == -1:
-                    framenum_last = packet.framenum
+                #if framenum_last == -1:
+                #    framenum_last = framenum
 
-                #pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
-                #= np.ctypeslib.as_array(pointer, (entry_size_in_bytes / 2,), )
+                #line = packet.data  # np.frombuffer(packet.data, np.uint16)
+                #pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
+                #entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
+                #data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
 
-                #if pointerh.contents.framenum == 0:
-                #    header.framenum = packet.framenum
-                #    pointerh[0] = header
+                #line = np.frombuffer(packet.data, np.uint16)[:4096]
+                #data.reshape([128, 4096])[127 - packet.packetnum] = line
 
-                #print(pointerh.contents.framenum)
-                #line = np.frombuffer(packet.data, np.uint16)[:1024]
-                line = packet.data  # np.frombuffer(packet.data, np.uint16)
-                pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-                entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
-                data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
-
-                # dependng on submodule index, lines are sent in different order
-                #if self.submodule_index % 2 == 0:
-                #    idxn = idx.reshape(self.n_packets_frame, -1)[packet.packetnum - 1].ravel()
-                #else:
-                #    idxn = idx.reshape(self.n_packets_frame, -1)[self.n_packets_frame - packet.packetnum].ravel()
-
-                line = np.frombuffer(packet.data, np.uint16)[:4096]
-                data.reshape([128, 4096])[127 - packet.packetnum] = line
                 #self.log.debug("data.shape, idxn.shape, max_index, line.shape: %s %s %d %s" % (data.shape, idxn.shape, idxn.max(), line.shape))
                 #np.put(data, idxn, line)
 
             except KeyboardInterrupt:
-                break
-        self.pass_on("test")
+                raise StopIteration
+        #self.log.info("done")
+        self.pass_on(n_recv_frames)
         # needed
-        return(1)
+        return(n_recv_frames)
         
     def reset(self):
         pass
