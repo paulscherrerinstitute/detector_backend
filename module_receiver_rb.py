@@ -233,8 +233,8 @@ class ModuleReceiver(DataFlowNode):
                         framenum_last = cframenum.value
                     total_packets = 0
                     n_recv_frames += 1
-                    
-                    if cframenum.value % 1000 == 0:
+                    #print("A", cframenum.value)
+                    if n_recv_frames % 1000 == 0:
                         print("Computed frame rate at frame %d: %.2f Hz Lost frames: %d (%d)" % (cframenum.value, 1000. / (time() - t_i), lost_frames, tot_lost_frames))
                         t_i = time()
                         lost_frames = 0

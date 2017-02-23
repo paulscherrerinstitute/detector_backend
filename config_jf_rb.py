@@ -36,8 +36,8 @@ log_config = dict( loggers =
                     {
                      'RestGWApplication' :           undef,
                      'RPCDataflowApplication' :      undef,
-                     'ModuleReceiver': debug,
-                    'ZMQSender': debug
+                     'ModuleReceiver': undef,
+                    'ZMQSender': undef
                      }
                  )
 

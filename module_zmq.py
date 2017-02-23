@@ -34,7 +34,7 @@ class HEADER(ctypes.Structure):
 header = HEADER(ctypes.c_uint16(), ctypes.c_uint8(),  np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 2 - 1, dtype=np.uint8)))
 
 
-def send_array(socket, A, flags=0, copy=True, track=False, frame=-1):
+def send_array(socket, A, flags=0, copy=False, track=True, frame=-1):
     """send a numpy array with metadata"""
     md = dict(
         htype=["array-1.0", ],

@@ -199,6 +199,9 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
       if(rb_current_slot != -1)
 	rb_commit_slot(rb_writer_id, rb_current_slot);
       rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      while(rb_current_slot == -1)
+	rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      //printf("%d\n", rb_current_slot);
     }
 
     rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
