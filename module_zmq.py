@@ -3,7 +3,7 @@ from dafl.application import XblLoggingConfigurable
 from dafl.traits import Int, Unicode, Float, List, Bool, Unicode
 from dafl.dataflow import DataFlowNode, DataFlow
 from dafl.application import XblBaseApplication
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 import struct
 
@@ -100,8 +100,8 @@ class ZMQSender(DataFlowNode):
 
                 pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-
-                print("WRITER" +  str(pointerh.contents.framenum))
+                
+                self.log.debug("WRITER " +  str(pointerh.contents.framenum))
 
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )

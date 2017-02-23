@@ -53,7 +53,7 @@ get_message = _mod.get_message
 get_message.argtypes = (ctypes.c_int, ctypes.POINTER(PACKET_STRUCT))
 get_message.restype = ctypes.c_int
 put_udp_in_rb = _mod.put_udp_in_rb
-put_udp_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32))
+put_udp_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_uint16))
 put_udp_in_rb.restype = ctypes.c_int
 
 
@@ -190,9 +190,10 @@ class ModuleReceiver(DataFlowNode):
         framenum_last = -1
         t_i = time()
         n_recv_frames = 0
-
-        #if self.rb_current_slot == -1:
-        #    self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
+        lost_frames = 0
+        tot_lost_frames = 0
+        
+        cframenum = ctypes.c_uint16(-1)
         
         while True:
             try:
@@ -201,73 +202,46 @@ class ModuleReceiver(DataFlowNode):
                 
                 # call the C code to get the frames
                 #nbytes = get_message(self.sock.fileno(), ctypes.byref(packet))
-                ret = put_udp_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY)
+                ret = put_udp_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, ctypes.byref(cframenum))
 
                 if ret == -1:
                     continue
 
                 self.rb_current_slot = ret  # , framenum = np.ctypeslib.as_array(ret, (2, ), )
-                pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
-                                       type(ctypes.pointer(header)))
-                framenum = pointerh.contents.framenum
+                #pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
+                #                       type(ctypes.pointer(header)))
+                
+                #framenum = pointerh.contents.framenum
+                #framenum = cframenum.value
                 if framenum_last == -1:
-                    framenum_last = framenum
+                    framenum_last = cframenum.value
                 total_packets += 1
                 
                 # reconstruct and ship the image
-                if framenum != framenum_last or total_packets == self.n_packets_frame:
-                    self.log.debug("%d %d" % (0, framenum))
+                if cframenum.value != framenum_last or total_packets == self.n_packets_frame:
+                    self.log.debug("%d %d" % (0, cframenum.value))
 
                     if self.mpi_rank == 0:
                         self.log.debug("Total recv for frame %d: %d" % (framenum_last, total_packets))
                     if total_packets != self.n_packets_frame:
-                        self.log.warn("missing packets for frame %d (got %d)" % (framenum_last, total_packets))
+                        lost_frames += 1
+                        tot_lost_frames += 1
+                        self.log.debug("missing packets for frame %d (got %d)" % (framenum_last, total_packets))
                     if total_packets == self.n_packets_frame:
                         framenum_last = -1
                     else:
-                        framenum_last = framenum
+                        framenum_last = cframenum.value
                     total_packets = 0
                     n_recv_frames += 1
                     
-                    #if not rb.commit_slot(self.rb_writer_id, self.rb_current_slot):
-                    #    self.log.error("CANNOT COMMIT SLOT")
-                    #self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
-                    #self.log.debug("WRITER: self.rb_current_slot %d" % self.rb_current_slot)
-                    #if self.rb_current_slot == -1:
-                    #    while self.rb_current_slot == -1:
-                    #        self.rb_current_slot = rb.claim_next_slot(self.rb_writer_id)
-
-                    #pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
-                    #header.framenum = packet.framenum
-                    # see https://docs.python.org/3/library/ctypes.html#ctypes-pointers
-                    # this copies data 
-                    #pointerh[0] = header
-                    # this changes the pointer
-                    #ph.contents = header
-                    
-                    if framenum % 100 == 0:
-                        print("Computed frame rate: %.2f Hz" % (100. / (time() - t_i)))
+                    if cframenum.value % 1000 == 0:
+                        print("Computed frame rate at frame %d: %.2f Hz Lost frames: %d (%d)" % (cframenum.value, 1000. / (time() - t_i), lost_frames, tot_lost_frames))
                         t_i = time()
-
-                #self.log.debug("Frame, packet, size, sender: %d %d %d" % (packet.framenum, packet.packetnum, len(packet.data)))
-
-                #if framenum_last == -1:
-                #    framenum_last = framenum
-
-                #line = packet.data  # np.frombuffer(packet.data, np.uint16)
-                #pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-                #entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
-                #data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
-
-                #line = np.frombuffer(packet.data, np.uint16)[:4096]
-                #data.reshape([128, 4096])[127 - packet.packetnum] = line
-
-                #self.log.debug("data.shape, idxn.shape, max_index, line.shape: %s %s %d %s" % (data.shape, idxn.shape, idxn.max(), line.shape))
-                #np.put(data, idxn, line)
+                        lost_frames = 0
 
             except KeyboardInterrupt:
                 raise StopIteration
-        #self.log.info("done")
+
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
