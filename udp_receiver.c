@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 // for uint64 printing
 #include <inttypes.h>
@@ -91,7 +92,7 @@ int get_message_jtb(int sd, jungfraujtb_packet * packet){
 
 //simple routine to get data from UDP socket
 int get_message(int sd, jungfrau_packet * packet){
-        ssize_t nbytes = recv(sd, packet, sizeof(*packet) - 2 - 1, MSG_DONTWAIT);
+  ssize_t nbytes = recv(sd, packet, sizeof(*packet) - 2 - 1, MSG_WAITALL); //MSG_WAITALL);//MSG_DONTWAIT);
         packet->framenum = (((int)(packet->framenum2[2])&0xff)<<16) + (((int)(packet->framenum2[1])&0xff)<<8) +((int)(packet->framenum2[0])&0xff);
 
         // does not work
@@ -166,7 +167,7 @@ int put_data_in_memory(int sd, jungfrau_packet * packet, int n_entries, uint16_t
     }
   }
   else{
-  packet->framenum = 65535;
+    packet->framenum = 65535;
   }
 
   return data_len;
@@ -187,6 +188,8 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
   int packets_frame;
   int *ret;
 
+  //printf("PID %d ID %d\n", getpid(), rb_writer_id);
+
   n_entries = BUFFER_LENGTH; // / (bit_depth / 8);
   //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
 
@@ -194,6 +197,10 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
   packets_frame = 127;
 
   if(data_len > 0){
+    printf("%d packet num %d\n", getpid(), packet.packetnum);
+    printf("PID %d ID %d\n", getpid(), rb_writer_id);
+    printf("PID %d %d %d\n", getpid(), rb_header_id, rb_hbuffer_id);
+
     if(packet.packetnum == 127 || packet.framenum != *framenum){
       //this means a new frame
       if(rb_current_slot != -1)
@@ -207,14 +214,18 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
     rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
     rb_adjust_nslots(rb_header_id);
 
+    
     ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
     p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
-
+    
     for(i=0; i < (sizeof(packet.data) / sizeof(uint16_t)); i++){
       p1[idx[i + n_entries * (packets_frame - packet.packetnum)]] = packet.data[i];
     }
+    
     header.framenum = packet.framenum;
-    *framenum = packet.framenum;
+    printf("A\n");
+    printf("%d\n", *framenum);
+    *framenum = header.framenum;
 
     if(ph->framenum != packet.framenum){
       memcpy(ph, &header, sizeof(header));
@@ -228,6 +239,135 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
   //ret[1] = packet.framenum;
   
 }
+
+
+
+int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int32_t * idx, int16_t nframes){
+
+  int n_recv_frames = 0;
+  uint16_t framenum_last = 0;
+  uint16_t framenum = 0;
+  int total_packets = 0;
+  int lost_frames = 0;
+  int tot_lost_frames = 0;
+  int lost_packets = 0;
+  int tot_lost_packets = 0;
+  time_t ti = 0;
+
+  int temp = 0;
+
+  //begin
+      int   data_len;
+    int i, j;
+    jungfrau_header * ph;
+    int n_entries;
+    //int rb_current_slot;
+    jungfrau_packet packet;
+    uint16_t * p1;
+    jungfrau_header header;
+    int packets_frame;
+    int *ret;
+    //end
+  
+  while(true){
+    //if(nframes != -1)
+    //  if(n_recv_frames >= nframes)
+    //break;
+
+    //rb_current_slot = put_udp_in_rb(sock, bit_depth, rb_current_slot, rb_header_id, rb_hbuffer_id, rb_dbuffer_id, rb_writer_id, idx, &framenum);
+
+
+    //begin
+
+    //printf("PID %d ID %d\n", getpid(), rb_writer_id);
+    
+    n_entries = BUFFER_LENGTH; // / (bit_depth / 8);
+    //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
+
+    data_len = get_message(sock, &packet);
+    packets_frame = 127;
+    
+    if(data_len > 0){
+
+      
+      if(framenum == 0)
+	framenum = packet.framenum;
+      
+      //printf("%d %d packet num %d\n", getpid(), packet.framenum, packet.packetnum);
+	//	printf("PID %d ID %d\n", getpid(), rb_writer_id);
+      //	printf("PID %d %d %d\n", getpid(), rb_header_id, rb_hbuffer_id);
+      
+      if(packet.packetnum == 127 || packet.framenum != framenum){
+	//this means a new frame
+	if(rb_current_slot != -1)
+	  rb_commit_slot(rb_writer_id, rb_current_slot);
+	rb_current_slot = rb_claim_next_slot(rb_writer_id);
+	while(rb_current_slot == -1)
+	  rb_current_slot = rb_claim_next_slot(rb_writer_id);
+	//printf("%d\n", rb_current_slot);
+      }
+
+      rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
+      rb_adjust_nslots(rb_header_id);
+
+    
+      ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
+      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+    
+      for(i=0; i < (sizeof(packet.data) / sizeof(uint16_t)); i++){
+	p1[idx[i + n_entries * (packets_frame - packet.packetnum)]] = packet.data[i];
+      }
+    
+      header.framenum = packet.framenum;
+      framenum = header.framenum;
+      
+      if(ph->framenum != packet.framenum){
+	memcpy(ph, &header, sizeof(header));
+      }
+    }
+    else
+      continue;
+      //end
+      
+    
+    if(rb_current_slot == -1)
+      continue;
+
+    if(ti == 0)
+      ti = time(NULL);
+
+    
+    if(framenum_last == 0)
+      framenum_last = framenum;
+
+    if(framenum != framenum_last ){
+      if(total_packets != 128){
+	//printf("frame %d got total_packets %d\n", framenum, total_packets);
+	lost_frames ++;
+	tot_lost_frames += 1;
+	lost_packets += 128 - total_packets;
+	tot_lost_packets += 128 - total_packets;
+      }
+
+      framenum_last = framenum;
+      total_packets = 0;
+      n_recv_frames ++;
+
+      if (n_recv_frames % 100 == 0){
+      	printf("Computed frame rate at frame %d: %.2f Hz Lost packets / frames: %d / %d (%d / %d)\n",
+      	       framenum, 100. / (float)(time(NULL) - ti), lost_packets, lost_frames, tot_lost_packets, tot_lost_frames);
+	ti = time(NULL);
+	lost_frames = 0;
+	lost_packets = 0;
+      }
+    }
+    total_packets ++;
+
+  }
+
+  return 0;
+}
+
 /*
 int main(){
 	int ret;

@@ -56,6 +56,10 @@ put_udp_in_rb = _mod.put_udp_in_rb
 put_udp_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_uint16))
 put_udp_in_rb.restype = ctypes.c_int
 
+put_data_in_rb = _mod.put_data_in_rb
+put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
+put_data_in_rb.restype = ctypes.c_int
+
 
 class HEADER(ctypes.Structure):
     _fields_ = [
@@ -167,7 +171,7 @@ class ModuleReceiver(DataFlowNode):
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
 
-        self.log.debug("Receiver ID: %d" % self.rb_id)
+        print("Receiver ID: %d" % self.rb_writer_id)
         #print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, 2 * 512 * 1024))
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
@@ -180,11 +184,12 @@ class ModuleReceiver(DataFlowNode):
         idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
         self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
         print(self.INDEX_ARRAY[0], idx[0])
+        print("Receiver ID2: %d" % self.rb_writer_id)
         #print(self.n_elements_line, self.n_packets_frame)
         
     def send(self, data):
 
-        print("Receiver ID:", self.rb_id)
+        #print("Receiver ID:", self.rb_id)
         counter = 0
         total_packets = 0
         framenum_last = -1
@@ -194,16 +199,21 @@ class ModuleReceiver(DataFlowNode):
         tot_lost_frames = 0
         
         cframenum = ctypes.c_uint16(-1)
-        
+
+        print("A", self.mpi_rank, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id)
+        ret = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, self.n_frames)
+
+        print("OUTTTTT")
         while True:
             try:
-                if self.n_frames > 0  and counter > self.n_frames:
+                if self.n_frames > 0 and counter > self.n_frames:
                     break
                 
                 # call the C code to get the frames
                 #nbytes = get_message(self.sock.fileno(), ctypes.byref(packet))
                 ret = put_udp_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, ctypes.byref(cframenum))
-
+                # possible new function
+                
                 if ret == -1:
                     continue
 
@@ -233,7 +243,7 @@ class ModuleReceiver(DataFlowNode):
                         framenum_last = cframenum.value
                     total_packets = 0
                     n_recv_frames += 1
-                    #print("A", cframenum.value)
+
                     if n_recv_frames % 1000 == 0:
                         print("Computed frame rate at frame %d: %.2f Hz Lost frames: %d (%d)" % (cframenum.value, 1000. / (time() - t_i), lost_frames, tot_lost_frames))
                         t_i = time()
