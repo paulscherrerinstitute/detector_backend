@@ -104,7 +104,7 @@ class ZMQSender(DataFlowNode):
 
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
-                send_array(self.skt, data.reshape(self.detector_size), frame=pointerh.contents.framenum, flags=zmq.NOBLOCK)
+                send_array(self.skt, data.reshape(self.detector_size), frame=pointerh.contents.framenum, ) #flags=zmq.NOBLOCK)
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     print("CANNOT COMMIT SLOT")
             except KeyboardInterrupt:

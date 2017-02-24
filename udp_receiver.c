@@ -243,53 +243,57 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
 
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int32_t * idx, int16_t nframes){
-
+  
   int n_recv_frames = 0;
   uint16_t framenum_last = 0;
   uint16_t framenum = 0;
   int total_packets = 0;
   int lost_frames = 0;
   int tot_lost_frames = 0;
-  int lost_packets = 0;
-  int tot_lost_packets = 0;
+  int64_t lost_packets = 0;
+  int64_t tot_lost_packets = 0;
   time_t ti = 0;
 
   int temp = 0;
-
+  
   //begin
-      int   data_len;
-    int i, j;
-    jungfrau_header * ph;
-    int n_entries;
-    //int rb_current_slot;
-    jungfrau_packet packet;
-    uint16_t * p1;
-    jungfrau_header header;
-    int packets_frame;
-    int *ret;
-    //end
+  int   data_len;
+  int i, j;
+  jungfrau_header * ph;
+  int n_entries;
+  //int rb_current_slot;
+  jungfrau_packet packet;
+  uint16_t * p1;
+  jungfrau_header header;
+  int packets_frame;
+  int *ret;
+  //end
+  
+  
+  rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
+  rb_adjust_nslots(rb_header_id);
+  
   
   while(true){
-    //if(nframes != -1)
-    //  if(n_recv_frames >= nframes)
-    //break;
-
+    if(nframes != -1)
+      if(n_recv_frames >= nframes)
+	break;
+    
     //rb_current_slot = put_udp_in_rb(sock, bit_depth, rb_current_slot, rb_header_id, rb_hbuffer_id, rb_dbuffer_id, rb_writer_id, idx, &framenum);
-
-
+    
+    
     //begin
-
+    
     //printf("PID %d ID %d\n", getpid(), rb_writer_id);
     
     n_entries = BUFFER_LENGTH; // / (bit_depth / 8);
     //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
-
+    
     data_len = get_message(sock, &packet);
     packets_frame = 127;
     
     if(data_len > 0){
 
-      
       if(framenum == 0)
 	framenum = packet.framenum;
       
@@ -304,18 +308,13 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	rb_current_slot = rb_claim_next_slot(rb_writer_id);
 	while(rb_current_slot == -1)
 	  rb_current_slot = rb_claim_next_slot(rb_writer_id);
-	//printf("%d\n", rb_current_slot);
       }
-
-      rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
-      rb_adjust_nslots(rb_header_id);
-
     
       ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
       p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
     
       for(i=0; i < (sizeof(packet.data) / sizeof(uint16_t)); i++){
-	p1[idx[i + n_entries * (packets_frame - packet.packetnum)]] = packet.data[i];
+      	p1[idx[i + n_entries * (packets_frame - packet.packetnum)]] = packet.data[i];
       }
     
       header.framenum = packet.framenum;
@@ -327,22 +326,18 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     }
     else
       continue;
-      //end
-      
     
     if(rb_current_slot == -1)
       continue;
 
     if(ti == 0)
       ti = time(NULL);
-
     
     if(framenum_last == 0)
       framenum_last = framenum;
 
     if(framenum != framenum_last ){
       if(total_packets != 128){
-	//printf("frame %d got total_packets %d\n", framenum, total_packets);
 	lost_frames ++;
 	tot_lost_frames += 1;
 	lost_packets += 128 - total_packets;
@@ -353,9 +348,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       total_packets = 0;
       n_recv_frames ++;
 
-      if (n_recv_frames % 100 == 0){
+      if (n_recv_frames % 1000 == 0){
       	printf("Computed frame rate at frame %d: %.2f Hz Lost packets / frames: %d / %d (%d / %d)\n",
-      	       framenum, 100. / (float)(time(NULL) - ti), lost_packets, lost_frames, tot_lost_packets, tot_lost_frames);
+      	       framenum, 1000. / (float)(time(NULL) - ti), lost_packets, lost_frames, tot_lost_packets, tot_lost_frames);
 	ti = time(NULL);
 	lost_frames = 0;
 	lost_packets = 0;
