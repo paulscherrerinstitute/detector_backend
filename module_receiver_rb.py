@@ -39,22 +39,22 @@ class PACKET_STRUCT(ctypes.Structure):
         ("framenum2", 3 * ctypes.c_char),
         ("bunchid", ctypes.c_uint64),
         ("data", ctypes.c_uint16 * BUFFER_LENGTH),
-        ("framenum", ctypes.c_uint16),
+        ("framenum", ctypes.c_uint64),
         ("packetnum", ctypes.c_uint8),
     ]
 
 #packet = PACKET_STRUCT("      ".encode('utf-8'), ctypes.c_uint32(), " ".encode('utf-8'), " ".encode('utf-8'),
 #                       ctypes.c_uint64(), DATA_ARRAY, ctypes.c_uint16(), ctypes.c_uint8())
 packet = PACKET_STRUCT("      ", ctypes.c_uint32(), " ", "   ",
-                       ctypes.c_uint64(), DATA_ARRAY, ctypes.c_uint16(), ctypes.c_uint8())
+                       ctypes.c_uint64(), DATA_ARRAY, ctypes.c_uint64(), ctypes.c_uint8())
 
 _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
-get_message = _mod.get_message
-get_message.argtypes = (ctypes.c_int, ctypes.POINTER(PACKET_STRUCT))
-get_message.restype = ctypes.c_int
-put_udp_in_rb = _mod.put_udp_in_rb
-put_udp_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_uint16))
-put_udp_in_rb.restype = ctypes.c_int
+#get_message = _mod.get_message
+#get_message.argtypes = (ctypes.c_int, ctypes.POINTER(PACKET_STRUCT))
+#get_message.restype = ctypes.c_int
+#put_udp_in_rb = _mod.put_udp_in_rb
+#put_udp_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_uint16))
+#put_udp_in_rb.restype = ctypes.c_int
 
 put_data_in_rb = _mod.put_data_in_rb
 put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
@@ -63,13 +63,13 @@ put_data_in_rb.restype = ctypes.c_int
 
 class HEADER(ctypes.Structure):
     _fields_ = [
-        ("framenum", ctypes.c_uint16),
+        ("framenum", ctypes.c_uint64),
         ("packetnum", ctypes.c_uint8),
-        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 2 - 1))
+        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 8 - 1))
         ]
 
-header = HEADER(ctypes.c_uint16(), ctypes.c_uint8(),
-                np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 2 - 1, dtype=np.uint8)))
+header = HEADER(ctypes.c_uint64(), ctypes.c_uint8(),
+                np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 8 - 1, dtype=np.uint8)))
 
 
 def define_quadrant(total_size, geometry, quadrant_index, index_axis=0):
@@ -160,7 +160,7 @@ class ModuleReceiver(DataFlowNode):
 
         self.sock = socket.socket(socket.AF_INET, # Internet
                              socket.SOCK_DGRAM) # UDP
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2000 * 1024 * 1024)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, str(10000 * 1024 * 1024))
         self.sock.bind((self.ip, self.port))
 
         # setting the correct data pointer type

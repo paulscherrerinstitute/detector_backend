@@ -87,7 +87,7 @@ class ModuleReceiver(DataFlowNode):
 
         self.sock = socket.socket(socket.AF_INET, # Internet
                              socket.SOCK_DGRAM) # UDP
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2000 * 1024 * 1024)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 10000 * 1024 * 1024)
         self.sock.bind((self.ip, self.port))
         # ringbuffer
         _ = rb.create_header_file(RB_HEAD_FILE)

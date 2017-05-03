@@ -25,12 +25,12 @@ CACHE_LINE_SIZE = 64
 
 class HEADER(ctypes.Structure):
     _fields_ = [
-        ("framenum", ctypes.c_uint16),
+        ("framenum", ctypes.c_uint64),
         ("packetnum", ctypes.c_uint8),
-        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 2 - 1))
+        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 8 - 1))
         ]
 
-header = HEADER(ctypes.c_uint16(), ctypes.c_uint8(),  np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 2 - 1, dtype=np.uint8)))
+header = HEADER(ctypes.c_uint64(), ctypes.c_uint8(),  np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 8 - 1, dtype=np.uint8)))
 
 
 def send_array(socket, A, flags=0, copy=False, track=True, frame=-1):
