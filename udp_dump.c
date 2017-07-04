@@ -99,7 +99,7 @@ int main(int argc, char *argv[]){
   int data_len;
   struct sockaddr_in serveraddr;	
   jungfrau_packet packet;
-  int data[1000];
+  uint16_t data[4096];
   int recv_packets;
   int recv_frames;
   int last_frame;
@@ -137,7 +137,8 @@ int main(int argc, char *argv[]){
     data_len = get_message(sd, &packet);
     //nbytes = recvfrom(sd, &packet, sizeof(packet), 0, 
     //(struct sockaddr *)&clientaddr, &clientaddrlen);
-  
+
+    memcpy(data, packet.data, 4096*sizeof(uint16_t));
 
     if (data_len == 0)
       continue;

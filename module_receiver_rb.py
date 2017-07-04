@@ -57,8 +57,13 @@ _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 #put_udp_in_rb.restype = ctypes.c_int
 
 put_data_in_rb = _mod.put_data_in_rb
-put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
+#put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
+put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int16, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int)
 put_data_in_rb.restype = ctypes.c_int
+
+put_data_in_rb_old = _mod.put_data_in_rb_old
+put_data_in_rb_old.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
+put_data_in_rb_old.restype = ctypes.c_int
 
 
 class HEADER(ctypes.Structure):
@@ -103,7 +108,7 @@ def define_quadrant(total_size, geometry, quadrant_index, index_axis=0):
     # do the required translations
     base_q = [x + module_size[1] * l_i + module_size[0] * h_i * H for x in base_q.ravel()]
     q_idx = base_q
-    return np.array(q_idx,  dtype=np.int32, order="C")
+    return np.array(q_idx, dtype=np.int32, order="C")
 
 
 
@@ -201,7 +206,18 @@ class ModuleReceiver(DataFlowNode):
         cframenum = ctypes.c_uint16(-1)
 
         print("A", self.mpi_rank, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id)
-        ret = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, self.n_frames)
+
+        mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
+        det_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
+        #IntArray2 = 2 * ctypes.c_int
+        #det_size = IntArray2(*self.module_size)
+        mod_size = np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C'))
+        #mod_size = IntArray2(*self.module_size)
+        #mod_idx = IntArray2(*mod_indexes)
+        mod_idx = np.ctypeslib.as_ctypes(mod_indexes)
+        
+        ret = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.n_frames, det_size, mod_size, mod_idx)
+        #ret = put_data_in_rb_old(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, self.n_frames)
 
         print("OUTTTTT")
         while True:
