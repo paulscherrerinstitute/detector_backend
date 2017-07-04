@@ -301,8 +301,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int mod_idx_x = mod_idx[0], mod_idx_j = mod_idx[1];
   int mod_size_x = mod_size[0], mod_size_y = mod_size[1];
   int det_size_x = det_size[0], det_size_y = det_size[1];
-
-
   int lines_per_packet = BUFFER_LENGTH / mod_size_y;
   
   int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_j * det_size_y;
@@ -340,11 +338,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       
       packets_frame_recv[packet.packetnum] = packet.packetnum + 1;
       
-      /*
-      printf("%d %d packet num %d\n", getpid(), packet.framenum, packet.packetnum);
-      	printf("PID %d ID %d\n", getpid(), rb_writer_id);
-      	printf("PID %d %d %d\n", getpid(), rb_header_id, rb_hbuffer_id);
-      */
+      
+      //printf("%d %d packet num %d\n", getpid(), packet.framenum, packet.packetnum);
+      //printf("PID %d ID %d\n", getpid(), rb_writer_id);
+      //printf("PID %d %d %d\n", getpid(), rb_header_id, rb_hbuffer_id);
+      
 
       //this means a new frame
       if(framenum != framenum_last ){
@@ -363,13 +361,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	  tot_lost_frames += 1;
 	  lost_packets += 128 - total_packets;
 	  tot_lost_packets += 128 - total_packets;
-	  
-	  /*
-	  for(j=0; j< 128; j++)
-	    printf("%d ", packets_frame_recv[j]);
-	  printf("\n");
-	  */
-	  
 	}
 	for(i=0; i< 128; i++)
 	  packets_frame_recv[i] = 0;
@@ -402,42 +393,15 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
       int line_number = lines_per_packet * (packets_frame - packet.packetnum);
       int int_line = 0;
+      int data_size = det_size_y * sizeof(uint16_t);
+      p1 += mod_origin;
       for(i=line_number; i < line_number + lines_per_packet; i++){
 	//printf("n %d a %d, b %d \n", line_number, mod_origin + int_line * det_size_y,i * det_size_y );
-	memcpy(p1 + mod_origin + i * det_size_y,
+	memcpy(p1 + i * det_size_y,
 	       packet.data + int_line * det_size_y,
-	       det_size_y * sizeof(uint16_t));
+	       data_size);
 	int_line ++;
       }
-
-      //reference
-      /*
-      int shift = n_entries * (packets_frame - packet.packetnum);
-      for(i=0; i < BUFFER_LENGTH; i++){
-      	p1[idx[i + shift]] = packet.data[i];
-      }
-      */
-
-      
-      /*
-      for(i=shift; i < BUFFER_LENGTH + shift; i++){
-	p1[idx[i]] = packet.data[i % shift];
-
-
-	//this fast, also with shift
-	//p1[i] = packet.data[i];
-	//this is slow
-	//p1[i + shift] = packet.data[i];
-	// this is slow
-	//j = idx[i + shift];
-	//p1[j] = packet.data[i];
-	
-      }
-      */
-      //memcpy(p1, packet.data, 4096*sizeof(uint16_t));
-      //memcpy(temp, packet.data, 4096 * sizeof(uint16_t));
-      
-      //printf("%d %d %d\n",  packet.data[0], temp[0], p1[idx[shift]]);
 
       header.framenum = packet.framenum;
       framenum = header.framenum;
@@ -519,6 +483,8 @@ int put_data_in_rb_old(int sock, int bit_depth, int rb_current_slot, int rb_head
     //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
     
     data_len = get_message(sock, &packet);
+    //printf("%d %d packet num %d\n", getpid(), packet.framenum, packet.packetnum);
+
     packets_frame = 127;
 
     if(data_len > 0){
@@ -590,8 +556,6 @@ int put_data_in_rb_old(int sock, int bit_depth, int rb_current_slot, int rb_head
       for(i=0; i < BUFFER_LENGTH; i++){
       	p1[idx[i + shift]] = packet.data[i];
       }
-    
-
       
       /*
       for(i=shift; i < BUFFER_LENGTH + shift; i++){
@@ -611,8 +575,6 @@ int put_data_in_rb_old(int sock, int bit_depth, int rb_current_slot, int rb_head
       //memcpy(p1, packet.data, 4096*sizeof(uint16_t));
       //memcpy(temp, packet.data, 4096 * sizeof(uint16_t));
       
-      //printf("%d %d %d\n",  packet.data[0], temp[0], p1[idx[shift]]);
-
       header.framenum = packet.framenum;
       framenum = header.framenum;
       
