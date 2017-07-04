@@ -297,7 +297,10 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   printf("MOD_IDX %d %d\n", mod_idx[0], mod_idx[1]);
 
   //sleep(10);
-  
+
+  int line_number = 0;
+  int int_line = 0;
+  int data_size = 0;
   int mod_idx_x = mod_idx[0], mod_idx_j = mod_idx[1];
   int mod_size_x = mod_size[0], mod_size_y = mod_size[1];
   int det_size_x = det_size[0], det_size_y = det_size[1];
@@ -391,9 +394,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
     
 
-      int line_number = lines_per_packet * (packets_frame - packet.packetnum);
-      int int_line = 0;
-      int data_size = det_size_y * sizeof(uint16_t);
+      line_number = lines_per_packet * (packets_frame - packet.packetnum);
+      int_line = 0;
+      data_size = det_size_y * sizeof(uint16_t);
       p1 += mod_origin;
       for(i=line_number; i < line_number + lines_per_packet; i++){
 	//printf("n %d a %d, b %d \n", line_number, mod_origin + int_line * det_size_y,i * det_size_y );
