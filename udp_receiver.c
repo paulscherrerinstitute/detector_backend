@@ -465,7 +465,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
 
 
-int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int32_t * idx, int16_t nframes){  
+int put_data_in_rb_old(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int32_t * idx, int16_t nframes){  
   int n_recv_frames = 0;
   uint64_t framenum_last = 0;
   uint64_t framenum = 0;
