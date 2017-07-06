@@ -177,74 +177,7 @@ int put_data_in_memory(int sd, jungfrau_packet * packet, int n_entries, uint16_t
 }
 
 
-// generic routine to save data from UDP socket in Ringbuffer
-int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int32_t * idx, uint16_t * framenum){
-
-  int data_len;
-  int i, j;
-  jungfrau_header * ph;
-  int n_entries;
-  //int rb_current_slot;
-  jungfrau_packet packet;
-  uint16_t * p1;
-  jungfrau_header header;
-  int packets_frame;
-  int *ret;
-
-  //printf("PID %d ID %d\n", getpid(), rb_writer_id);
-
-  n_entries = BUFFER_LENGTH; // / (bit_depth / 8);
-  //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
-
-  data_len = get_message(sock, &packet);
-  packets_frame = 127;
-
-  if(data_len > 0){
-    printf("%d packet num %d\n", getpid(), packet.packetnum);
-    printf("PID %d ID %d\n", getpid(), rb_writer_id);
-    printf("PID %d %d %d\n", getpid(), rb_header_id, rb_hbuffer_id);
-
-    if(packet.packetnum == 127 || packet.framenum != *framenum){
-      //this means a new frame
-      if(rb_current_slot != -1)
-	rb_commit_slot(rb_writer_id, rb_current_slot);
-      rb_current_slot = rb_claim_next_slot(rb_writer_id);
-      while(rb_current_slot == -1)
-	rb_current_slot = rb_claim_next_slot(rb_writer_id);
-      //printf("%d\n", rb_current_slot);
-    }
-
-    rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
-    rb_adjust_nslots(rb_header_id);
-
-    
-    ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
-    p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
-    
-    for(i=0; i < (sizeof(packet.data) / sizeof(uint16_t)); i++){
-      p1[idx[i + n_entries * (packets_frame - packet.packetnum)]] = packet.data[i];
-    }
-    
-    header.framenum = packet.framenum;
-    printf("A\n");
-    printf("%d\n", *framenum);
-    *framenum = header.framenum;
-
-    if(ph->framenum != packet.framenum){
-      memcpy(ph, &header, sizeof(header));
-    }
-
-    return rb_current_slot;
-  }
-  else
-    return -1;
-  //ret[0] = rb_current_slot;
-  //ret[1] = packet.framenum;
-  
-}
-
-
- int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int16_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
+int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int16_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
   
   int n_recv_frames = 0;
   uint64_t framenum_last = 0;
@@ -296,8 +229,6 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
   for(i=0; i< 128; i++)
     packets_frame_recv[i] = 0;
 
-  // claim a slot before starting
-  rb_current_slot = rb_claim_next_slot(rb_writer_id);
   
   timeout_i = time(NULL);
  
@@ -316,6 +247,11 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
     packets_frame = 127;
     
     if(data_len > 0){
+      // claim a slot before starting
+      if(rb_current_slot == -1){
+	rb_current_slot = rb_claim_next_slot(rb_writer_id);
+	printf("Claimed1 slot %d\n", rb_current_slot);
+      }
       timeout_i = time(NULL);
       if(last_recorded_packet == -1)
 	last_recorded_packet = packet.packetnum;
@@ -335,18 +271,20 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
             
       //this means a new frame, assuming frame number is unique in the sequence
       if(packet.framenum != framenum_last){
+	printf("%d %d new_frame_num %d slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
           
 	if(rb_current_slot != -1)
 	  rb_commit_slot(rb_writer_id, rb_current_slot);
 	rb_current_slot = rb_claim_next_slot(rb_writer_id);
-	
+	printf("Claimed2 slot %d\n", rb_current_slot);
+
 	if(rb_current_slot == -1)
 	  while(rb_current_slot == -1)
 	    rb_current_slot = rb_claim_next_slot(rb_writer_id);
 
 	// still gives me wrong number it seems, +1
 	if(total_packets != 128){
-  printf("PID %d frame # %d last # %d total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
+	  printf("PID %d frame # %d last # %d total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
 	  lost_frames ++;
 	  tot_lost_frames += 1;
 	  lost_packets += 128 - total_packets;
@@ -417,7 +355,12 @@ int put_udp_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id
       // timeout
       //printf("%d \n", (int)time(NULL) - (int)timeout_i);
       if ((int)time(NULL) - (int)timeout_i > timeout){
-	rb_commit_slot(rb_writer_id, rb_current_slot);
+	printf("T %d %d new_frame_num %d slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
+
+	if(rb_current_slot != -1){
+	  rb_commit_slot(rb_writer_id, rb_current_slot);
+	  printf("Committed slot %d\n", rb_current_slot);
+	}
 	break;
       }
     }

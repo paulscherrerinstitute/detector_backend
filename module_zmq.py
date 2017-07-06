@@ -36,7 +36,7 @@ header = HEADER(ctypes.c_uint64(), ctypes.c_uint8(),  np.ctypeslib.as_ctypes(np.
 def send_array(socket, A, flags=0, copy=False, track=True, frame=-1):
     """send a numpy array with metadata"""
     md = dict(
-        htype=["array-1.0", ],
+        htype="array-1.0",
         type=str(A.dtype),
         shape=A.shape,
         frame=frame
@@ -90,27 +90,31 @@ class ZMQSender(DataFlowNode):
         print("READER:",)
         
     def send(self, data):    
-        #while True:
-        try:
-            self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
+        
+        while True:
+            try:
+                self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
 
-            if self.rb_current_slot == -1:
-                self.pass_on(self.counter)
-                return(self.counter)
-            self.log.debug("READER: self.rb_current_slot" + str(self.rb_current_slot))
+                if self.rb_current_slot == -1:
+                    sleep(1)
+                    self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
+                    if self.rb_current_slot == -1:
+                        break
+                self.log.debug("READER: self.rb_current_slot" + str(self.rb_current_slot))
 
-            pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
-            pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
+                pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
+                pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
-            self.log.debug("WRITER " +  str(pointerh.contents.framenum))
+                self.log.debug("WRITER " +  str(pointerh.contents.framenum))
 
-            entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
-            data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
-            send_array(self.skt, data.reshape(self.detector_size), frame=pointerh.contents.framenum, ) #flags=zmq.NOBLOCK)
-            if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
-                print("CANNOT COMMIT SLOT")
-        except KeyboardInterrupt:
-            raise StopIteration
+                entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
+                data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
+                send_array(self.skt, data.reshape(self.detector_size), frame=pointerh.contents.framenum, ) #flags=zmq.NOBLOCK)
+                self.log.debug("WRITER " +  str(pointerh.contents.framenum))
+                if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
+                    self.log.error("CANNOT COMMIT SLOT")
+            except KeyboardInterrupt:
+                raise StopIteration
      
         self.pass_on(self.counter)
         return(self.counter)
