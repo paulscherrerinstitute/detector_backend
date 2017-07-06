@@ -185,6 +185,8 @@ class ModuleReceiver(DataFlowNode):
         self.rb_current_slot = -1
 
         self.n_packets_frame = 128
+        self.period = 1
+        
         self.log.info("Packets per frame: %d" % self.n_packets_frame)
         idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
         self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
@@ -204,26 +206,24 @@ class ModuleReceiver(DataFlowNode):
         tot_lost_frames = 0
         
         cframenum = ctypes.c_uint16(-1)
-
-        print("A", self.mpi_rank, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id)
+        self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
 
         mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
         det_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
-        #IntArray2 = 2 * ctypes.c_int
-        #det_size = IntArray2(*self.module_size)
         mod_size = np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C'))
-        #mod_size = IntArray2(*self.module_size)
-        #mod_idx = IntArray2(*mod_indexes)
         mod_idx = np.ctypeslib.as_ctypes(mod_indexes)
         
-        ret = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.n_frames, det_size, mod_size, mod_idx)
+        ret = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.n_frames, det_size, mod_size, mod_idx, self.timeout)
         #ret = put_data_in_rb_old(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, self.n_frames)
 
-        print("OUTTTTT")
-        
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
+
+    def reconfigure(self, settings):
+        self.log.info(settings)
+        if "period" in settings:
+            self.period = settings.period / 1000000000
         
     def reset(self):
         pass
