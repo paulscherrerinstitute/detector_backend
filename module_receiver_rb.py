@@ -223,7 +223,9 @@ class ModuleReceiver(DataFlowNode):
     def reconfigure(self, settings):
         self.log.info(settings)
         if "period" in settings:
-            self.period = settings.period / 1000000000
+            self.period = settings["period"] / 1000000000
+        if "n_frames" in settings:
+            self.n_frames = settings["n_frames"]
         
     def reset(self):
         pass

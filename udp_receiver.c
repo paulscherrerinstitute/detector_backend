@@ -205,7 +205,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int *ret;
   //end
   clock_t ti2;  
-
+  
   int packets_frame_recv[128];
 
   struct  timeval ti, te; //for timing
@@ -242,129 +242,129 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
     
  
-    // for timeout
     data_len = get_message(sock, &packet);
     packets_frame = 127;
-    
-    if(data_len > 0){
-      // claim a slot before starting
-      if(rb_current_slot == -1){
-	rb_current_slot = rb_claim_next_slot(rb_writer_id);
-	printf("Claimed1 slot %d\n", rb_current_slot);
-      }
-      timeout_i = time(NULL);
-      if(last_recorded_packet == -1)
-	last_recorded_packet = packet.packetnum;
-      
-      ///if(framenum == 0)
-      //framenum = packet.framenum;
-      
-      if(framenum_last == 0)
-	framenum_last = packet.framenum;
-      
-      packets_frame_recv[packet.packetnum] = packet.packetnum + 1;
-            
-      //printf("%d %d packet num %d\n", getpid(), packet.framenum, packet.packetnum);
-      //printf("PID %d ID %d\n", getpid(), rb_writer_id);
-      //printf("PID %d %d %d\n", getpid(), rb_header_id, rb_hbuffer_id);
-      //spot the fw bug where frame number is shifted
-            
-      //this means a new frame, assuming frame number is unique in the sequence
-      if(packet.framenum != framenum_last){
-	printf("%d %d new_frame_num %d slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
-          
-	if(rb_current_slot != -1)
-	  rb_commit_slot(rb_writer_id, rb_current_slot);
-	rb_current_slot = rb_claim_next_slot(rb_writer_id);
-	printf("Claimed2 slot %d\n", rb_current_slot);
 
-	if(rb_current_slot == -1)
-	  while(rb_current_slot == -1)
-	    rb_current_slot = rb_claim_next_slot(rb_writer_id);
-
-	// still gives me wrong number it seems, +1
-	if(total_packets != 128){
-	  printf("PID %d frame # %d last # %d total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
-	  lost_frames ++;
-	  tot_lost_frames += 1;
-	  lost_packets += 128 - total_packets;
-	  tot_lost_packets += 128 - total_packets;
-	}
-	for(i=0; i< 128; i++)
-	  packets_frame_recv[i] = 0;
-	
-	framenum_last = packet.framenum;
-
-	int stats_frames = 1000;
-
-	stat_total_frames ++;
-	n_recv_frames ++;
-	if (n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
-            gettimeofday(&te, NULL);
-	    tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
-	    printf("| %d | %d | %.2f | %d | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
-	    gettimeofday(&ti,NULL);
-	    lost_frames = 0;
-	    lost_packets = 0;
-	    stat_total_frames = 0;
-        } 
-
-	total_packets = 0;
-      } // end new frame if
-      else if(packet.packetnum > last_recorded_packet)
-	printf("[WARNING] Something went wrong, frame number replicated over frames new_packet:%d last_packet:%d\n", packet.packetnum, last_recorded_packet);
-      
-      last_recorded_packet = packet.packetnum;
-
-      ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
-      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
-    
-
-      line_number = lines_per_packet * (packets_frame - packet.packetnum);
-      int_line = 0;
-      data_size = det_size_y * sizeof(uint16_t);
-      p1 += mod_origin;
-      for(i=line_number; i < line_number + lines_per_packet; i++){
-        memcpy(p1 + i * det_size_y,
-	       packet.data + int_line * det_size_y,
-	       data_size);
-	int_line ++;
-      }
-
-      header.framenum = packet.framenum;
-      
-      if(ph->framenum != packet.framenum){
-	memcpy(ph, &header, sizeof(header));
-      }
-
-      // This should cast an error, or a warning
-      if(rb_current_slot == -1)
-	continue;
-      
-      if(tdif < 0){
-	//ti2 = clock();
-	tdif = 0;
-	gettimeofday(&ti, NULL);
-      }    
-
-      last_recorded_packet = packet.packetnum;
-      total_packets ++;
-
-    } // end data if
-    else{
-      // timeout
-      //printf("%d \n", (int)time(NULL) - (int)timeout_i);
+    // no data? Checks timeout
+    if(data_len <= 0){
       if ((int)time(NULL) - (int)timeout_i > timeout){
 	printf("T %d %d new_frame_num %d slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
-
+	
+	// flushes the last message
 	if(rb_current_slot != -1){
 	  rb_commit_slot(rb_writer_id, rb_current_slot);
 	  printf("Committed slot %d\n", rb_current_slot);
 	}
 	break;
       }
+      continue;
     }
-  }
+
+    // claim a slot before starting, if data
+    if(rb_current_slot == -1){
+      rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      printf("Claimed1 slot %d\n", rb_current_slot);
+    }
+    timeout_i = time(NULL);
+    if(last_recorded_packet == -1)
+      last_recorded_packet = packet.packetnum;
+      
+    if(framenum_last == 0)
+      framenum_last = packet.framenum;
+      
+    packets_frame_recv[packet.packetnum] = packet.packetnum + 1;
+            
+    //printf("%d %d packet num %d\n", getpid(), packet.framenum, packet.packetnum);
+    //printf("PID %d ID %d\n", getpid(), rb_writer_id);
+    //printf("PID %d %d %d\n", getpid(), rb_header_id, rb_hbuffer_id);
+    //spot the fw bug where frame number is shifted
+            
+    //this means a new frame, assuming frame number is unique in the sequence
+    
+
+    if(packet.framenum != framenum_last){
+      printf("%d %d new_frame_num %d slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
+          
+      if(rb_current_slot != -1)
+	rb_commit_slot(rb_writer_id, rb_current_slot);
+      rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      printf("Claimed2 slot %d\n", rb_current_slot);
+
+      if(rb_current_slot == -1)
+	while(rb_current_slot == -1)
+	  rb_current_slot = rb_claim_next_slot(rb_writer_id);
+
+      // still gives me wrong number it seems, +1
+      if(total_packets != 128){
+	printf("PID %d frame # %d last # %d total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
+	lost_frames ++;
+	tot_lost_frames += 1;
+	lost_packets += 128 - total_packets;
+	tot_lost_packets += 128 - total_packets;
+      }
+      for(i=0; i< 128; i++)
+	packets_frame_recv[i] = 0;
+	
+      framenum_last = packet.framenum;
+
+      int stats_frames = 1000;
+
+      stat_total_frames ++;
+      n_recv_frames ++;
+      if (n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
+	gettimeofday(&te, NULL);
+	tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
+	printf("| %d | %d | %.2f | %d | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
+	gettimeofday(&ti,NULL);
+	lost_frames = 0;
+	lost_packets = 0;
+	stat_total_frames = 0;
+      } 
+
+      total_packets = 0;
+    } // end new frame if
+    else if(packet.packetnum > last_recorded_packet)
+      printf("[WARNING] Something went wrong, frame number replicated over frames new_packet:%d last_packet:%d\n", packet.packetnum, last_recorded_packet);
+      
+    last_recorded_packet = packet.packetnum;
+
+    ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
+    p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+    
+
+    line_number = lines_per_packet * (packets_frame - packet.packetnum);
+    int_line = 0;
+    data_size = det_size_y * sizeof(uint16_t);
+    p1 += mod_origin;
+    for(i=line_number; i < line_number + lines_per_packet; i++){
+      memcpy(p1 + i * det_size_y,
+	     packet.data + int_line * det_size_y,
+	     data_size);
+      int_line ++;
+    }
+
+    header.framenum = packet.framenum;
+      
+    if(ph->framenum != packet.framenum){
+      memcpy(ph, &header, sizeof(header));
+    }
+
+    // This should cast an error, or a warning
+    if(rb_current_slot == -1)
+      continue;
+      
+    if(tdif < 0){
+      //ti2 = clock();
+      tdif = 0;
+      gettimeofday(&ti, NULL);
+    }    
+
+    last_recorded_packet = packet.packetnum;
+    total_packets ++;
+
+  } // end while
+
+
 
   return n_recv_frames;
 }
