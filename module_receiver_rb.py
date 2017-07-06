@@ -220,54 +220,7 @@ class ModuleReceiver(DataFlowNode):
         #ret = put_data_in_rb_old(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, self.n_frames)
 
         print("OUTTTTT")
-        while True:
-            try:
-                if self.n_frames > 0 and counter > self.n_frames:
-                    break
-                
-                # call the C code to get the frames
-                #nbytes = get_message(self.sock.fileno(), ctypes.byref(packet))
-                ret = put_udp_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, ctypes.byref(cframenum))
-                # possible new function
-                
-                if ret == -1:
-                    continue
-
-                self.rb_current_slot = ret  # , framenum = np.ctypeslib.as_array(ret, (2, ), )
-                #pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
-                #                       type(ctypes.pointer(header)))
-                
-                #framenum = pointerh.contents.framenum
-                #framenum = cframenum.value
-                if framenum_last == -1:
-                    framenum_last = cframenum.value
-                total_packets += 1
-                
-                # reconstruct and ship the image
-                if cframenum.value != framenum_last or total_packets == self.n_packets_frame:
-                    self.log.debug("%d %d" % (0, cframenum.value))
-
-                    if self.mpi_rank == 0:
-                        self.log.debug("Total recv for frame %d: %d" % (framenum_last, total_packets))
-                    if total_packets != self.n_packets_frame:
-                        lost_frames += 1
-                        tot_lost_frames += 1
-                        self.log.debug("missing packets for frame %d (got %d)" % (framenum_last, total_packets))
-                    if total_packets == self.n_packets_frame:
-                        framenum_last = -1
-                    else:
-                        framenum_last = cframenum.value
-                    total_packets = 0
-                    n_recv_frames += 1
-
-                    if n_recv_frames % 1000 == 0:
-                        print("Computed frame rate at frame %d: %.2f Hz Lost frames: %d (%d)" % (cframenum.value, 1000. / (time() - t_i), lost_frames, tot_lost_frames))
-                        t_i = time()
-                        lost_frames = 0
-
-            except KeyboardInterrupt:
-                raise StopIteration
-
+        
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)

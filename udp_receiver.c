@@ -103,11 +103,11 @@ int get_message(int sd, jungfrau_packet * packet){
      */
 
     //ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet) - 8 - 1, 0, (struct sockaddr *)&clientaddr, &clientaddrlen);
-    ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), 0, 
-			      (struct sockaddr *)&clientaddr, &clientaddrlen);
-  
+    /*ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), 0, 
+      (struct sockaddr *)&clientaddr, &clientaddrlen);*/
+    //ssize_t nbytes = recv(sd, packet, sizeof(*packet), MSG_DONTWAIT);
 
-//ssize_t nbytes = recv(sd, packet, sizeof(*packet) - 8 - 1, 0); //, MSG_DONTWAIT);
+    ssize_t nbytes = recv(sd, packet, sizeof(*packet) - 8 - 1, MSG_DONTWAIT);
     packet->framenum = (((int)(packet->framenum2[2])&0xff)<<16) + (((int)(packet->framenum2[1])&0xff)<<8) +((int)(packet->framenum2[0])&0xff);
   
     packet->packetnum =  (uint16_t)((packet->packetnum2));
@@ -269,7 +269,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int tot_lost_frames = 0;
   int64_t lost_packets = 0;
   int64_t tot_lost_packets = 0;
-  //time_t ti = 0;
+  time_t timeout_i = 0;
 
   int temp = 0;
   
@@ -318,7 +318,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   // claim a slot before starting
   rb_current_slot = rb_claim_next_slot(rb_writer_id);
-
+  
+  timeout_i = time(NULL);
+ 
   while(true){
     //printf("A\n");
     if(nframes != -1)
@@ -328,10 +330,14 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     n_entries = BUFFER_LENGTH; // / (bit_depth / 8);
     //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
     
+ 
+    // for timeout
     data_len = get_message(sock, &packet);
     packets_frame = 127;
 
+
     if(data_len > 0){
+      timeout_i = time(NULL);
       
       if(framenum == 0)
 	framenum = packet.framenum;
@@ -372,12 +378,12 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	stat_total_frames ++;
 	n_recv_frames ++;
 	
-	if (n_recv_frames % 5000 == 0){
+	if (n_recv_frames % 1000 == 0){
 	  gettimeofday(&te, NULL);
-	  tdif = (1e6 * (te.tv_sec - ti.tv_sec) + (long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
+	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
 	  //printf("%f %d %d", tdif, te.tv_sec, ti.tv_sec);
 	  printf("| %d | %d | %.2f | %d | %.1f |\n",
-		 getpid(), framenum_last, (double) 5000. / tdif, lost_packets, 
+		 getpid(), framenum_last, (double) 1000. / tdif, lost_packets, 
 		 100. * (float)lost_packets / (float)(128 * stat_total_frames)
 		 );
 	  //ti = time(NULL);
@@ -425,9 +431,18 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       
       total_packets ++;
     } // end data if
+    else{
+      // timeout
+      //printf("%d \n", (int)time(NULL) - (int)timeout_i);
+      if ((int)time(NULL) - (int)timeout_i > 1 ){
+	printf("C loop break! \n");
+	rb_commit_slot(rb_writer_id, rb_current_slot);
+	break;
+      }
+    }
   }
 
-  return 0;
+  return n_recv_frames;
 }
 
 
