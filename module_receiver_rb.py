@@ -49,16 +49,10 @@ packet = PACKET_STRUCT("      ", ctypes.c_uint32(), " ", "   ",
                        ctypes.c_uint64(), DATA_ARRAY, ctypes.c_uint64(), ctypes.c_uint8())
 
 _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
-#get_message = _mod.get_message
-#get_message.argtypes = (ctypes.c_int, ctypes.POINTER(PACKET_STRUCT))
-#get_message.restype = ctypes.c_int
-#put_udp_in_rb = _mod.put_udp_in_rb
-#put_udp_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_uint16))
-#put_udp_in_rb.restype = ctypes.c_int
 
 put_data_in_rb = _mod.put_data_in_rb
 #put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
-put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int16, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int)
+put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int16, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
 put_data_in_rb.restype = ctypes.c_int
 
 put_data_in_rb_old = _mod.put_data_in_rb_old

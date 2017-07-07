@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 
 // for uint64 printing
 #include <inttypes.h>
@@ -91,10 +92,11 @@ int get_message_jtb(int sd, jungfraujtb_packet * packet){
         return nbytes;
 }
 
+
 //simple routine to get data from UDP socket
 int get_message(int sd, jungfrau_packet * packet){
     struct sockaddr_in clientaddr;
-    int    clientaddrlen = sizeof(clientaddr);
+    socklen_t clientaddrlen = sizeof(clientaddr);
 
     //ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet) - 8 - 1, 0, (struct sockaddr *)&clientaddr, &clientaddrlen);
     ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), MSG_DONTWAIT, (struct sockaddr *)&clientaddr, &clientaddrlen);
@@ -189,22 +191,22 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int64_t tot_lost_packets = 0;
   time_t timeout_i = 0;
 
-  int temp = 0;
+  //int temp = 0;
   
   //begin
   int   data_len;
-  int i, j;
+  int i;
   jungfrau_header * ph;
-  int n_entries;
+  //int n_entries;
   //int rb_current_slot;
   jungfrau_packet packet;
   uint16_t * p1;
   jungfrau_header header;
   int packets_frame;
   int last_recorded_packet = -1;
-  int *ret;
+
   //end
-  clock_t ti2;  
+  //clock_t ti2;  
   
   int packets_frame_recv[128];
 
@@ -224,7 +226,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
   rb_adjust_nslots(rb_header_id);
   
-  printf("| PID | cur_frame | Hz | Lost packets | \% lost packets |\n");
+  printf("| PID | cur_frame | Hz | Lost packets | perc lost packets |\n");
   
   for(i=0; i< 128; i++)
     packets_frame_recv[i] = 0;
@@ -238,7 +240,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       if(n_recv_frames >= nframes)
 	break;
     
-    n_entries = BUFFER_LENGTH; // / (bit_depth / 8);
+    //n_entries = BUFFER_LENGTH; // / (bit_depth / 8);
     //data_len = put_data_in_memory(sock, &packetb, n_entries, p1, ph, idx);
     
  
@@ -248,7 +250,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     // no data? Checks timeout
     if(data_len <= 0){
       if ((int)time(NULL) - (int)timeout_i > timeout){
-	printf("T %d %d new_frame_num %d slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
+	printf("T %d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
 	
 	// flushes the last message
 	if(rb_current_slot != -1){
@@ -283,7 +285,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     
 
     if(packet.framenum != framenum_last){
-      printf("%d %d new_frame_num %d slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
+      printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
           
       if(rb_current_slot != -1)
 	rb_commit_slot(rb_writer_id, rb_current_slot);
@@ -296,7 +298,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
       // still gives me wrong number it seems, +1
       if(total_packets != 128){
-	printf("PID %d frame # %d last # %d total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
+	printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
 	lost_frames ++;
 	tot_lost_frames += 1;
 	lost_packets += 128 - total_packets;
@@ -314,7 +316,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       if (n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
 	gettimeofday(&te, NULL);
 	tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
-	printf("| %d | %d | %.2f | %d | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
+	printf("| %d | %lu | %.2f | %lu | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
 	gettimeofday(&ti,NULL);
 	lost_frames = 0;
 	lost_packets = 0;
@@ -383,7 +385,7 @@ int put_data_in_rb_old(int sock, int bit_depth, int rb_current_slot, int rb_head
   int64_t tot_lost_packets = 0;
   //time_t ti = 0;
 
-  int temp = 0;
+  //int temp = 0;
   
   //begin
   int   data_len;
@@ -395,9 +397,9 @@ int put_data_in_rb_old(int sock, int bit_depth, int rb_current_slot, int rb_head
   uint16_t * p1;
   jungfrau_header header;
   int packets_frame;
-  int *ret;
+  //int *ret;
   //end
-  clock_t ti2;  
+  //clock_t ti2;  
 
   int packets_frame_recv[128];
 
@@ -407,7 +409,7 @@ int put_data_in_rb_old(int sock, int bit_depth, int rb_current_slot, int rb_head
   rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
   rb_adjust_nslots(rb_header_id);
   
-  printf("| PID | cur_frame | Hz | Lost packets | \% lost packets |\n");
+  printf("| PID | cur_frame | Hz | Lost packets | perc lost packets |\n");
   
   for(i=0; i< 128; i++)
     packets_frame_recv[i] = 0;
@@ -475,7 +477,7 @@ int put_data_in_rb_old(int sock, int bit_depth, int rb_current_slot, int rb_head
 	  gettimeofday(&te, NULL);
 	  tdif = (1e6 * (te.tv_sec - ti.tv_sec) + (long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
 	  //printf("%f %d %d", tdif, te.tv_sec, ti.tv_sec);
-	  printf("| %d | %d | %.2f | %d | %.1f |\n",
+	  printf("| %d | %lu | %.2f | %lu | %.1f |\n",
 		 getpid(), framenum_last, (double) 5000. / tdif, lost_packets, 
 		 100. * (float)lost_packets / (float)(128 * stat_total_frames)
 		 );
