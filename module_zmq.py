@@ -86,9 +86,10 @@ class ZMQSender(DataFlowNode):
 
         self.rb_current_slot = -1
 
-        self.n_frames = 0
+        self.n_frames = -1
         self.period = 1
-        print("READER:",)
+        self.first_frame = -1
+        self.log.info("ZMQ streamer initialized")
 
     def reconfigure(self, settings):
         self.log.info(settings)
@@ -96,6 +97,7 @@ class ZMQSender(DataFlowNode):
             self.n_frames = settings["n_frames"]
         if "period" in settings:
             self.period = settings["period"] / 1000000000
+        self.first_frame = -1
         
     def send(self, data):    
         # FIXME
@@ -103,7 +105,7 @@ class ZMQSender(DataFlowNode):
 
         ref_time = time()
         counter = 0
-        while counter < self.n_frames and (time() -  ref_time < timeout):
+        while (counter < self.n_frames or self.n_frames == -1) and (time() -  ref_time < timeout):
             try:
                 self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
                 
@@ -119,21 +121,23 @@ class ZMQSender(DataFlowNode):
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
                 self.log.debug("WRITER " +  str(pointerh.contents.framenum))
-
+                if self.first_frame == -1:
+                    self.first_frame = pointerh.contents.framenum
+                
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
-                send_array(self.skt, data.reshape(self.detector_size), frame=pointerh.contents.framenum, ) #flags=zmq.NOBLOCK)
+                send_array(self.skt, data.reshape(self.detector_size), frame=pointerh.contents.framenum - self.first_frame, ) #flags=zmq.NOBLOCK)
                 counter += 1
                 ref_time = time()
 
-                self.log.debug("WRITER " +  str(pointerh.contents.framenum))
+                self.log.debug("WRITER " +  str(pointerh.contents.framenum - self.first_frame))
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     self.log.error("CANNOT COMMIT SLOT")
 
             except KeyboardInterrupt:
                 raise StopIteration
         
-        
+        self.log.info("Writer loop exited")
         self.pass_on(counter)
         return(counter)
     
