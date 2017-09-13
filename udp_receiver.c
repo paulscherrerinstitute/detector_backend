@@ -223,8 +223,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   
   int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_j * det_size_y;
 
-  rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
-  rb_adjust_nslots(rb_header_id);
+  //do I need this?
+  //rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
+  //rb_adjust_nslots(rb_header_id);
   
   printf("| PID | cur_frame | Hz | Lost packets | perc lost packets |\n");
   
