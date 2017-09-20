@@ -115,12 +115,12 @@ class ZMQSender(DataFlowNode):
                     #self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
                     #if self.rb_current_slot == -1:
                     #    break
-                self.log.debug("READER: self.rb_current_slot" + str(self.rb_current_slot))
+                #self.log.debug("READER: self.rb_current_slot" + str(self.rb_current_slot))
 
                 pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
-                self.log.debug("WRITER " +  str(pointerh.contents.framenum))
+                #self.log.debug("WRITER " +  str(pointerh.contents.framenum))
                 if self.first_frame == -1:
                     self.first_frame = pointerh.contents.framenum
                 
@@ -130,14 +130,14 @@ class ZMQSender(DataFlowNode):
                 counter += 1
                 ref_time = time()
 
-                self.log.debug("WRITER " +  str(pointerh.contents.framenum - self.first_frame))
+                #self.log.debug("WRITER " +  str(pointerh.contents.framenum - self.first_frame))
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     self.log.error("CANNOT COMMIT SLOT")
 
             except KeyboardInterrupt:
                 raise StopIteration
         
-        self.log.info("Writer loop exited")
+        #self.log.info("Writer loop exited")
         self.pass_on(counter)
         return(counter)
     

@@ -29,25 +29,6 @@ RB_IMGHEAD_FILE = "rb_image_header.dat"
 RB_IMGDATA_FILE = "rb_image_data.dat"
 
 
-# Jungfrau
-class PACKET_STRUCT(ctypes.Structure):
-    _pack_ = 2
-    _fields_ = [
-        ("emptyheader", HEADER_ARRAY),
-        ("reserved", ctypes.c_uint32),
-        ("packetnum2", ctypes.c_char),
-        ("framenum2", 3 * ctypes.c_char),
-        ("bunchid", ctypes.c_uint64),
-        ("data", ctypes.c_uint16 * BUFFER_LENGTH),
-        ("framenum", ctypes.c_uint64),
-        ("packetnum", ctypes.c_uint8),
-    ]
-
-#packet = PACKET_STRUCT("      ".encode('utf-8'), ctypes.c_uint32(), " ".encode('utf-8'), " ".encode('utf-8'),
-#                       ctypes.c_uint64(), DATA_ARRAY, ctypes.c_uint16(), ctypes.c_uint8())
-packet = PACKET_STRUCT("      ", ctypes.c_uint32(), " ", "   ",
-                       ctypes.c_uint64(), DATA_ARRAY, ctypes.c_uint64(), ctypes.c_uint8())
-
 _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 
 put_data_in_rb = _mod.put_data_in_rb
@@ -55,20 +36,9 @@ put_data_in_rb = _mod.put_data_in_rb
 put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int16, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
 put_data_in_rb.restype = ctypes.c_int
 
-put_data_in_rb_old = _mod.put_data_in_rb_old
-put_data_in_rb_old.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
-put_data_in_rb_old.restype = ctypes.c_int
-
-
-class HEADER(ctypes.Structure):
-    _fields_ = [
-        ("framenum", ctypes.c_uint64),
-        ("packetnum", ctypes.c_uint8),
-        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 8 - 1))
-        ]
-
-header = HEADER(ctypes.c_uint64(), ctypes.c_uint8(),
-                np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 8 - 1, dtype=np.uint8)))
+#put_data_in_rb_old = _mod.put_data_in_rb_old
+#put_data_in_rb_old.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
+#put_data_in_rb_old.restype = ctypes.c_int
 
 
 def define_quadrant(total_size, geometry, quadrant_index, index_axis=0):
@@ -152,6 +122,7 @@ class ModuleReceiver(DataFlowNode):
         super(ModuleReceiver, self).__init__(**kwargs)
         self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
 
+        self.log.info("PID: %d IP: %s:%d" % (os.getpid(), self.ip, self.port))
         # for setting up barriers
         app = XblBaseApplication.instance()
         self.worker_communicator = app.worker_communicator
@@ -170,7 +141,6 @@ class ModuleReceiver(DataFlowNode):
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
 
-        print("Receiver ID: %d" % self.rb_writer_id)
         #print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, 2 * 512 * 1024))
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])

@@ -56,7 +56,7 @@ module_size = [512, 1024]
 
 RECEIVER_RANKS = [0, 1, 2]
 SENDERS_RANKS = [3, ]
-ip = ["10.30.10.2", "10.30.10.2", "10.30.10.2"]
+ip = 3 * ["10.30.10.3", ]
 port = [50004, 50005, 50006]
 
 
@@ -93,7 +93,7 @@ elif rank in SENDERS_RANKS:
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
     c.ZMQSender.uri = "tcp://127.0.0.1:40000"
-    c.ZMQSender.socket_type = "PUSH"
+    c.ZMQSender.socket_type = "PUB"
 
     c.ZMQSender.rb_id = rank
     c.ZMQSender.rb_followers = RECEIVER_RANKS

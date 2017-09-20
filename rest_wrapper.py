@@ -5,7 +5,7 @@ from collections import Counter
 
 import logging
 log = logging.getLogger('bottle')
-log.setLevel(logging.ERROR)
+log.setLevel(logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -15,8 +15,8 @@ logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
 class Config(object):
     writer_name = "writer"
     proxy_name = "writer_proxy"
-    writer_url = "http://localhost:8083/api/v1/" + writer_name
-    backend_url = "http://localhost:8081/v1"
+    writer_url = "http://xbl-daq-28:41000/api/v1/" + writer_name
+    backend_url = "http://localhost:8080/v1"
     writer_status = "DOWN"
     backend_status = "DOWN"
     status = "DOWN"
@@ -27,9 +27,9 @@ _config = Config()
 
 rest_server = Bottle()
 
-writer_statuses = {False: "CONFIGURED", True: "OPEN"}
-writer_cfg_params = ["filename", ]
-backend_cfg_params = ["bitdepth", "period", "n_frames"]
+writer_statuses = {False: "CONFIGURED", True: "OPEN", None: "CONFIGURED"}
+writer_cfg_params = ["output_file", ]
+backend_cfg_params = ["bit_depth", "period", "n_frames"]
 
 
 def interpret_status(backend, writer):
@@ -45,6 +45,7 @@ def interpret_status(backend, writer):
 
 @rest_server.route('/api/v1/state', method="GET")
 def state():
+    logger.debug({"status": "ok", "state": get_status()})
     return {"status": "ok", "state": get_status()}
 
     
@@ -52,11 +53,11 @@ def get_status():
     global _config
     backend_status = json.loads(requests.get(_config.backend_url + "/state").text)["global_state"]
     writer_status = requests.get(_config.writer_url + "/status").text
-    logger.debug("Writer got %s" % writer_status)
+    logger.debug("Writer got %s %s" % (writer_status, json.loads(writer_status)["data"]["is_running"]))
     writer_status = writer_statuses[json.loads(writer_status)["data"]["is_running"]]
     logger.debug("Writer status %s" % writer_status)
-    print({"status": interpret_status(backend_status, writer_status),
-            "details": {"backend": backend_status, "writer": writer_status}})
+    #print({"status": interpret_status(backend_status, writer_status),
+    #        "details": {"backend": backend_status, "writer": writer_status}})
     return {"status": interpret_status(backend_status, writer_status),
             "details": {"backend": backend_status, "writer": writer_status}}
 
@@ -67,17 +68,22 @@ def configure():
     writer_cfg = {}
     backend_cfg = {"settings": {}}
     logger.debug("Configuration: %s" % cfg)
-    for k, v in cfg.items():
+    for k, v in cfg["settings"].items():
         if k in writer_cfg_params:
             writer_cfg[k] = v
         if k in backend_cfg_params:
             backend_cfg["settings"][k] = v
-    
+    logger.debug("Configurations for backend and writer: %s %s" % (backend_cfg, writer_cfg))
+
+    if "output_file" in writer_cfg:
+        if writer_cfg["output_file"][-3:] != ".h5":
+            writer_cfg["output_file"] += ".h5"
+            
     r = requests.post(_config.backend_url + "/state/configure", json=backend_cfg).text
     logger.debug("Backend cfg got %s" % r)
     if r != "CONFIGURED":
         logger.error("Cannot setup backend parameters, aborting: %s" % r)
-        return {"state": _config.status, "message": r["message"]}
+        return {"state": _config.status, "message": r}
 
     r = json.loads(requests.post(_config.writer_url + "/parameters", json=writer_cfg).text)
     logger.debug("Writer cfg got %s" % r)
