@@ -32,13 +32,9 @@ RB_IMGDATA_FILE = "rb_image_data.dat"
 _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 
 put_data_in_rb = _mod.put_data_in_rb
-#put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
+# put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
 put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int16, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
 put_data_in_rb.restype = ctypes.c_int
-
-#put_data_in_rb_old = _mod.put_data_in_rb_old
-#put_data_in_rb_old.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
-#put_data_in_rb_old.restype = ctypes.c_int
 
 
 def define_quadrant(total_size, geometry, quadrant_index, index_axis=0):
@@ -79,10 +75,9 @@ def define_quadrant(total_size, geometry, quadrant_index, index_axis=0):
 class ModuleReceiver(DataFlowNode):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
-    
+
     mpi_rank = comm.Get_rank()
-    
-    #filename = Unicode(u'data.txt', config=True, reconfig=True, help='output filename with optional path')
+
     ip = Unicode('192.168.10.10', config=True, reconfig=True, help="Ip to listen to for UDP packets")
     port = Int(9000, config=True, reconfig=True, help="Port to listen to for UDP packets")
     module_size = List((512, 1024), config=True, reconfig=True)
@@ -91,7 +86,7 @@ class ModuleReceiver(DataFlowNode):
 
     bit_depth = Int(16, config=True, reconfig=True, help="")
     n_frames = Int(-1, config=True, reconfig=True, help="Frames to receive")
-    
+
     rb_id = Int(0, config=True, reconfig=True, help="")
     rb_followers = List([1, ], config=True, reconfig=True, help="")
     create_and_delete_ringbuffer_header = Bool(False, config=True, reconfig=True, help="Index within the module, with NW=0 and SE=3")
@@ -99,7 +94,6 @@ class ModuleReceiver(DataFlowNode):
     rb_imghead_file = Unicode('', config=True, reconfig=True, help="")
     rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
 
-        
     def _prepare_ringbuffer_header_files(self):
         files = [self.rb_head_file, ]
         #print("MPI,", self.mpi_rank, self.create_and_delete_ringbuffer_header)
@@ -107,7 +101,7 @@ class ModuleReceiver(DataFlowNode):
             self.log.debug("create ringbuffer header files")
             for f in files:
                 ret = rb.create_header_file(f)
-                assert ret == True
+                assert ret is True
                 self.log.debug("created %s", f)
             self.worker_communicator.barrier()
                 
@@ -115,7 +109,7 @@ class ModuleReceiver(DataFlowNode):
             self.log.debug("wait for ringbuffer header files to become available")
             self.worker_communicator.barrier()
             for f in files:
-                if not os.path.exists(f) :
+                if not os.path.exists(f):
                     raise RuntimeError("file %s not available " % (f,))
     
     def __init__(self, **kwargs):
@@ -128,8 +122,8 @@ class ModuleReceiver(DataFlowNode):
         self.worker_communicator = app.worker_communicator
         self._prepare_ringbuffer_header_files()
 
-        self.sock = socket.socket(socket.AF_INET, # Internet
-                             socket.SOCK_DGRAM) # UDP
+        self.sock = socket.socket(socket.AF_INET,  # Internet
+                                  socket.SOCK_DGRAM)  # UDP
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, str(10000 * 1024 * 1024))
         self.sock.bind((self.ip, self.port))
 
@@ -141,8 +135,9 @@ class ModuleReceiver(DataFlowNode):
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
 
-        #print(rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, 2 * 512 * 1024))
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64)
+        # header data is 64b times n_modules. Each entry is a cache line owned by the receiving process
+        # TODO add asserts / exceptions
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
         self.log.debug("RB slots: %d" % nslots)
@@ -152,23 +147,17 @@ class ModuleReceiver(DataFlowNode):
         self.period = 1
         
         self.log.info("Packets per frame: %d" % self.n_packets_frame)
-        idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
-        self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
-        print(self.INDEX_ARRAY[0], idx[0])
+        # idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
+        # self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
+        # print(self.INDEX_ARRAY[0], idx[0])
         print("Receiver ID2: %d" % self.rb_writer_id)
         #print(self.n_elements_line, self.n_packets_frame)
         
     def send(self, data):
-
         #print("Receiver ID:", self.rb_id)
-        counter = 0
-        total_packets = 0
-        framenum_last = -1
-        t_i = time()
+
         n_recv_frames = 0
-        lost_frames = 0
-        tot_lost_frames = 0
-        
+
         cframenum = ctypes.c_uint16(-1)
         self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
 
@@ -177,7 +166,9 @@ class ModuleReceiver(DataFlowNode):
         mod_size = np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C'))
         mod_idx = np.ctypeslib.as_ctypes(mod_indexes)
         
-        ret = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.n_frames, det_size, mod_size, mod_idx, self.timeout)
+        n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot,
+                                       self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
+                                       self.n_frames, det_size, mod_size, mod_idx, self.timeout)
         #ret = put_data_in_rb_old(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, self.n_frames)
 
         self.pass_on(n_recv_frames)

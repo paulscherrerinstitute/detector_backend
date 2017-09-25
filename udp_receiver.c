@@ -26,12 +26,13 @@
 //Jungfrau
 
 // header struct for RB
+// 64 bytes length == 1 cache line
 typedef struct _jungfrau_header{
-  uint8_t n_modules;
-  uint64_t framenum[32];
-  uint64_t recorded_packets1;
-  uint64_t recorded_packets2;
-  int8_t padding[320 - 1 - 34 * 8];
+  // Field 0: frame number
+  // Field 1: packets lost
+  // Field 2: packets counter 0-63
+  // Field 3: packets counter 64-127
+  uint64_t framemetadata[8];
 } jungfrau_header;
 
 /*
@@ -54,21 +55,6 @@ typedef struct _jungfraujtb_packet{
 #pragma pack(pop)
 
 //Jungfrau
-/*
-#pragma pack(push)
-#pragma pack(2)
-typedef struct _jungfrau_packet{
-  char emptyheader[6];
-  uint32_t reserved;
-  char packetnum2;
-  char framenum2[3];
-  uint64_t bunchid;
-  uint16_t data[BUFFER_LENGTH];
-  uint64_t framenum;
-  uint8_t packetnum;
-} jungfrau_packet;
-#pragma pack(pop)
-*/
 #pragma pack(push)
 #pragma pack(2)
 typedef struct _jungfrau_packet{
@@ -98,16 +84,15 @@ int get_message(int sd, jungfrau_packet * packet){
     //ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), MSG_DONTWAIT, (struct sockaddr *)&clientaddr, &clientaddrlen);
     ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), 0, (struct sockaddr *)&clientaddr, &clientaddrlen);
     
-    #ifdef DEBUG
+#ifdef DEBUG
     if(nbytes >= 0){
+      int stats_frames = 1000;
       printf("+ PID %d ", getpid());
       //printf("-%6c-\t", packet->emptyheader);
-      printf("frame %lu ", packet->framenum);
-      printf("packet %u ", packet->packetnum);
-      printf("data0 %hu ", packet->data[0]);
-      printf("datalast %hu \n", packet->data[BUFFER_LENGTH - 1]);
+      printf(" frame %lu ", packet->framenum);
+      printf(" packet %u \n", packet->packetnum);
     }
-    #endif
+#endif
     
   return nbytes;
 }
@@ -115,6 +100,7 @@ int get_message(int sd, jungfrau_packet * packet){
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int16_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
   
+  int stats_frames = 1000;
   int n_recv_frames = 0;
   uint64_t framenum_last = 0;
   int total_packets = 0;
@@ -125,6 +111,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int64_t tot_lost_packets = 0;
   time_t timeout_i = 0;
 
+  int new_frame = 0;
   //int temp = 0;
   
   //begin
@@ -135,14 +122,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   //int rb_current_slot;
   jungfrau_packet packet;
   uint16_t * p1;
-  jungfrau_header header;
-  int packets_frame = 127;
+  //jungfrau_header header;
+  int packets_frame = 128;
   int last_recorded_packet = -1;
-
-  //end
-  //clock_t ti2;  
-  
-  //int packets_frame_recv[128];
 
   struct  timeval ti, te; //for timing
   double tdif=-1;
@@ -150,26 +132,25 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int line_number = 0;
   int int_line = 0;
   int data_size = 0;
-  int mod_idx_x = mod_idx[0], mod_idx_j = mod_idx[1];
+  int mod_idx_x = mod_idx[0], mod_idx_y = mod_idx[1];
   int mod_size_x = mod_size[0], mod_size_y = mod_size[1];
   //int det_size_x = det_size[0];
   int det_size_y = det_size[1];
+  int mod_number = mod_idx_x + mod_idx_y * det_size_y; //numbering inside the detctor, growing over the x-axis 
   int lines_per_packet = BUFFER_LENGTH / mod_size_y;
   
-  int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_j * det_size_y;
+  int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_y * det_size_y;
 
   data_size = det_size_y * sizeof(uint16_t);
-  //do I need this?
-  //rb_set_buffer_stride_in_byte(rb_dbuffer_id, 2 * 512 * 3 * 1024);
-  //rb_adjust_nslots(rb_header_id);
-  
-  //for(i=0; i< 128; i++)
-  //  packets_frame_recv[i] = 0;
-  
+
   timeout_i = time(NULL);
- 
+
+  struct timeval tv;
+  tv.tv_sec = 0;
+  tv.tv_usec = 50;
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
+  
   while(true){
-  //printf("A\n");
     if(nframes != -1)
       if(n_recv_frames >= nframes)
 	break;
@@ -179,12 +160,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     // no data? Checks timeout
     if(data_len <= 0){
       if ((int)time(NULL) - (int)timeout_i > timeout){
-	//printf("TIMEOUT %d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
+	//printf("TIMEOUT %d %lu new_frame_num %lu slot %d %d \n", getpid(), packet.framenum, framenum_last, rb_current_slot, (int)time(NULL) - (int)timeout_i);
 	
 	// flushes the last message
 	if(rb_current_slot != -1){
 	  rb_commit_slot(rb_writer_id, rb_current_slot);
-	  //printf("Committed slot %d\n", rb_current_slot);
 	}
 	break;
       }
@@ -194,67 +174,56 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     // claim a slot before starting, if data
     if(rb_current_slot == -1){
       rb_current_slot = rb_claim_next_slot(rb_writer_id);
-      //printf("Claimed1 slot %d\n", rb_current_slot);
     }
+
     timeout_i = time(NULL);
+
     if(last_recorded_packet == -1)
       last_recorded_packet = packet.packetnum;
       
     if(framenum_last == 0)
-      framenum_last = packet.framenum;
-      
-    //packets_frame_recv[packet.packetnum] = packet.packetnum + 1;
-                      
-    //this means a new frame, assuming frame number is unique in the sequence
-    
+      framenum_last = packet.framenum;    
 
+    // New frame arrived
     if(packet.framenum != framenum_last){
+      new_frame = 0;
       //printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
-          
+      
       if(rb_current_slot != -1)
 	rb_commit_slot(rb_writer_id, rb_current_slot);
       rb_current_slot = rb_claim_next_slot(rb_writer_id);
-      //printf("Claimed2 slot %d\n", rb_current_slot);
 
       if(rb_current_slot == -1)
 	while(rb_current_slot == -1)
 	  rb_current_slot = rb_claim_next_slot(rb_writer_id);
 
-      // still gives me wrong number it seems, +1
-      //printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
-      if(total_packets != 128){
-	//printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
+      printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
+      if(total_packets != packets_frame){
 	lost_frames ++;
-	tot_lost_frames += 1;
-	lost_packets += 128 - total_packets;
-	tot_lost_packets += 128 - total_packets;
+	tot_lost_frames ++;
+	lost_packets += packets_frame - total_packets;
+	tot_lost_packets += packets_frame - total_packets;
       }
-      //for(i=0; i< 128; i++)
-      //packets_frame_recv[i] = 0;
 	
       framenum_last = packet.framenum;
 
-      int stats_frames = 1000;
-
       stat_total_frames ++;
       n_recv_frames ++;
+
       if (n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
 	gettimeofday(&te, NULL);
 	if (lost_packets != 0){
 	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
-	  printf("| %d | %lu | %.2f | %lu | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
+	  printf("| %d | %lu | %.2f | %lu | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, tot_lost_packets, 100. * (float)tot_lost_packets / (float)(packets_frame * stat_total_frames));
 	}
 	gettimeofday(&ti,NULL);
-	lost_frames = 0;
-	lost_packets = 0;
+	tot_lost_frames = 0;
+	tot_lost_packets = 0;
 	stat_total_frames = 0;
       } 
 
-      total_packets = 0;
+      //total_packets = 0;
     } // end new frame if
-    // This holds no more, packets are coming not in a sequence
-    //else if(packet.packetnum > last_recorded_packet)
-    //  printf("[WARNING] Something went wrong, frame number replicated over frames new_packet:%d last_packet:%d\n", packet.packetnum, last_recorded_packet);
       
     last_recorded_packet = packet.packetnum;
 
@@ -262,7 +231,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
     p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
     
-    line_number = lines_per_packet * (packets_frame - packet.packetnum);
+    line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
     
     p1 += mod_origin;
@@ -273,25 +242,24 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       int_line ++;
     }
 
-    header.framenum = packet.framenum;
-      
-    if(ph->framenum != packet.framenum){
-      memcpy(ph, &header, sizeof(header));
+    if(new_frame == 0){
+      new_frame = 1;
+      total_packets = 0;
     }
+    total_packets ++;
 
+    // Copy the framenum
+    ph += mod_number;
+    ph->framemetadata[0] = packet.framenum;
+    ph->framemetadata[1] = packets_frame - total_packets;
+    //printf("PID %lu %d %d %d %d \n", packet.framenum, getpid(), packets_frame, total_packets,  packets_frame - total_packets);
+    // ph[2] = bits;
+    // ph[3] = bits;
+    
     // This should cast an error, or a warning
     if(rb_current_slot == -1)
       continue;
-      
-    if(tdif < 0){
-      //ti2 = clock();
-      tdif = 0;
-      gettimeofday(&ti, NULL);
-    }    
-
-    //last_recorded_packet = packet.packetnum;
-    total_packets ++;
-
+          
   } // end while
 
 
@@ -353,8 +321,8 @@ int main(int argc, char *argv[]){
     }
 
     if (recv_frames % 1000 == 0 && packet.packetnum == 127 && recv_frames != 0){
-      lost_packets = 128 * recv_frames - recv_packets;
-      printf("%d %d %d %.1f\n", getpid(), recv_frames, lost_packets, 100. * (float)(lost_packets) / (float)(128 * recv_frames));
+      lost_packets = packets_frame * recv_frames - recv_packets;
+      printf("%d %d %d %.1f\n", getpid(), recv_frames, lost_packets, 100. * (float)(lost_packets) / (float)(packets_frame * recv_frames));
     }
     recv_packets ++;
 

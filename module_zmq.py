@@ -23,14 +23,23 @@ HEADER_ARRAY = ctypes.c_char * 6
 
 CACHE_LINE_SIZE = 64
 
-class HEADER(ctypes.Structure):
-    _fields_ = [
-        ("framenum", ctypes.c_uint64),
-        ("packetnum", ctypes.c_uint8),
-        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 8 - 1))
-        ]
+class Mystruct(ctypes.Structure):
+    _fields_ = [("framemetadata", ctypes.c_uint64 * 8), ]
 
-header = HEADER(ctypes.c_uint64(), ctypes.c_uint8(),  np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 8 - 1, dtype=np.uint8)))
+
+_mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libstruct_array.so")
+
+HEADER = Mystruct * 10
+
+
+#class HEADER(ctypes.Structure):
+#    _fields_ = [
+#        ("framenum", ctypes.c_uint64),
+#        ("packetnum", ctypes.c_uint8),
+#        ("padding", ctypes.c_uint8 * (CACHE_LINE_SIZE - 8 - 1))
+#        ]
+
+#header = HEADER(ctypes.c_uint64(), ctypes.c_uint8(),  np.ctypeslib.as_ctypes(np.zeros(CACHE_LINE_SIZE - 8 - 1, dtype=np.uint8)))
 
 
 def send_array(socket, A, flags=0, copy=False, track=True, frame=-1):
@@ -74,7 +83,7 @@ class ZMQSender(DataFlowNode):
         self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64)
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
                                            int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
@@ -98,17 +107,17 @@ class ZMQSender(DataFlowNode):
         if "period" in settings:
             self.period = settings["period"] / 1000000000
         self.first_frame = -1
-        
-    def send(self, data):    
+
+    def send(self, data):
         # FIXME
         timeout = 1  # ctypes.c_int(max(int(2. * self.period), 1))
 
         ref_time = time()
         counter = 0
-        while (counter < self.n_frames or self.n_frames == -1) and (time() -  ref_time < timeout):
+        while (counter < self.n_frames or self.n_frames == -1) and (time() - ref_time < timeout):
             try:
                 self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
-                
+
                 if self.rb_current_slot == -1:
                     continue
                     #sleep(1)
@@ -117,16 +126,22 @@ class ZMQSender(DataFlowNode):
                     #    break
                 #self.log.debug("READER: self.rb_current_slot" + str(self.rb_current_slot))
 
-                pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot), type(ctypes.pointer(header)))
+                pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
+                                       ctypes.POINTER(HEADER))
+                #type(ctypes.pointer(header)))
+                for i in range(3):
+                    print(i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1])
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
                 #self.log.debug("WRITER " +  str(pointerh.contents.framenum))
-                if self.first_frame == -1:
-                    self.first_frame = pointerh.contents.framenum
+                #if self.first_frame == -1:
+                #    self.first_frame = pointerh.contents.framenum
                 
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
-                send_array(self.skt, data.reshape(self.detector_size), frame=pointerh.contents.framenum - self.first_frame, ) #flags=zmq.NOBLOCK)
+                send_array(self.skt, data.reshape(self.detector_size), )
+
+                #frame=pointerh.contents.framenum - self.first_frame, ) #flags=zmq.NOBLOCK)
                 counter += 1
                 ref_time = time()
 
@@ -136,8 +151,8 @@ class ZMQSender(DataFlowNode):
 
             except KeyboardInterrupt:
                 raise StopIteration
-        
-        #self.log.info("Writer loop exited")
+
+        self.log.info("Writer loop exited")
         self.pass_on(counter)
         return(counter)
     
