@@ -248,11 +248,17 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     }
     total_packets ++;
 
-    // Copy the framenum
+    // Copy the framenumg
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;
     ph->framemetadata[1] = packets_frame - total_packets;
-    //printf("PID %lu %d %d %d %d \n", packet.framenum, getpid(), packets_frame, total_packets,  packets_frame - total_packets);
+    int mask = 1 << packet.packetnum;
+    if(packet.packetnum < 64)
+      ph->framemetadata[2] ^= mask;
+    else
+      ph->framemetadata[3] ^= mask;
+   
+      //printf("PID %lu %d %d %d %d \n", packet.framenum, getpid(), packets_frame, total_packets,  packets_frame - total_packets);
     // ph[2] = bits;
     // ph[3] = bits;
     
