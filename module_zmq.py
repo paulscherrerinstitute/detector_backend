@@ -130,7 +130,8 @@ class ZMQSender(DataFlowNode):
                                        ctypes.POINTER(HEADER))
                 #type(ctypes.pointer(header)))
                 for i in range(3):
-                    print(i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1])
+                    print(i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1],
+                          pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3])
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
                 #self.log.debug("WRITER " +  str(pointerh.contents.framenum))
