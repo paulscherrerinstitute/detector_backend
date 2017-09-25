@@ -28,13 +28,20 @@
 #pragma pack(2)
 typedef struct _jungfrau_packet{
   char emptyheader[6];
-  uint32_t reserved;
-  char packetnum2;
-  char framenum2[3];
-  uint64_t bunchid;
-  uint16_t data[BUFFER_LENGTH];
   uint64_t framenum;
-  uint8_t packetnum;
+  uint32_t exptime;
+  uint32_t packetnum;
+  uint64_t bunchid;
+  uint64_t timestamp;
+  uint16_t moduleID;
+  uint16_t xCoord;
+  uint16_t yCoord;
+  uint16_t zCoord;
+  uint32_t debug;
+  uint16_t roundRobin;
+  uint8_t detectortype;
+  uint8_t headerVersion;
+  uint16_t data[BUFFER_LENGTH];
 } jungfrau_packet;
 #pragma pack(pop)
 
@@ -55,10 +62,10 @@ int get_message(int sd, jungfrau_packet * packet){
     //			      (struct sockaddr *)&clientaddr, &clientaddrlen);
   
 
-    ssize_t nbytes = recv(sd, packet, sizeof(*packet) - 8 - 1, 0); //, MSG_DONTWAIT);
-    packet->framenum = (((int)(packet->framenum2[2])&0xff)<<16) + (((int)(packet->framenum2[1])&0xff)<<8) +((int)(packet->framenum2[0])&0xff);
+    ssize_t nbytes = recv(sd, packet, sizeof(*packet), 0); //, MSG_DONTWAIT);
+    //packet->framenum = (((int)(packet->framenum2[2])&0xff)<<16) + (((int)(packet->framenum2[1])&0xff)<<8) +((int)(packet->framenum2[0])&0xff);
   
-    packet->packetnum =  (uint16_t)((packet->packetnum2));
+    //packet->packetnum =  (uint16_t)((packet->packetnum2));
 
     /*
   #ifdef DEBUG
@@ -104,7 +111,8 @@ int main(int argc, char *argv[]){
   int recv_frames;
   int last_frame;
   int lost_packets;
-
+  int new_frame = 1;
+  
   sd = socket(AF_INET, SOCK_DGRAM, 0);
   printf("SD: %d\n", sd);
   
@@ -122,7 +130,7 @@ int main(int argc, char *argv[]){
   serveraddr.sin_addr.s_addr = inet_addr(argv[1]);
   
   rc = bind(sd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-  printf("RC bind: %d %s %d \n", rc, "10.30.10.2", atoi(argv[2]));
+  printf("RC bind: %d %s %d \n", rc, argv[1], atoi(argv[2]));
   
   recv_packets = 0;
   recv_frames = 0;
@@ -132,13 +140,13 @@ int main(int argc, char *argv[]){
   struct sockaddr_in clientaddr;
   int    clientaddrlen = sizeof(clientaddr);
   ssize_t nbytes;
-
+  
   while(1==1){
     data_len = get_message(sd, &packet);
     //nbytes = recvfrom(sd, &packet, sizeof(packet), 0, 
     //(struct sockaddr *)&clientaddr, &clientaddrlen);
 
-    memcpy(data, packet.data, 4096*sizeof(uint16_t));
+    //memcpy(data, packet.data, 4096*sizeof(uint16_t));
 
     if (data_len == 0)
       continue;
@@ -146,14 +154,19 @@ int main(int argc, char *argv[]){
     if (last_frame == -1)
       last_frame = packet.framenum;
 
+    new_frame = 1;
     if (last_frame != packet.framenum){
       recv_frames ++;
       last_frame = packet.framenum;
+      new_frame = 0;
+      
     }
 
-    if (recv_frames % 1000 == 0 && packet.packetnum == 127 && recv_frames != 0){
+    if (recv_frames % 1000 == 0 && new_frame == 0){
       lost_packets = 128 * recv_frames - recv_packets;
       printf("%d %d %d %.1f\n", getpid(), recv_frames, lost_packets, 100. * (float)(lost_packets) / (float)(128 * recv_frames));
+      recv_packets = 0;
+      recv_frames = 0;
     }
     recv_packets ++;
 
