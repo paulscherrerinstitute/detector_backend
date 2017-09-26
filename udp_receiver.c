@@ -111,9 +111,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int64_t tot_lost_packets = 0;
   time_t timeout_i = 0;
 
-  int new_frame = 0;
-  //int temp = 0;
-  
   //begin
   int   data_len;
   int i;
@@ -162,7 +159,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       if ((int)time(NULL) - (int)timeout_i > timeout){
 	//printf("TIMEOUT %d %lu new_frame_num %lu slot %d %d \n", getpid(), packet.framenum, framenum_last, rb_current_slot, (int)time(NULL) - (int)timeout_i);
 	
-	// flushes the last message
+	// flushes the last message - what happens if I commit an already committed slot?
 	if(rb_current_slot != -1){
 	  rb_commit_slot(rb_writer_id, rb_current_slot);
 	}
@@ -186,18 +183,25 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
     // New frame arrived
     if(packet.framenum != framenum_last){
-      new_frame = 0;
-      //printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
+     
+      if(total_packets != packets_frame){
       
-      if(rb_current_slot != -1)
-	rb_commit_slot(rb_writer_id, rb_current_slot);
+      //printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
+	if(rb_current_slot != -1)
+	  rb_commit_slot(rb_writer_id, rb_current_slot);
+      }
       rb_current_slot = rb_claim_next_slot(rb_writer_id);
-
+      
       if(rb_current_slot == -1)
 	while(rb_current_slot == -1)
 	  rb_current_slot = rb_claim_next_slot(rb_writer_id);
 
       printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
+
+      total_packets = 0;
+
+
+      // refactor statistics
       if(total_packets != packets_frame){
 	lost_frames ++;
 	tot_lost_frames ++;
@@ -210,7 +214,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       stat_total_frames ++;
       n_recv_frames ++;
 
-      if (n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
+      if(n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
 	gettimeofday(&te, NULL);
 	if (lost_packets != 0){
 	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
@@ -222,10 +226,10 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	stat_total_frames = 0;
       } 
 
-      //total_packets = 0;
     } // end new frame if
       
     last_recorded_packet = packet.packetnum;
+    total_packets ++;
 
     // data copy
     ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
@@ -242,13 +246,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       int_line ++;
     }
 
-    if(new_frame == 0){
-      new_frame = 1;
-      total_packets = 0;
-    }
-    total_packets ++;
-
-    // Copy the framenumg
+    // Copy the framenum and frame metadata
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;
     ph->framemetadata[1] = packets_frame - total_packets;
@@ -258,17 +256,10 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     else
       ph->framemetadata[3] ^= mask;
    
-      //printf("PID %lu %d %d %d %d \n", packet.framenum, getpid(), packets_frame, total_packets,  packets_frame - total_packets);
-    // ph[2] = bits;
-    // ph[3] = bits;
-    
-    // This should cast an error, or a warning
-    if(rb_current_slot == -1)
-      continue;
-          
+    if(total_packets == packets_frame)
+      rb_commit_slot(rb_writer_id, rb_current_slot);
+
   } // end while
-
-
 
   return n_recv_frames;
 }

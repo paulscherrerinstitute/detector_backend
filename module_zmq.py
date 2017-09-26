@@ -50,6 +50,7 @@ def send_array(socket, A, flags=0, copy=False, track=True, frame=-1):
         shape=A.shape,
         frame=frame
     )
+    print(md)
     socket.send_json(md, flags | zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
