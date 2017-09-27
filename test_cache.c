@@ -33,8 +33,8 @@ int main(int argc, char * argv[]){
     
   if(id == 0){
     printf("id is 0, creating header file\n");
-    ret = rb_create_header_file("header.dat");
-    assert(ret == true);
+    //ret = rb_create_header_file("header.dat");
+    //assert(ret == true);
   }
   //else
   //  sleep(1);
@@ -47,29 +47,23 @@ int main(int argc, char * argv[]){
   // connect buffers
   rb_buffer_id buffer_id = rb_attach_buffer_to_header("/dev/shm/eiger/rb_image_header.dat", header_id, 0);
   //set stride to image size
-  rb_set_buffer_stride_in_byte(buffer_id, 64);
+  rb_set_buffer_stride_in_byte(buffer_id, 6400);
   rb_adjust_nslots(header_id);
   //rb_print_header(header_id);
 
-  slot = rb_claim_next_slot(writer);
-  //printf("Got slot %d\n", slot);
-  p1 = (jungfrau_header *) rb_get_buffer_slot(buffer_id, slot);
+  //slot = rb_claim_next_slot(writer);
+  //p1 = (jungfrau_header *) rb_get_buffer_slot(buffer_id, slot);
     
-
-  //p1 += (uint64_t) lineid;
-  // write data
-  //for(int i=0; i<10; i++)
-  //  printf("%lu ", p1[lineid].framemetadata[i]);
-  ///printf("\n");
-
-  //for(int i=0; i<10; i++)
-  //  printf("%lu ", p1[lineid].framemetadata[i]);
-  //printf("\n");
-
   for(int j=0; j<1000; j++){
-    for(int i=0; i<1000000; i++)
+    for(int i=0; i<1000000; i++){
+      slot = rb_claim_next_slot(writer);
+    
+      p1 = (jungfrau_header *) rb_get_buffer_slot(buffer_id, slot);
+      
       p1[lineid].framemetadata[id] = (uint64_t) id;
-
+      //printf("Got %d slot %d\n", writer, slot);
+      rb_commit_slot(writer, slot);
+  }
   //for(int i=0; i<10; i++)
    // printf("%lu ", p1[lineid].framemetadata[i]);
   //printf("\n");
