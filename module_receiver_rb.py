@@ -101,7 +101,9 @@ class ModuleReceiver(DataFlowNode):
             self.log.debug("create ringbuffer header files")
             for f in files:
                 ret = rb.create_header_file(f)
-                assert ret is True
+                if not ret:
+                    self.log.error("Ring buffer files do not exist!")
+                    raise RuntimeError("Ring buffer files do not exist!")
                 self.log.debug("created %s", f)
             self.worker_communicator.barrier()
                 
