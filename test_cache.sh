@@ -8,9 +8,9 @@ PIDS=()
 let N1=N-1
 for i in `seq 0 ${N1}`; do
     if [ $sharing == 1 ]; then 
-	$cmd -c $i ./test_cache $i 1  &>> ${N}_${sharing}.log &
+	$cmd -c $(($i % 36)) ./test_cache $i 1  &>> ${N}_${sharing}.log &
     else
-	$cmd -c $i ./test_cache $i $i &>> ${N}_${sharing}.log &
+	$cmd -c $(($i % 36)) ./test_cache $i $i &>> ${N}_${sharing}.log &
     fi
     PIDS[i]=$!
 done
