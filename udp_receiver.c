@@ -196,10 +196,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	while(rb_current_slot == -1)
 	  rb_current_slot = rb_claim_next_slot(rb_writer_id);
 
-      printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
-
-      total_packets = 0;
-
+      //printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
 
       // refactor statistics
       if(total_packets != packets_frame){
@@ -225,6 +222,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	tot_lost_packets = 0;
 	stat_total_frames = 0;
       } 
+      total_packets = 0;
 
     } // end new frame if
       

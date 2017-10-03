@@ -27,7 +27,7 @@ class Mystruct(ctypes.Structure):
     _fields_ = [("framemetadata", ctypes.c_uint64 * 8), ]
 
 
-_mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libstruct_array.so")
+#_mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libstruct_array.so")
 
 HEADER = Mystruct * 10
 
@@ -41,7 +41,7 @@ def send_array(socket, A, flags=0, copy=False, track=True, frame=-1, is_good_fra
         frame=frame,
         is_good_frame=is_good_frame,
     )
-    print(md)
+    #print(md)
     socket.send_json(md, flags | zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
@@ -127,20 +127,19 @@ class ZMQSender(DataFlowNode):
 
                 # check that all frame numbers are the same
                 if self.check_framenum:
-                    framenums = [pointerh.contents[i].framemetadata[0] for i in range(n_modules)]
+                    framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
                     is_good_frame = len(set(framenums)) == 1
 
                 framenum = pointerh.contents[0].framemetadata[0]
 
                 # check if packets are missing
-                missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(n_modules)])
+                missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
                 is_good_frame = missing_packets == 0
                 if missing_packets != 0:
                     self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
                 
-                for i in range(n_modules):
-                    self.log.debug(i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1],
-                          pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3])
+                for i in range(self.n_modules):
+                    self.log.debug("%d %d %d %d %d" % (i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1],                                  pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3]))
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
@@ -157,7 +156,7 @@ class ZMQSender(DataFlowNode):
             except KeyboardInterrupt:
                 raise StopIteration
 
-        self.log.info("Writer loop exited")
+        self.log.debug("Writer loop exited")
         self.pass_on(counter)
         return(counter)
     
