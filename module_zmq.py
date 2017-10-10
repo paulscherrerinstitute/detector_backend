@@ -146,7 +146,9 @@ class ZMQSender(DataFlowNode):
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
+                # TODO: benchmark speed of this:
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
+
                 send_array(self.skt, data.reshape(self.detector_size), frame=framenum, is_good_frame=is_good_frame)
                 self.metrics.set("received_frames", {"total": counter, "incomplete": frames_with_missing_packets, 
                                                      "packets_lost": total_missing_packets})
@@ -156,7 +158,7 @@ class ZMQSender(DataFlowNode):
 
                 #self.log.debug("WRITER " +  str(pointerh.contents.framenum - self.first_frame))
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
-                    self.log.error("CANNOT COMMIT SLOT")
+                    self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
 
             except KeyboardInterrupt:
                 raise StopIteration
