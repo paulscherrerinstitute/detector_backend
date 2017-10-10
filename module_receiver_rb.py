@@ -14,6 +14,7 @@ import ctypes
 import numpy as np
 import os
 import zmq
+import sys
 
 from time import time, sleep
 
@@ -185,6 +186,17 @@ class ModuleReceiver(DataFlowNode):
             self.n_frames = settings["n_frames"]
         
     def reset(self):
-        pass
+        self.log.info("Restarting the socket connection")
+        try:
+            self.sock.shutdown(socket.SHUT_RD)
+        except:
+            self.log.error(sys.exc_info()[1])
+        self.sock.close()
+        self.sock = socket.socket(socket.AF_INET,  # Internet
+                                  socket.SOCK_DGRAM)  # UDP
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, str(10000 * 1024 * 1024))
+        self.sock.bind((self.ip, self.port))
+        self.log.info("Socket connection restarted")
+
 
 

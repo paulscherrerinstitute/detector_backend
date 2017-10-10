@@ -16,6 +16,7 @@ c = get_config()  # @UndefinedVariable
 
 
 rb_fdir = "/dev/shm/eiger/"
+#rb_fdir = "/mnt/north/"
 rb_head_file = rb_fdir + "rb_header.dat"
 rb_imghead_file = rb_fdir + "rb_image_header.dat"
 rb_imgdata_file = rb_fdir + "rb_image_data.dat"

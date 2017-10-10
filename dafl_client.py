@@ -79,3 +79,12 @@ class DaflClient(object):
         response = self.send_request("POST", '/state/reset', json_cfg=cfg)
         return self.return_response(response)
 
+    def get_metrics(self, *args):
+        """
+        Input: strings, identifying the metrics name
+        Output: dict 
+        """
+        print(args)
+        answer = json.loads(self.send_request("GET", "/metrics").content)["value"]["backend"]
+        ret = {k: answer.get(k, None) for k in args}
+        return ret

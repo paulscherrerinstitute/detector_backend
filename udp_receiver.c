@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -8,6 +9,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sched.h>
 
 // for uint64 printing
 #include <inttypes.h>
@@ -186,7 +188,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
      
       if(total_packets != packets_frame){
       
-      //printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
+	//printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
 	if(rb_current_slot != -1)
 	  rb_commit_slot(rb_writer_id, rb_current_slot);
       }
@@ -213,10 +215,10 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
       if(n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
 	gettimeofday(&te, NULL);
-	if (lost_packets != 0){
+	//if (lost_packets != 0){
 	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
-	  printf("| %d | %lu | %.2f | %lu | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, tot_lost_packets, 100. * (float)tot_lost_packets / (float)(packets_frame * stat_total_frames));
-	}
+	  printf("| %d | %d | %lu | %.2f | %lu | %.1f |\n", sched_getcpu(), getpid(), framenum_last, (double) stats_frames / tdif, tot_lost_packets, 100. * (float)tot_lost_packets / (float)(packets_frame * stat_total_frames));
+	  //}
 	gettimeofday(&ti,NULL);
 	tot_lost_frames = 0;
 	tot_lost_packets = 0;
@@ -237,13 +239,41 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     int_line = 0;
     
     p1 += mod_origin;
+    /*
     for(i=line_number; i < line_number + lines_per_packet; i++){
+      
       memcpy(p1 + i * det_size_y,
 	     packet.data + int_line * det_size_y,
 	     data_size);
+      
       int_line ++;
     }
-
+    */
+    i = line_number;
+    memcpy(p1 + i * det_size_y,
+	   packet.data + int_line * det_size_y,
+	   data_size);
+    int_line ++;
+    i ++;
+    /*
+    memcpy(p1 + i * det_size_y,
+	   packet.data + int_line * det_size_y,
+	   data_size);
+    int_line ++;
+    i ++;
+    memcpy(p1 + i * det_size_y,
+	   packet.data + int_line * det_size_y,
+	   data_size);
+    int_line ++;
+    i ++;
+    */
+    /*
+    memcpy(p1 + i * det_size_y,
+	   packet.data + int_line * det_size_y,
+	   data_size);
+    int_line ++;
+    i ++;
+    */
     // Copy the framenum and frame metadata
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;

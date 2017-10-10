@@ -135,9 +135,9 @@ class ZMQSender(DataFlowNode):
                 # check if packets are missing
                 missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
                 is_good_frame = missing_packets == 0
-                if missing_packets != 0:
-                    self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
-                
+                #if missing_packets != 0:
+                #    self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
+                    
                 for i in range(self.n_modules):
                     self.log.debug("%d %d %d %d %d" % (i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1],                                  pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3]))
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
