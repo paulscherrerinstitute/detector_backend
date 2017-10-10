@@ -140,6 +140,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   
   int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_y * det_size_y;
 
+  uint64_t packets_lost_int1=0, packets_lost_int2=0;
+
   data_size = det_size_y * sizeof(uint16_t);
 
   timeout_i = time(NULL);
@@ -192,6 +194,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	if(rb_current_slot != -1)
 	  rb_commit_slot(rb_writer_id, rb_current_slot);
       }
+      
+      // resetting encoded ints for packets lost
+      packets_lost_int1 = 0;
+      packets_lost_int2 = 0;
+
       rb_current_slot = rb_claim_next_slot(rb_writer_id);
       
       if(rb_current_slot == -1)
@@ -215,10 +222,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
       if(n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
 	gettimeofday(&te, NULL);
-	//if (lost_packets != 0){
+	if (lost_packets != 0){
 	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
+
 	  printf("| %d | %d | %lu | %.2f | %lu | %.1f |\n", sched_getcpu(), getpid(), framenum_last, (double) stats_frames / tdif, tot_lost_packets, 100. * (float)tot_lost_packets / (float)(packets_frame * stat_total_frames));
-	  //}
+	}
 	gettimeofday(&ti,NULL);
 	tot_lost_frames = 0;
 	tot_lost_packets = 0;
@@ -279,11 +287,15 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     ph->framemetadata[0] = packet.framenum;
     ph->framemetadata[1] = packets_frame - total_packets;
     int mask = 1 << packet.packetnum;
-    if(packet.packetnum < 64)
-      ph->framemetadata[2] ^= mask;
-    else
-      ph->framemetadata[3] ^= mask;
-   
+    if(packet.packetnum < 64){
+      ph->framemetadata[2] = packets_lost_int1 ^ mask;
+      packets_lost_int1 = ph->framemetadata[2];
+    }
+    else{
+      ph->framemetadata[3] = packets_lost_int2 ^ mask;
+      packets_lost_int2 = ph->framemetadata[3];
+      //ph->framemetadata[3] ^= mask;
+    }
     if(total_packets == packets_frame)
       rb_commit_slot(rb_writer_id, rb_current_slot);
 
