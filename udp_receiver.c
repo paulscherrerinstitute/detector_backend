@@ -203,7 +203,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	while(rb_current_slot == -1)
 	  rb_current_slot = rb_claim_next_slot(rb_writer_id);
 
-      printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
+      //printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
 
       // refactor statistics
       if(total_packets != packets_frame){
@@ -223,7 +223,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	if (lost_packets != 0){
 	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
 	  printf("| %d | %lu | %.2f | %lu | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, tot_lost_packets, 100. * (float)tot_lost_packets / (float)(packets_frame * stat_total_frames));
-	}
+	  }
 	gettimeofday(&ti,NULL);
 	tot_lost_frames = 0;
 	tot_lost_packets = 0;

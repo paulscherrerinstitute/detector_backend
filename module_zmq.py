@@ -109,7 +109,9 @@ class ZMQSender(DataFlowNode):
 
         ref_time = time()
         counter = 0
+        frames_with_missing_packets = 0
         is_good_frame = True
+        total_missing_packets = 0
         while (counter < self.n_frames or self.n_frames == -1) and (time() - ref_time < timeout):
             try:
                 self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
@@ -137,7 +139,8 @@ class ZMQSender(DataFlowNode):
                 is_good_frame = missing_packets == 0
                 if missing_packets != 0:
                     self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
-                
+                    frames_with_missing_packets += 1
+                    total_missing_packets += missing_packets
                 for i in range(self.n_modules):
                     self.log.debug("%d %d %d %d %d" % (i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1],                                  pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3]))
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
@@ -145,6 +148,8 @@ class ZMQSender(DataFlowNode):
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
                 send_array(self.skt, data.reshape(self.detector_size), frame=framenum, is_good_frame=is_good_frame)
+                self.metrics.set("received_frames", {"total": counter, "incomplete": frames_with_missing_packets, 
+                                                     "packets_lost": total_missing_packets})
 
                 counter += 1
                 ref_time = time()
