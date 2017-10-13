@@ -32,17 +32,21 @@ class Mystruct(ctypes.Structure):
 HEADER = Mystruct * 10
 
 
-def send_array(socket, A, flags=0, copy=False, track=True, frame=-1, is_good_frame=True, packets_lost=[0,0]):
+def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
     """send a numpy array with metadata"""
-    md = dict(
-        htype="array-1.0",
-        type=str(A.dtype),
-        shape=A.shape,
-        frame=frame,
-        is_good_frame=is_good_frame,
-    )
+    metadata["htype"] = "array-1.0"
+    metadata["type"] = str(A.dtype)
+    metadata["shape"] = A.shape
+
+    #md = dict(
+    #    htype="array-1.0",
+    #    type=str(A.dtype),
+    #    shape=A.shape,
+    #    frame=frame,
+    #    is_good_frame=is_good_frame,
+    #)
     #print(md)
-    socket.send_json(md, flags | zmq.SNDMORE)
+    socket.send_json(metadata, flags | zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
 
@@ -94,9 +98,9 @@ class ZMQSender(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
-                                           int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
+                                     int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         rb.adjust_nslots(self.rb_header_id)
-        
+
         self.context = zmq.Context()
         self.open_sockets()
 
@@ -116,7 +120,7 @@ class ZMQSender(DataFlowNode):
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
         if "period" in settings:
-            self.period = settings["period"] / 1000000000
+            self.period = settings["period"] / 1e9
         self.first_frame = -1
 
     def send(self, data):
@@ -152,6 +156,8 @@ class ZMQSender(DataFlowNode):
                     is_good_frame = len(set(framenums)) == 1
 
                 framenum = pointerh.contents[0].framemetadata[0]
+                daq_rec = pointerh.contents[0].framemetadata[4]
+                pulseid = pointerh.contents[0].framemetadata[5]
 
                 # check if packets are missing
                 missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
@@ -161,7 +167,7 @@ class ZMQSender(DataFlowNode):
                     frames_with_missing_packets += 1
                     total_missing_packets += missing_packets
 
-                #for i in range(self.n_modules):
+                # for i in range(self.n_modules):
                 #    self.log.debug("%d %d %d %d %d" % (i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1], pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3]))
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
@@ -170,11 +176,10 @@ class ZMQSender(DataFlowNode):
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
 
                 try:
-                    send_array(self.skt, data.reshape(self.detector_size), frame=framenum, is_good_frame=is_good_frame)
+                    send_array(self.skt, data.reshape(self.detector_size), metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulseid": pulseid})
                 except:
                     pass
-                self.metrics.set("received_frames", {"total": self.counter, "incomplete": frames_with_missing_packets, 
-                                                     "packets_lost": total_missing_packets, "epoch": time()})
+                self.metrics.set("received_frames", {"total": self.counter, "incomplete": frames_with_missing_packets, "packets_lost": total_missing_packets, "epoch": time()})
 
                 self.counter += 1
                 frame_comp_counter += 1
@@ -186,7 +191,6 @@ class ZMQSender(DataFlowNode):
                     
                 ref_time = time()
 
-                #self.log.debug("WRITER " +  str(pointerh.contents.framenum - self.first_frame))
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
                 break

@@ -157,11 +157,9 @@ class ModuleReceiver(DataFlowNode):
         #print(self.n_elements_line, self.n_packets_frame)
         
     def send(self, data):
-        #print("Receiver ID:", self.rb_id)
-
         n_recv_frames = 0
 
-        cframenum = ctypes.c_uint16(-1)
+        # cframenum = ctypes.c_uint16(-1)
         self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
         self.log.info("Timeout is %d" % self.timeout.value)
 
@@ -173,6 +171,11 @@ class ModuleReceiver(DataFlowNode):
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot,
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, det_size, mod_size, mod_idx, self.timeout)
+
+        # This means that the put_Data_in_rb routine was not able to get a slot
+        if rb.get_buffer_slot(self.rb_writer_id) == -1:
+            self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
+
         self.log.info("Received %d" % n_recv_frames)
         self.pass_on(n_recv_frames)
         # needed
