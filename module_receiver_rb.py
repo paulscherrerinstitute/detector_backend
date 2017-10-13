@@ -163,6 +163,7 @@ class ModuleReceiver(DataFlowNode):
 
         cframenum = ctypes.c_uint16(-1)
         self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
+        self.log.info("Timeout is %d" % self.timeout.value)
 
         mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
         det_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
@@ -172,8 +173,7 @@ class ModuleReceiver(DataFlowNode):
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot,
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, det_size, mod_size, mod_idx, self.timeout)
-        #ret = put_data_in_rb_old(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, self.INDEX_ARRAY, self.n_frames)
-
+        self.log.info("Received %d" % n_recv_frames)
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
@@ -187,10 +187,6 @@ class ModuleReceiver(DataFlowNode):
         
     def reset(self):
         self.log.info("Restarting the socket connection")
-        try:
-            self.sock.shutdown(socket.SHUT_RD)
-        except:
-            self.log.error(sys.exc_info()[1])
         self.sock.close()
         self.sock = socket.socket(socket.AF_INET,  # Internet
                                   socket.SOCK_DGRAM)  # UDP

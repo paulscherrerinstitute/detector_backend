@@ -64,7 +64,22 @@ class ZMQSender(DataFlowNode):
     rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
 
     check_framenum = Bool(True, config=True, reconfig=True, help="Check that the frame numbers of all the modules are the same")
-    
+
+    def open_sockets(self):
+        self.log.info("CALLING OPEN")
+        self.skt = self.context.socket(zmq.__getattribute__(self.socket_type))
+        self.skt.bind(self.uri)
+        self.skt.SNDTIMEO = 1000
+
+    def close_sockets(self):
+        #self.skt.unbind(self.uri)
+        self.log.info("CALLING CLOSE")
+        self.skt.close(linger=0)
+        #self.skt.destroy()
+        while not self.skt.closed:
+            print(self.skt.closed)
+            sleep(1)
+
     def __init__(self, **kwargs):
         super(ZMQSender, self).__init__(**kwargs)
         self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
@@ -83,8 +98,7 @@ class ZMQSender(DataFlowNode):
         rb.adjust_nslots(self.rb_header_id)
         
         self.context = zmq.Context()
-        self.skt = self.context.socket(zmq.__getattribute__(self.socket_type))
-        self.skt.bind(self.uri)
+        self.open_sockets()
 
         self.rb_current_slot = -1
 
@@ -93,6 +107,8 @@ class ZMQSender(DataFlowNode):
         self.first_frame = -1
 
         self.n_modules = self.geometry[0] * self.geometry[1]
+
+        self.counter = 0
         self.log.info("ZMQ streamer initialized")
 
     def reconfigure(self, settings):
@@ -108,11 +124,14 @@ class ZMQSender(DataFlowNode):
         timeout = 1  # ctypes.c_int(max(int(2. * self.period), 1))
 
         ref_time = time()
-        counter = 0
+        frame_comp_time = time()
+        frame_comp_counter = 0
         frames_with_missing_packets = 0
         is_good_frame = True
         total_missing_packets = 0
-        while (counter < self.n_frames or self.n_frames == -1) and (time() - ref_time < timeout):
+        
+        # FIXME avoid infinit loop
+        while (self.counter < self.n_frames or self.n_frames == -1) and (time() - ref_time < timeout):
             try:
                 self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
 
@@ -142,31 +161,45 @@ class ZMQSender(DataFlowNode):
                     frames_with_missing_packets += 1
                     total_missing_packets += missing_packets
 
-                for i in range(self.n_modules):
-                    self.log.debug("%d %d %d %d %d" % (i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1],                                  pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3]))
+                #for i in range(self.n_modules):
+                #    self.log.debug("%d %d %d %d %d" % (i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1], pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3]))
                 pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 # TODO: benchmark speed of this:
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
 
-                send_array(self.skt, data.reshape(self.detector_size), frame=framenum, is_good_frame=is_good_frame)
-                self.metrics.set("received_frames", {"total": counter, "incomplete": frames_with_missing_packets, 
-                                                     "packets_lost": total_missing_packets})
+                try:
+                    send_array(self.skt, data.reshape(self.detector_size), frame=framenum, is_good_frame=is_good_frame)
+                except:
+                    pass
+                self.metrics.set("received_frames", {"total": self.counter, "incomplete": frames_with_missing_packets, 
+                                                     "packets_lost": total_missing_packets, "epoch": time()})
 
-                counter += 1
+                self.counter += 1
+                frame_comp_counter += 1
+                
+                #if frame_comp_time % 10 == 0:
+                #    self.metrics.set("frame_rate_computed", float(frame_comp_counter) / (time() - frame_comp_time))
+                #    frame_comp_counter = 0
+                #    frame_comp_time = time()
+                    
                 ref_time = time()
 
                 #self.log.debug("WRITER " +  str(pointerh.contents.framenum - self.first_frame))
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
-
+                break
             except KeyboardInterrupt:
                 raise StopIteration
 
         self.log.debug("Writer loop exited")
-        self.pass_on(counter)
-        return(counter)
+        self.pass_on(self.counter)
+        return(self.counter)
     
     def reset(self):
-        pass
+        self.counter = 0
+        self.close_sockets()
+        sleep(1)
+        self.open_sockets()
+        self.log.info("Reset done")

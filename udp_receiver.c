@@ -158,8 +158,10 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     
     data_len = get_message(sock, &packet);
 
-    // no data? Checks timeout
+    // no data? Checks timeout 
+    // FIXME: what to do when ringbuffer is full, and cannot get a slot? Exit and retry?
     if(data_len <= 0){
+      //printf("TIMEOUT %d %lu new_frame_num %lu slot %d %d \n", getpid(), packet.framenum, framenum_last, rb_current_slot, (int)time(NULL) - (int)timeout_i);
       if ((int)time(NULL) - (int)timeout_i > timeout){
 	//printf("TIMEOUT %d %lu new_frame_num %lu slot %d %d \n", getpid(), packet.framenum, framenum_last, rb_current_slot, (int)time(NULL) - (int)timeout_i);
 	
@@ -226,6 +228,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
 
 	  printf("| %d | %d | %lu | %.2f | %lu | %.1f |\n", sched_getcpu(), getpid(), framenum_last, (double) stats_frames / tdif, tot_lost_packets, 100. * (float)tot_lost_packets / (float)(packets_frame * stat_total_frames));
+	  lost_packets = 0;
 	}
 	gettimeofday(&ti,NULL);
 	tot_lost_frames = 0;
@@ -247,7 +250,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     int_line = 0;
     
     p1 += mod_origin;
-    /*
+    
     for(i=line_number; i < line_number + lines_per_packet; i++){
       
       memcpy(p1 + i * det_size_y,
@@ -256,32 +259,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       
       int_line ++;
     }
-    */
-    i = line_number;
-    memcpy(p1 + i * det_size_y,
-	   packet.data + int_line * det_size_y,
-	   data_size);
-    int_line ++;
-    i ++;
-    /*
-    memcpy(p1 + i * det_size_y,
-	   packet.data + int_line * det_size_y,
-	   data_size);
-    int_line ++;
-    i ++;
-    memcpy(p1 + i * det_size_y,
-	   packet.data + int_line * det_size_y,
-	   data_size);
-    int_line ++;
-    i ++;
-    */
-    /*
-    memcpy(p1 + i * det_size_y,
-	   packet.data + int_line * det_size_y,
-	   data_size);
-    int_line ++;
-    i ++;
-    */
+    
     // Copy the framenum and frame metadata
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;
@@ -301,6 +279,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   } // end while
 
+  printf("%d\n", n_recv_frames);
   return n_recv_frames;
 }
 

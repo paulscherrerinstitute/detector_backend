@@ -33,8 +33,8 @@ undef = dict(level=0)
 
 log_config = dict( loggers =
                    {
-                       'ModuleReceiver': info,
-                       'ZMQSender': info
+                       'ModuleReceiver': debug,
+                       'ZMQSender': debug
                    }
 )
 
@@ -95,7 +95,7 @@ elif rank in SENDERS_RANKS:
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
     c.ZMQSender.uri = "tcp://127.0.0.1:40000"
-    c.ZMQSender.socket_type = "PUB"
+    c.ZMQSender.socket_type = "PUSH"
 
     c.ZMQSender.rb_id = rank
     c.ZMQSender.rb_followers = RECEIVER_RANKS
