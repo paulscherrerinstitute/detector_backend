@@ -34,7 +34,7 @@ _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 
 put_data_in_rb = _mod.put_data_in_rb
 # put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
-put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int16, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
+put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
 put_data_in_rb.restype = ctypes.c_int
 
 
@@ -102,6 +102,7 @@ class ModuleReceiver(DataFlowNode):
             self.log.debug("create ringbuffer header files")
             for f in files:
                 ret = rb.create_header_file(f)
+                print(ret)
                 if not ret:
                     self.log.error("Ring buffer files do not exist!")
                     raise RuntimeError("Ring buffer files do not exist!")
@@ -143,7 +144,7 @@ class ModuleReceiver(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
-        self.log.debug("RB slots: %d" % nslots)
+        self.log.info("RB slots: %d" % nslots)
         self.rb_current_slot = -1
 
         self.n_packets_frame = 128
@@ -172,9 +173,10 @@ class ModuleReceiver(DataFlowNode):
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, det_size, mod_size, mod_idx, self.timeout)
 
+        # FIXME
         # This means that the put_Data_in_rb routine was not able to get a slot
-        if rb.get_buffer_slot(self.rb_writer_id) == -1:
-            self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
+        #if rb.get_buffer_slot(self.rb_writer_id) == -1:
+        #    self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
 
         self.log.info("Received %d" % n_recv_frames)
         self.pass_on(n_recv_frames)

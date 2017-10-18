@@ -84,7 +84,7 @@ int get_message(int sd, jungfrau_packet * packet){
 }
 
 
-int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, int16_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
+int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
   
   int stats_frames = 1000;
   int n_recv_frames = 0;
