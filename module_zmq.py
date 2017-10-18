@@ -16,6 +16,7 @@ import os
 import zmq
 import sys
 
+import h5py
 from time import time, sleep
 
 BUFFER_LENGTH = 4096
@@ -70,6 +71,8 @@ class ZMQSender(DataFlowNode):
 
     check_framenum = Bool(True, config=True, reconfig=True, help="Check that the frame numbers of all the modules are the same")
 
+    output_file = Unicode('', config=True, reconfig=True)
+    
     def open_sockets(self):
         self.log.info("CALLING OPEN")
         self.skt = self.context.socket(zmq.__getattribute__(self.socket_type))
@@ -119,6 +122,11 @@ class ZMQSender(DataFlowNode):
 
         self.log.info("ZMQ streamer initialized")
 
+        #if self.output_file != '':
+        #    self.log.info("writing to %s " % self.output_file)
+        #    self.outfile = h5py.File(self.output_file, "w")
+        #    self.dst = self.outfile.create_dataset("/data", shape=(1000, ) + self.detector_size, dtype=np.uint16)
+            
     def reconfigure(self, settings):
         self.log.info(settings)
         if "n_frames" in settings:
@@ -179,6 +187,8 @@ class ZMQSender(DataFlowNode):
             #print(data.shape)
             #data = self.fakedata
 
+            #if self.output_file != '':
+            #    self.dst[self.counter] = data
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulseid": pulseid})
                 #pass
@@ -198,12 +208,15 @@ class ZMQSender(DataFlowNode):
                 #break
             #except KeyboardInterrupt:
             #    raise StopIteration
+        #self.outfile.close()
 
         self.log.debug("Writer loop exited")
         self.pass_on(self.counter)
         return(self.counter)
     
     def reset(self):
+        #if self.output_file != '':
+        #    self.outfile.close()
         self.counter = 0
         self.close_sockets()
         sleep(1)

@@ -4,8 +4,8 @@ mpirun -n 4 mpi-dafld --config-file config_jf_0.5_fake.py
 
 
 import sys
-new_path = '/home/l_det/Work/dafl.jungfrau'
-#new_path = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau"
+#new_path = '/home/l_det/Work/dafl.jungfrau'
+new_path = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau"
 if new_path not in sys.path:
     sys.path.append(new_path)
 
@@ -24,7 +24,7 @@ c.RestGWApplication.rest_port = 8081
 c.RestGWApplication.rest_host = u'0.0.0.0'   # pass u'0.0.0.0' to listen on all interfaces
 c.RestGWApplication.trace_rest = True
 c.RPCBulletinBoardApplication.trace_metrics = True
-c.RPCDataflowApplication.initialize_dataflow_on_startup = False
+c.RPCDataflowApplication.initialize_dataflow_on_startup = True
 # =============================================================================================
 debug = dict(level='DEBUG')
 info  = dict(level='INFO')
@@ -33,7 +33,7 @@ undef = dict(level=0)
 log_config = dict( loggers =
                    {
                        'ModuleReceiver': debug,
-                       'ZMQSender': undef
+                       'ZMQSender': info
                    }
 )
 
@@ -102,7 +102,7 @@ elif rank in SENDERS_RANKS:
     c.ZMQSender.rb_imgdata_file = rb_imgdata_file
     c.ZMQSender.geometry = geometry
     c.ZMQSender.module_size = module_size
-
+    c.ZMQSender.output_file = "test.h5"
 
 #c.DataFlow.maxitterations = 20
 
