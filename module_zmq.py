@@ -16,6 +16,7 @@ import os
 import zmq
 import sys
 
+import h5py
 from time import time, sleep
 
 BUFFER_LENGTH = 4096
@@ -70,6 +71,8 @@ class ZMQSender(DataFlowNode):
 
     check_framenum = Bool(True, config=True, reconfig=True, help="Check that the frame numbers of all the modules are the same")
 
+    output_file = Unicode('', config=True, reconfig=True)
+    
     def open_sockets(self):
         self.log.info("CALLING OPEN")
         self.skt = self.context.socket(zmq.__getattribute__(self.socket_type))
@@ -124,6 +127,11 @@ class ZMQSender(DataFlowNode):
 
         self.log.info("ZMQ streamer initialized")
 
+        #if self.output_file != '':
+        #    self.log.info("writing to %s " % self.output_file)
+        #    self.outfile = h5py.File(self.output_file, "w")
+        #    self.dst = self.outfile.create_dataset("/data", shape=(1000, ) + self.detector_size, dtype=np.uint16)
+            
     def reconfigure(self, settings):
         self.log.info(settings)
         if "n_frames" in settings:
@@ -176,8 +184,8 @@ class ZMQSender(DataFlowNode):
             is_good_frame = missing_packets == 0
             if missing_packets != 0:
                 #self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
-                frames_with_missing_packets += 1
-                total_missing_packets += missing_packets
+                self.frames_with_missing_packets += 1
+                self.total_missing_packets += missing_packets
 
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
@@ -190,12 +198,14 @@ class ZMQSender(DataFlowNode):
             #print(data.shape)
             #data = self.fakedata
 
+            #if self.output_file != '':
+            #    self.dst[self.counter] = data
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulseid": pulseid})
                 #pass
             except:
                 pass #print(sys.exc_info())
-            self.metrics.set("received_frames", {"total": self.counter, "incomplete": frames_with_missing_packets, "packets_lost": total_missing_packets, "epoch": time()})
+            self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
 
             if self.counter % 1000 == 0:
                 print(time(), " ", self.counter)
@@ -209,19 +219,23 @@ class ZMQSender(DataFlowNode):
                 #break
             #except KeyboardInterrupt:
             #    raise StopIteration
+        #self.outfile.close()
 
         self.log.debug("Writer loop exited")
         self.pass_on(self.counter)
         return(self.counter)
     
     def reset(self):
+        #if self.output_file != '':
+        #    self.outfile.close()
         self.counter = 0
         self.sent_frames = 0
         self.first_frame = 0
         self.frames_with_missing_packets = 0
         self.total_missing_packets = 0
 
-        self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, 
+        self.metrics.set("received_frames", {"total": self.counter,
+                                             "incomplete": self.frames_with_missing_packets,
                                              "packets_lost": self.total_missing_packets, "epoch": time()})
         self.metrics.set("sent_frames", self.sent_frames)
 
