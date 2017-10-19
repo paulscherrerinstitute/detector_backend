@@ -162,7 +162,7 @@ class ModuleReceiver(DataFlowNode):
 
         # cframenum = ctypes.c_uint16(-1)
         self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
-        self.log.info("Timeout is %d" % self.timeout.value)
+        #self.log.info("Timeout is %d" % self.timeout.value)
 
         mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
         det_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
@@ -172,13 +172,15 @@ class ModuleReceiver(DataFlowNode):
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot,
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, det_size, mod_size, mod_idx, self.timeout)
+        
+        if n_recv_frames != 0:
+            self.log.info("Received %d" % n_recv_frames)
 
         # FIXME
         # This means that the put_Data_in_rb routine was not able to get a slot
         #if rb.get_buffer_slot(self.rb_writer_id) == -1:
         #    self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
 
-        self.log.info("Received %d" % n_recv_frames)
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
@@ -189,6 +191,7 @@ class ModuleReceiver(DataFlowNode):
             self.period = settings["period"] / 1000000000
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
+
         
     def reset(self):
         self.log.info("Restarting the socket connection")

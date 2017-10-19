@@ -77,6 +77,8 @@ int get_message(int sd, jungfrau_packet * packet){
       //printf("-%6c-\t", packet->emptyheader);
       printf(" frame %lu ", packet->framenum);
       printf(" packet %u \n", packet->packetnum);
+      printf(" data[0] %u \n", packet->data[0]);
+      printf(" data[10] %u \n", packet->data[10]);
     }
 #endif
     
@@ -86,7 +88,7 @@ int get_message(int sd, jungfrau_packet * packet){
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
   
-  int stats_frames = 1000;
+  int stats_frames = 10;
   int n_recv_frames = 0;
   uint64_t framenum_last = 0;
   int total_packets = 0;
@@ -135,6 +137,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   tv.tv_usec = 50;
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
   
+  //printf("NFRAMES %d\n", nframes);
   while(true){
     if(nframes != -1)
       if(n_recv_frames >= nframes)
@@ -233,7 +236,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     
     line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
-    printf("line number %d\n", line_number);
+    //printf("line number %d\n", line_number);
     
     p1 += mod_origin;
     
@@ -278,7 +281,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   } // end while
 
-  printf("%d\n", n_recv_frames);
+  //printf("%d\n", n_recv_frames);
   return n_recv_frames;
 }
 

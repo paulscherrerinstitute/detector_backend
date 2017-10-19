@@ -86,5 +86,8 @@ class DaflClient(object):
         """
         print(args)
         answer = json.loads(self.send_request("GET", "/metrics").content)["value"]["backend"]
-        ret = {k: answer.get(k, None) for k in args}
+        if args:
+            ret = {k: answer.get(k, None) for k in args}
+        else:
+            ret = answer
         return ret
