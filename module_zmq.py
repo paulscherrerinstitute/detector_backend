@@ -77,7 +77,7 @@ class ZMQSender(DataFlowNode):
         self.skt.close(linger=0)
         #self.skt.destroy()
         while not self.skt.closed:
-            print(self.skt.closed)
+            #print(self.skt.closed)
             sleep(1)
 
     def __init__(self, **kwargs):
@@ -109,6 +109,10 @@ class ZMQSender(DataFlowNode):
         self.n_modules = self.geometry[0] * self.geometry[1]
 
         self.counter = 0
+        self.sent_frames = 0
+        self.frames_with_missing_packets = 0
+        self.total_missing_packets = 0
+        self.first_frame = 0
         self.log.info("ZMQ streamer initialized")
 
     def reconfigure(self, settings):
@@ -117,7 +121,7 @@ class ZMQSender(DataFlowNode):
             self.n_frames = settings["n_frames"]
         if "period" in settings:
             self.period = settings["period"] / 1000000000
-        self.first_frame = -1
+        self.first_frame = 0
 
     def send(self, data):
         # FIXME
@@ -126,9 +130,9 @@ class ZMQSender(DataFlowNode):
         ref_time = time()
         frame_comp_time = time()
         frame_comp_counter = 0
-        frames_with_missing_packets = 0
+        #frames_with_missing_packets = 0
         is_good_frame = True
-        total_missing_packets = 0
+        #total_missing_packets = 0
         
         # FIXME avoid infinit loop
         while (self.counter < self.n_frames or self.n_frames == -1) and (time() - ref_time < timeout):
@@ -152,14 +156,19 @@ class ZMQSender(DataFlowNode):
                     is_good_frame = len(set(framenums)) == 1
 
                 framenum = pointerh.contents[0].framemetadata[0]
+                if self.first_frame == 0:
+                    self.log.info("First frame got: %d" % framenum)
+                    self.first_frame = framenum
+                
+                framenum -= self.first_frame
 
                 # check if packets are missing
                 missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
                 is_good_frame = missing_packets == 0
                 if missing_packets != 0:
                     self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
-                    frames_with_missing_packets += 1
-                    total_missing_packets += missing_packets
+                    self.frames_with_missing_packets += 1
+                    self.total_missing_packets += missing_packets
 
                 #for i in range(self.n_modules):
                 #    self.log.debug("%d %d %d %d %d" % (i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1], pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3]))
@@ -169,12 +178,14 @@ class ZMQSender(DataFlowNode):
                 # TODO: benchmark speed of this:
                 data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
 
+                self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, 
+                                                     "packets_lost": self.total_missing_packets, "epoch": time()})
                 try:
                     send_array(self.skt, data.reshape(self.detector_size), frame=framenum, is_good_frame=is_good_frame)
+                    self.sent_frames += 1
+                    self.metrics.set("sent_frames", self.sent_frames)
                 except:
                     pass
-                self.metrics.set("received_frames", {"total": self.counter, "incomplete": frames_with_missing_packets, 
-                                                     "packets_lost": total_missing_packets, "epoch": time()})
 
                 self.counter += 1
                 frame_comp_counter += 1
@@ -199,6 +210,15 @@ class ZMQSender(DataFlowNode):
     
     def reset(self):
         self.counter = 0
+        self.sent_frames = 0
+        self.first_frame = 0
+        self.frames_with_missing_packets = 0
+        self.total_missing_packets = 0
+
+        self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, 
+                                             "packets_lost": self.total_missing_packets, "epoch": time()})
+        self.metrics.set("sent_frames", self.sent_frames)
+
         self.close_sockets()
         sleep(1)
         self.open_sockets()

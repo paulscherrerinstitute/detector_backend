@@ -34,7 +34,7 @@ _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 
 put_data_in_rb = _mod.put_data_in_rb
 # put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
-put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int16, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
+put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
 put_data_in_rb.restype = ctypes.c_int
 
 
@@ -163,7 +163,7 @@ class ModuleReceiver(DataFlowNode):
 
         cframenum = ctypes.c_uint16(-1)
         self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
-        self.log.info("Timeout is %d" % self.timeout.value)
+        #self.log.info("Timeout is %d" % self.timeout.value)
 
         mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
         det_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
@@ -173,7 +173,9 @@ class ModuleReceiver(DataFlowNode):
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot,
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, det_size, mod_size, mod_idx, self.timeout)
-        self.log.info("Received %d" % n_recv_frames)
+        
+        if n_recv_frames != 0:
+            self.log.info("Received %d" % n_recv_frames)
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
@@ -184,6 +186,7 @@ class ModuleReceiver(DataFlowNode):
             self.period = settings["period"] / 1000000000
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
+
         
     def reset(self):
         self.log.info("Restarting the socket connection")
