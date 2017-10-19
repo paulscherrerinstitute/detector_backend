@@ -34,28 +34,12 @@ typedef struct _jungfrau_header{
   // Field 1: packets lost
   // Field 2: packets counter 0-63
   // Field 3: packets counter 64-127
+  // Field 4: pulse id
+  // Field 5: debug (daq_rec) - gain flag
   uint64_t framemetadata[8];
 } jungfrau_header;
 
-/*
-typedef struct _jungfrau_header{
-  uint64_t framenum;
-  uint8_t packetnum;
-  int8_t padding[64 - 2 - 1];
-} jungfrau_header;
-*/
-
 //Memory packing (see: https://msdn.microsoft.com/en-us/library/2e70t5y1.aspx)
-#pragma pack(push)
-#pragma pack(2)
-typedef struct _jungfraujtb_packet{
-    char emptyheader[6]; //was 2
-    uint64_t framenum;
-    uint64_t packetnum;
-    uint16_t data[BUFFER_LENGTH];
-  } jungfraujtb_packet;
-#pragma pack(pop)
-
 //Jungfrau
 #pragma pack(push)
 #pragma pack(2)
@@ -207,9 +191,10 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       rb_current_slot = rb_claim_next_slot(rb_writer_id);
       
       if(rb_current_slot == -1)
-	while(rb_current_slot == -1)
-	  rb_current_slot = rb_claim_next_slot(rb_writer_id);
-
+	//while(rb_current_slot == -1)
+	//  rb_current_slot = rb_claim_next_slot(rb_writer_id);
+	return n_recv_frames;
+	
       //printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
 
       // refactor statistics
@@ -277,6 +262,10 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       packets_lost_int2 = ph->framemetadata[3];
       //ph->framemetadata[3] ^= mask;
     }
+    ph->framemetadata[4] = packet.bunchid;
+    ph->framemetadata[5] = (uint64_t) packet.debug;
+
+    // Slot committing, if all packets acquired
     if(total_packets == packets_frame)
       rb_commit_slot(rb_writer_id, rb_current_slot);
 

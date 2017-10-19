@@ -14,6 +14,7 @@ import ctypes
 import numpy as np
 import os
 import zmq
+import sys
 
 from time import time, sleep
 
@@ -32,17 +33,21 @@ class Mystruct(ctypes.Structure):
 HEADER = Mystruct * 10
 
 
-def send_array(socket, A, flags=0, copy=False, track=True, frame=-1, is_good_frame=True, packets_lost=[0,0]):
+def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
     """send a numpy array with metadata"""
-    md = dict(
-        htype="array-1.0",
-        type=str(A.dtype),
-        shape=A.shape,
-        frame=frame,
-        is_good_frame=is_good_frame,
-    )
+    metadata["htype"] = "array-1.0"
+    metadata["type"] = str(A.dtype)
+    metadata["shape"] = A.shape
+
+    #md = dict(
+    #    htype="array-1.0",
+    #    type=str(A.dtype),
+    #    shape=A.shape,
+    #    frame=frame,
+    #    is_good_frame=is_good_frame,
+    #)
     #print(md)
-    socket.send_json(md, flags | zmq.SNDMORE)
+    socket.send_json(metadata, flags | zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
 
@@ -82,7 +87,7 @@ class ZMQSender(DataFlowNode):
 
     def __init__(self, **kwargs):
         super(ZMQSender, self).__init__(**kwargs)
-        self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+        self.detector_size = (self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1])
         app = XblBaseApplication.instance()
         self.worker_communicator = app.worker_communicator
         self.worker_communicator.barrier()
@@ -94,10 +99,10 @@ class ZMQSender(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
-                                           int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
+                                     int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         rb.adjust_nslots(self.rb_header_id)
-        
-        self.context = zmq.Context()
+
+        self.context = zmq.Context(io_threads=2)
         self.open_sockets()
 
         self.rb_current_slot = -1
@@ -113,6 +118,10 @@ class ZMQSender(DataFlowNode):
         self.frames_with_missing_packets = 0
         self.total_missing_packets = 0
         self.first_frame = 0
+
+        self.fakedata = np.zeros([1536, 1024], dtype=np.uint16)
+        self.entry_size_in_bytes = -1
+
         self.log.info("ZMQ streamer initialized")
 
     def reconfigure(self, settings):
@@ -120,7 +129,7 @@ class ZMQSender(DataFlowNode):
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
         if "period" in settings:
-            self.period = settings["period"] / 1000000000
+            self.period = settings["period"] / 1e9
         self.first_frame = 0
 
     def send(self, data):
@@ -135,74 +144,71 @@ class ZMQSender(DataFlowNode):
         #total_missing_packets = 0
         
         # FIXME avoid infinit loop
-        while (self.counter < self.n_frames or self.n_frames == -1) and (time() - ref_time < timeout):
-            try:
-                self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
-
-                if self.rb_current_slot == -1:
-                    continue
-                    #sleep(1)
-                    #self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
-                    #if self.rb_current_slot == -1:
-                    #    break
-                #self.log.debug("READER: self.rb_current_slot" + str(self.rb_current_slot))
-
-                pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
-                                       ctypes.POINTER(HEADER))
-
-                # check that all frame numbers are the same
-                if self.check_framenum:
-                    framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
-                    is_good_frame = len(set(framenums)) == 1
-
-                framenum = pointerh.contents[0].framemetadata[0]
-                if self.first_frame == 0:
-                    self.log.info("First frame got: %d" % framenum)
-                    self.first_frame = framenum
-                
-                framenum -= self.first_frame
-
-                # check if packets are missing
-                missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
-                is_good_frame = missing_packets == 0
-                if missing_packets != 0:
-                    self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
-                    self.frames_with_missing_packets += 1
-                    self.total_missing_packets += missing_packets
-
-                #for i in range(self.n_modules):
-                #    self.log.debug("%d %d %d %d %d" % (i, pointerh.contents[i].framemetadata[0], pointerh.contents[i].framemetadata[1], pointerh.contents[i].framemetadata[2], pointerh.contents[i].framemetadata[3]))
-                pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-
-                entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
-                # TODO: benchmark speed of this:
-                data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), )
-
-                self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, 
-                                                     "packets_lost": self.total_missing_packets, "epoch": time()})
-                try:
-                    send_array(self.skt, data.reshape(self.detector_size), frame=framenum, is_good_frame=is_good_frame)
-                    self.sent_frames += 1
-                    self.metrics.set("sent_frames", self.sent_frames)
-                except:
-                    pass
-
-                self.counter += 1
-                frame_comp_counter += 1
-                
-                #if frame_comp_time % 10 == 0:
-                #    self.metrics.set("frame_rate_computed", float(frame_comp_counter) / (time() - frame_comp_time))
-                #    frame_comp_counter = 0
-                #    frame_comp_time = time()
-                    
-                ref_time = time()
-
-                #self.log.debug("WRITER " +  str(pointerh.contents.framenum - self.first_frame))
-                if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
-                    self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
+        while True:
+            if(self.counter >= self.n_frames and self.n_frames != -1) or (time() - ref_time > timeout):
                 break
-            except KeyboardInterrupt:
-                raise StopIteration
+
+            self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
+
+            if self.rb_current_slot == -1:
+                continue
+
+            pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
+                                   ctypes.POINTER(HEADER))
+
+            # check that all frame numbers are the same
+            if self.check_framenum:
+                framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
+                is_good_frame = len(set(framenums)) == 1
+
+            framenum = pointerh.contents[0].framemetadata[0]
+            daq_rec = pointerh.contents[0].framemetadata[4]
+            pulseid = pointerh.contents[0].framemetadata[5]
+
+            if self.first_frame == 0:
+                self.log.info("First frame got: %d" % framenum)
+                self.first_frame = framenum
+
+            framenum -= self.first_frame
+
+            # check if packets are missing
+            missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
+            is_good_frame = missing_packets == 0
+            if missing_packets != 0:
+                #self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
+                frames_with_missing_packets += 1
+                total_missing_packets += missing_packets
+
+            pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
+
+            #if self.entry_size_in_bytes == -1:
+            #    self.entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
+            #    data_size = (int(self.entry_size_in_bytes / (self.bit_depth / 8) / self.detector_size[1], self.detector_size[1])
+            #                 print(self.entry_size_in_bytes, data_size)
+            #    # TODO: benchmark speed of this:
+            data = np.ctypeslib.as_array(pointer, self.detector_size, )
+            #print(data.shape)
+            #data = self.fakedata
+
+            try:
+                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulseid": pulseid})
+                #pass
+            except:
+                pass #print(sys.exc_info())
+            self.metrics.set("received_frames", {"total": self.counter, "incomplete": frames_with_missing_packets, "packets_lost": total_missing_packets, "epoch": time()})
+
+            if self.counter % 1000 == 0:
+                print(time(), " ", self.counter)
+
+            self.counter += 1
+            frame_comp_counter += 1
+            ref_time = time()
+
+            if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
+                self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
+                #break
+            #except KeyboardInterrupt:
+            #    raise StopIteration
 
         self.log.debug("Writer loop exited")
         self.pass_on(self.counter)

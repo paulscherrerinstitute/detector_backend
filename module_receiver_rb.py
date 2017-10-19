@@ -102,6 +102,7 @@ class ModuleReceiver(DataFlowNode):
             self.log.debug("create ringbuffer header files")
             for f in files:
                 ret = rb.create_header_file(f)
+                print(ret)
                 if not ret:
                     self.log.error("Ring buffer files do not exist!")
                     raise RuntimeError("Ring buffer files do not exist!")
@@ -143,7 +144,7 @@ class ModuleReceiver(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
-        self.log.debug("RB slots: %d" % nslots)
+        self.log.info("RB slots: %d" % nslots)
         self.rb_current_slot = -1
 
         self.n_packets_frame = 128
@@ -157,11 +158,9 @@ class ModuleReceiver(DataFlowNode):
         #print(self.n_elements_line, self.n_packets_frame)
         
     def send(self, data):
-        #print("Receiver ID:", self.rb_id)
-
         n_recv_frames = 0
 
-        cframenum = ctypes.c_uint16(-1)
+        # cframenum = ctypes.c_uint16(-1)
         self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
         #self.log.info("Timeout is %d" % self.timeout.value)
 
@@ -176,6 +175,12 @@ class ModuleReceiver(DataFlowNode):
         
         if n_recv_frames != 0:
             self.log.info("Received %d" % n_recv_frames)
+
+        # FIXME
+        # This means that the put_Data_in_rb routine was not able to get a slot
+        #if rb.get_buffer_slot(self.rb_writer_id) == -1:
+        #    self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
+
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
