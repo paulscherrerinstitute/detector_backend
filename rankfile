@@ -1,14 +1,14 @@
-#rank 0=localhost slot=1
-#rank 1=localhost slot=2
-#rank 2=localhost slot=3
-#rank 3=localhost slot=4
-#rank 4=localhost slot=5
+rank 0=localhost slot=30
+rank 1=localhost slot=31
+rank 2=localhost slot=32
+rank 3=localhost slot=4
+rank 4=localhost slot=5
 #rank 5=localhost slot=6
-rank 0=localhost slot=11
-rank 1=localhost slot=12
-rank 2=localhost slot=13
-rank 3=localhost slot=14-15
-rank 4=localhost slot=16
-rank 5=localhost slot=16
+#rank 0=localhost slot=18
+#rank 1=localhost slot=19
+#rank 2=localhost slot=20
+#rank 3=localhost slot=21-22
+#rank 4=localhost slot=23
+#rank 5=localhost slot=23
 
 

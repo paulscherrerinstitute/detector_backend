@@ -137,7 +137,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   tv.tv_usec = 50;
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
   
-  //printf("NFRAMES %d\n", nframes);
   while(true){
     if(nframes != -1)
       if(n_recv_frames >= nframes)
@@ -274,6 +273,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     }
     ph->framemetadata[4] = packet.bunchid;
     ph->framemetadata[5] = (uint64_t) packet.debug;
+    //printf("%d debug: %u\n", getpid(), packet.debug);
 
     // Slot committing, if all packets acquired
     if(total_packets == packets_frame)

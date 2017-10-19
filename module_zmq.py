@@ -170,8 +170,8 @@ class ZMQSender(DataFlowNode):
                 is_good_frame = len(set(framenums)) == 1
 
             framenum = pointerh.contents[0].framemetadata[0]
-            daq_rec = pointerh.contents[0].framemetadata[4]
-            pulseid = pointerh.contents[0].framemetadata[5]
+            pulseid = pointerh.contents[0].framemetadata[4]
+            daq_rec = pointerh.contents[0].framemetadata[5]
 
             if self.first_frame == 0:
                 self.log.info("First frame got: %d" % framenum)
