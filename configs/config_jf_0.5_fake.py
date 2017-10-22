@@ -55,7 +55,7 @@ module_size = [512, 1024]
 RECEIVER_RANKS = range(geometry[0] * geometry[1])
 SENDERS_RANKS = [RECEIVER_RANKS[-1] + 1, ]
 ip = len(RECEIVER_RANKS) * ["127.0.0.1", ]  # "10.30.10.2", "10.30.10.2"]
-port = [50004, 50005, 50006]
+port = [50004, ]
 
 
 c.BulletinBoardClient.prefix = u'backend'

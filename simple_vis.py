@@ -53,9 +53,7 @@ plt.colorbar(line1)
 prev_data = None
 
 while True:
-    #print data
     md, data = recv_array(socket)
-    #print md, data.shape
     t_i = time()
     if int(md['frame']) % 10 == 0:
     #if True:

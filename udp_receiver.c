@@ -127,7 +127,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_y * det_size_y;
 
   uint64_t packets_lost_int1=0, packets_lost_int2=0;
-
+  uint16_t empty_frame[det_size[0] * det_size[1]];
+  
   data_size = det_size_y * sizeof(uint16_t);
 
   timeout_i = time(NULL);
@@ -136,6 +137,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   tv.tv_sec = 0;
   tv.tv_usec = 50;
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
+
+  // creating an empty frame for initializing the rb slot
+  for(int i=0; i<det_size[0]*det_size[1]; i++)
+    empty_frame[i] = 0;
+
   
   while(true){
     if(nframes != -1)
@@ -163,6 +169,14 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     // claim a slot before starting, if data
     if(rb_current_slot == -1){
       rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      if(rb_current_slot == -1)
+	return n_recv_frames;
+
+      // initialize it
+      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+      memcpy(p1 + mod_origin,
+	     empty_frame,
+	     sizeof(empty_frame));
     }
 
     timeout_i = time(NULL);
@@ -187,14 +201,19 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       packets_lost_int1 = 0;
       packets_lost_int2 = 0;
 
+
+      // get new RB slot
       rb_current_slot = rb_claim_next_slot(rb_writer_id);
       
       if(rb_current_slot == -1)
-	//while(rb_current_slot == -1)
-	//  rb_current_slot = rb_claim_next_slot(rb_writer_id);
 	return n_recv_frames;
-	
-      //printf("PID %d frame # %lu last # %lu total_packets %d\n", getpid(), packet.framenum, framenum_last, total_packets);
+          
+      // initialize it
+      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+      memcpy(p1 + mod_origin,
+	     empty_frame,
+	     sizeof(empty_frame));
+
 
       // refactor statistics
       if(total_packets != packets_frame){
@@ -250,7 +269,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     }
     */
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      //printf("bottom1: %d\n", i * det_size[1]);
       memcpy(p1 + i * det_size_y,
 	     packet.data + int_line * det_size_y,
 	     data_size);
