@@ -19,6 +19,8 @@ import sys
 import h5py
 from time import time, sleep
 
+from copy import copy
+
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
 HEADER_ARRAY = ctypes.c_char * 6
@@ -40,14 +42,6 @@ def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
     metadata["type"] = str(A.dtype)
     metadata["shape"] = A.shape
 
-    #md = dict(
-    #    htype="array-1.0",
-    #    type=str(A.dtype),
-    #    shape=A.shape,
-    #    frame=frame,
-    #    is_good_frame=is_good_frame,
-    #)
-    #print(md)
     socket.send_json(metadata, flags | zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
@@ -57,7 +51,7 @@ class ZMQSender(DataFlowNode):
     #filename = Unicode(u'data.txt', config=True, reconfig=True, help='output filename with optional path')
     uri = Unicode('tcp://192.168.10.1:9999', config=True, reconfig=True, help="URI which binds for ZMQ")
     socket_type = Unicode('PUB', config=True, reconfig=True, help="ZMQ socket type")
-    send_rate = Float(1, config=True, reconfig=True, help="Frame fraction to be sent")
+    send_every_n = Float(1, config=True, reconfig=True, help="send every n-th frame")
     module_size = List((512, 1024), config=True, reconfig=True)
     geometry = List((1, 1), config=True, reconfig=True)
 
@@ -70,7 +64,8 @@ class ZMQSender(DataFlowNode):
     rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
 
     check_framenum = Bool(True, config=True, reconfig=True, help="Check that the frame numbers of all the modules are the same")
-
+    reset_framenum = Bool(False, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
+    
     output_file = Unicode('', config=True, reconfig=True)
     
     def open_sockets(self):
@@ -125,8 +120,11 @@ class ZMQSender(DataFlowNode):
         self.fakedata = np.zeros([1536, 1024], dtype=np.uint16)
         self.entry_size_in_bytes = -1
 
+        self.recv_frames = 0
+
         self.log.info("ZMQ streamer initialized")
 
+        
         #if self.output_file != '':
         #    self.log.info("writing to %s " % self.output_file)
         #    self.outfile = h5py.File(self.output_file, "w")
@@ -139,6 +137,7 @@ class ZMQSender(DataFlowNode):
         if "period" in settings:
             self.period = settings["period"] / 1e9
         self.first_frame = 0
+        self.recv_frames = 0
 
     def send(self, data):
         # FIXME
@@ -150,7 +149,7 @@ class ZMQSender(DataFlowNode):
         #frames_with_missing_packets = 0
         is_good_frame = True
         #total_missing_packets = 0
-        
+
         # FIXME avoid infinit loop
         while True:
             if(self.counter >= self.n_frames and self.n_frames != -1) or (time() - ref_time > timeout):
@@ -169,7 +168,7 @@ class ZMQSender(DataFlowNode):
                 framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
                 is_good_frame = len(set(framenums)) == 1
 
-            framenum = pointerh.contents[0].framemetadata[0]
+            framenum = copy(pointerh.contents[0].framemetadata[0])
             pulseid = pointerh.contents[0].framemetadata[4]
             daq_rec = pointerh.contents[0].framemetadata[5]
 
@@ -177,8 +176,17 @@ class ZMQSender(DataFlowNode):
                 self.log.info("First frame got: %d" % framenum)
                 self.first_frame = framenum
 
-            framenum -= self.first_frame
+            if self.reset_framenum:
+                framenum -= self.first_frame
 
+            self.log.debug("Received %d frames" % self.recv_frames)
+            if self.recv_frames % self.send_every_n != 0:
+                self.recv_frames += 1
+                if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
+                    self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
+                continue
+            self.recv_frames += 1
+            
             # check if packets are missing
             missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
             is_good_frame = missing_packets == 0
@@ -189,20 +197,12 @@ class ZMQSender(DataFlowNode):
 
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
-            #if self.entry_size_in_bytes == -1:
-            #    self.entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
-            #    data_size = (int(self.entry_size_in_bytes / (self.bit_depth / 8) / self.detector_size[1], self.detector_size[1])
-            #                 print(self.entry_size_in_bytes, data_size)
-            #    # TODO: benchmark speed of this:
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
-            #print(data.shape)
-            #data = self.fakedata
 
             #if self.output_file != '':
             #    self.dst[self.counter] = data
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulseid": pulseid})
-                #pass
             except:
                 pass #print(sys.exc_info())
             self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
