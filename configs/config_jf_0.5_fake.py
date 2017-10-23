@@ -54,6 +54,7 @@ module_size = [512, 1024]
 
 RECEIVER_RANKS = range(geometry[0] * geometry[1])
 SENDERS_RANKS = [RECEIVER_RANKS[-1] + 1, ]
+PREVIEW_RANKS = [SENDERS_RANKS[-1] + 1, ]
 ip = len(RECEIVER_RANKS) * ["127.0.0.1", ]  # "10.30.10.2", "10.30.10.2"]
 port = [50004, ]
 
@@ -99,4 +100,21 @@ elif rank in SENDERS_RANKS:
     c.ZMQSender.geometry = geometry
     c.ZMQSender.module_size = module_size
     c.ZMQSender.output_file = "test.h5"
+    c.ZMQSender.reset_framenum = True 
+    
+elif rank in PREVIEW_RANKS:
+    c.DataFlow.nodelist = [
+        ('preview', 'module_zmq.ZMQSender'),
+    ]
+    c.DataFlow.targets_per_node = {'preview': []}
+    c.ZMQSender.uri = "tcp://127.0.0.1:10000"
+    c.ZMQSender.socket_type = "PUB"
 
+    c.ZMQSender.rb_id = rank
+    c.ZMQSender.rb_followers = RECEIVER_RANKS
+    c.ZMQSender.rb_head_file = rb_head_file
+    c.ZMQSender.rb_imghead_file = rb_imghead_file
+    c.ZMQSender.rb_imgdata_file = rb_imgdata_file
+    c.ZMQSender.geometry = geometry
+    c.ZMQSender.module_size = module_size
+    c.ZMQSender.send_every_n = 10

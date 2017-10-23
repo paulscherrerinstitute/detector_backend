@@ -34,7 +34,7 @@ _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 
 put_data_in_rb = _mod.put_data_in_rb
 # put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
-put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
+put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
 put_data_in_rb.restype = ctypes.c_int
 
 
@@ -145,7 +145,7 @@ class ModuleReceiver(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
         self.log.info("RB slots: %d" % nslots)
-        self.rb_current_slot = -1
+        self.rb_current_slot = ctypes.c_int(-1)
 
         self.n_packets_frame = 128
         self.period = 1
@@ -169,10 +169,11 @@ class ModuleReceiver(DataFlowNode):
         mod_size = np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C'))
         mod_idx = np.ctypeslib.as_ctypes(mod_indexes)
         
-        n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot,
+        n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, det_size, mod_size, mod_idx, self.timeout)
-        
+
+        self.log.debug("Current slot: %d" % self.rb_current_slot.value)
         if n_recv_frames != 0:
             self.log.info("Received %d" % n_recv_frames)
 
