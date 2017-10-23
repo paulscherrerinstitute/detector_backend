@@ -86,7 +86,7 @@ int get_message(int sd, jungfrau_packet * packet){
 }
 
 
-int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
+int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
   
   int stats_frames = 10;
   int n_recv_frames = 0;
@@ -158,8 +158,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 	//printf("TIMEOUT %d %lu new_frame_num %lu slot %d %d \n", getpid(), packet.framenum, framenum_last, rb_current_slot, (int)time(NULL) - (int)timeout_i);
 	
 	// flushes the last message - what happens if I commit an already committed slot?
-	if(rb_current_slot != -1){
-	  rb_commit_slot(rb_writer_id, rb_current_slot);
+	if(*rb_current_slot != -1){
+	  rb_commit_slot(rb_writer_id, *rb_current_slot);
 	}
 	break;
       }
@@ -167,13 +167,13 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     }
 
     // claim a slot before starting, if data
-    if(rb_current_slot == -1){
-      rb_current_slot = rb_claim_next_slot(rb_writer_id);
-      if(rb_current_slot == -1)
+    if(*rb_current_slot == -1){
+      *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      if(*rb_current_slot == -1)
 	return n_recv_frames;
 
       // initialize it
-      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
       memcpy(p1 + mod_origin,
 	     empty_frame,
 	     sizeof(empty_frame));
@@ -193,8 +193,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       if(total_packets != packets_frame){
       
 	//printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
-	if(rb_current_slot != -1)
-	  rb_commit_slot(rb_writer_id, rb_current_slot);
+	if(*rb_current_slot != -1)
+	  rb_commit_slot(rb_writer_id, *rb_current_slot);
       }
       
       // resetting encoded ints for packets lost
@@ -203,13 +203,13 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
 
       // get new RB slot
-      rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      *rb_current_slot = rb_claim_next_slot(rb_writer_id);
       
-      if(rb_current_slot == -1)
+      if(*rb_current_slot == -1)
 	return n_recv_frames;
           
       // initialize it
-      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
       memcpy(p1 + mod_origin,
 	     empty_frame,
 	     sizeof(empty_frame));
@@ -249,8 +249,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     total_packets ++;
 
     // data copy
-    ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
-    p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+    ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
+    p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
     
     line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
@@ -295,7 +295,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
     // Slot committing, if all packets acquired
     if(total_packets == packets_frame)
-      rb_commit_slot(rb_writer_id, rb_current_slot);
+      rb_commit_slot(rb_writer_id, *rb_current_slot);
 
   } // end while
 

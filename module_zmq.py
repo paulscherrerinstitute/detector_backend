@@ -204,13 +204,13 @@ class ZMQSender(DataFlowNode):
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulseid": pulseid})
             except:
-                pass #print(sys.exc_info())
+                pass
+            self.counter += 1
             self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
 
             if self.counter % 1000 == 0:
                 print(time(), " ", self.counter)
 
-            self.counter += 1
             frame_comp_counter += 1
             ref_time = time()
 
