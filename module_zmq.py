@@ -19,7 +19,11 @@ import sys
 import h5py
 from time import time, sleep
 
+from numba import jit
+
 from copy import copy
+
+import warnings
 
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
@@ -36,6 +40,21 @@ class Mystruct(ctypes.Structure):
 HEADER = Mystruct * 10
 
 
+@jit(nopython=True, nogil=True, cache=True)
+def do_corrections(m, n, image, G, P):
+    #m, n = image.shape
+    mask = int('0b' + 14 * '1' , 2)
+    gain_mask = np.right_shift(image, 14)
+    data = np.bitwise_and(image, mask)
+    res = np.empty((m, n), dtype=np.uint16)
+
+    for i in range(m):
+        for j in range(n):
+            gm = gain_mask[i][j]
+            res[i][j] = (data[i][j] - P[gm - 1][i][j]) / G[gm - 1][i][j]
+    return res
+
+
 def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
     """send a numpy array with metadata"""
     metadata["htype"] = "array-1.0"
@@ -49,6 +68,7 @@ def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
 class ZMQSender(DataFlowNode):
 
     #filename = Unicode(u'data.txt', config=True, reconfig=True, help='output filename with optional path')
+    name = Unicode("ZMQSender", config=True, reconfig=True)
     uri = Unicode('tcp://192.168.10.1:9999', config=True, reconfig=True, help="URI which binds for ZMQ")
     socket_type = Unicode('PUB', config=True, reconfig=True, help="ZMQ socket type")
     send_every_n = Float(1, config=True, reconfig=True, help="send every n-th frame")
@@ -67,6 +87,10 @@ class ZMQSender(DataFlowNode):
     reset_framenum = Bool(False, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
     
     output_file = Unicode('', config=True, reconfig=True)
+
+    apply_corrections = Bool(False, config=True, reconfig=True, help="")
+    gain_corrections_list = List((0,), config=True, reconfig=True, help="" )
+    pedestal_corrections_list = List((0,), config=True, reconfig=True, help="" )
     
     def open_sockets(self):
         self.log.info("CALLING OPEN")
@@ -122,20 +146,32 @@ class ZMQSender(DataFlowNode):
 
         self.recv_frames = 0
 
-        self.log.info("ZMQ streamer initialized")
+        self.gain_corrections = np.array((0,))
+        self.pedestal_corrections = np.array((0,))
+        self.metrics.set("apply_corrections", self.apply_corrections)
+        self.metrics.set("name", self.name)
 
-        
+        if self.name == "preview":
+            self.setup_corrections()
+
         #if self.output_file != '':
         #    self.log.info("writing to %s " % self.output_file)
         #    self.outfile = h5py.File(self.output_file, "w")
         #    self.dst = self.outfile.create_dataset("/data", shape=(1000, ) + self.detector_size, dtype=np.uint16)
             
     def reconfigure(self, settings):
-        self.log.info(settings)
+        #self.log.info(settings)
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
         if "period" in settings:
             self.period = settings["period"] / 1e9
+        if "gain_corrections_list" in settings:
+            self.gain_corrections_list = settings["gain_corrections_list"]
+        if "pedestal_corrections_list" in settings:
+            self.pedestal_corrections_list = settings["pedestal_corrections_list"]
+
+        if self.name == "preview":
+            self.setup_corrections()
         self.first_frame = 0
         self.recv_frames = 0
 
@@ -199,6 +235,8 @@ class ZMQSender(DataFlowNode):
 
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
 
+            if self.apply_corrections:
+                do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pedestal_corrections)
             #if self.output_file != '':
             #    self.dst[self.counter] = data
             try:
@@ -240,6 +278,23 @@ class ZMQSender(DataFlowNode):
         self.metrics.set("sent_frames", self.sent_frames)
 
         self.close_sockets()
-        sleep(1)
+        sleep(0.1)
         self.open_sockets()
         self.log.info("Reset done")
+
+    def setup_corrections(self, ):
+        if (self.gain_corrections != self.gain_corrections_list).all():
+            self.gain_corrections = np.array(self.gain_corrections_list)
+        if (self.pedestal_corrections != self.pedestal_corrections_list).all():
+            self.pedestal_corrections = np.array(self.pedestal_corrections_list)
+            
+        if self.gain_corrections_list != [0] or self.pedestal_corrections_list != [0]:
+            if len(self.gain_corrections.shape) != 3 or len(self.pedestal_corrections.shape) != 3:
+                self.log.error("Gain and pedestal corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pedestal_corrections.shape))
+                raise ValueError("Gain and pedestal corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pedestal_corrections.shape))
+                
+            self.apply_corrections = True
+            self.log.info("Gain and pedestal corrections will be applied")
+            self.metrics.set("pedestal_corrections", self.pedestal_corrections)
+            self.metrics.set("gain_corrections", self.gain_corrections)
+            self.metrics.set("apply_corrections", self.apply_corrections)
