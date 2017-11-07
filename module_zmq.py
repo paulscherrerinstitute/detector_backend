@@ -84,7 +84,7 @@ class ZMQSender(DataFlowNode):
     rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
 
     check_framenum = Bool(True, config=True, reconfig=True, help="Check that the frame numbers of all the modules are the same")
-    reset_framenum = Bool(False, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
+    reset_framenum = Bool(True, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
     
     output_file = Unicode('', config=True, reconfig=True)
 
@@ -131,7 +131,6 @@ class ZMQSender(DataFlowNode):
 
         self.n_frames = -1
         self.period = 1
-        self.first_frame = -1
 
         self.n_modules = self.geometry[0] * self.geometry[1]
 
