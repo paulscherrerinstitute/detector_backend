@@ -270,7 +270,6 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     
     line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
-    //printf("line number %d\n", line_number);
     
     p1 += mod_origin;
     
@@ -285,19 +284,11 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     }
     */
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      /*memcpy(p1 + i * det_size_y ,
+      memcpy(p1 + i * det_size_y ,
 	     packet.data + int_line * det_size_y,
 	     data_size);
       int_line ++;
-      */
-    	memcpy(p1 + i * det_size[1],
-	       packet.data + int_line * det_size[1],
-	       data_size / 2);
-	//printf("bottom2: %d\n", i * det_size[1] + GAP_PX_CHIPS_Y + submod_size[1] / 2);
-	memcpy(p1 + i * det_size[1] + gap_px_chips[1] + det_size[1] / 2,
-	       packet.data + int_line * det_size[1] + det_size[1] / 2,
-	       data_size / 2);
-	int_line ++;
+      
     }
     // Copy the framenum and frame metadata
     ph += mod_number;
