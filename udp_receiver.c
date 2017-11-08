@@ -101,7 +101,31 @@ int initialize_slot(int rb_current_slot, int rb_dbuffer_id, int rb_hbuffer_id, i
   return 0;
 }
 
-int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t mod_size[2], int32_t mod_idx[2], int32_t gap_px_chips[2], int32_t gap_px_modules[2], int timeout){
+
+int check_framenums(int total_modules, jungfrau_header * ph, jungfrau_packet packet, int *rb_current_slot, int rb_writer_id){
+  // checks frame numbers for all modules
+  
+  for (int mod=0; mod < total_modules; mod ++){
+    // if the slot is empty, go on
+    if((ph + mod)->framemetadata[0] == 0)
+      continue;
+    // if this is a late frame, discard
+    else if((ph + mod)->framemetadata[0] > packet.framenum)
+      return 2;
+    // if this is an early frame, advance slots
+    else if((ph + mod)->framemetadata[0] < packet.framenum){
+      rb_commit_slot(rb_writer_id, *rb_current_slot);
+      *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      if(*rb_current_slot == -1)
+	return -1;
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t total_modules, int32_t det_size[2], int32_t mod_size[2], int32_t mod_idx[2], int32_t gap_px_chips[2], int32_t gap_px_modules[2], int timeout){
 
   /*
 #define GAP_PX_CHIPS_X 2
@@ -205,16 +229,6 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
       // initialize it
       initialize_slot(*rb_current_slot, rb_dbuffer_id, rb_hbuffer_id, mod_origin, mod_number, det_size, empty_frame);
-	/*
-      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-      ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
-      memcpy(p1 + mod_origin,
-	     empty_frame,
-	     sizeof(empty_frame));
-      ph += mod_number;
-      for(int i=0; i < 8; i++)
-	ph->framemetadata[i] = 0;
-	*/
     }
 
     timeout_i = time(NULL);
@@ -227,10 +241,9 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
     // New frame arrived
     if(packet.framenum != framenum_last){
-     
+
+      // commit the slot if not all the packets were received for the previous frame (dangling slot)
       if(total_packets != packets_frame){
-      
-	//printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
 	if(*rb_current_slot != -1)
 	  rb_commit_slot(rb_writer_id, *rb_current_slot);
       }
@@ -239,22 +252,16 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       packets_lost_int1 = 0;
       packets_lost_int2 = 0;
 
-
       // get new RB slot
       *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-      
+
+      // exit if got no slot
       if(*rb_current_slot == -1)
 	return n_recv_frames;
           
       // initialize it
       initialize_slot(*rb_current_slot, rb_dbuffer_id, rb_hbuffer_id, mod_origin, mod_number, det_size, empty_frame);
-      /*
-      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-      memcpy(p1 + mod_origin,
-	     empty_frame,
-	     sizeof(empty_frame));
-      */
-
+     
       // refactor statistics
       if(total_packets != packets_frame){
 	lost_frames ++;
@@ -284,18 +291,37 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       total_packets = 0;
 
     } // end new frame if
-      
-    last_recorded_packet = packet.packetnum;
-    total_packets ++;
     
+    // get memory slots
+    ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
 
-    // data copy
+    // compare frame nums for all modules
+    int should_continue = 1;
+    should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
+    
+    while(should_continue != 0){
+      // this means got no slot
+      if(should_continue == -1)
+	return n_recv_frames;
+      // this means there is a late frame
+      if(should_continue == 2)
+	break;
+      should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
+    }
+    // discard late frames
+    if(should_continue == 2)
+      continue;
+
+    // get them again, after RB slot is updated
     ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
     p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
     printf("%d %lu new_frame_num %lu slot %d  framenum_stored %lu \n", getpid(), packet.framenum, framenum_last, *rb_current_slot, (ph + mod_number)->framemetadata[0]);
-    
+
     line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
+
+    last_recorded_packet = packet.packetnum;
+    total_packets ++;
     
     p1 += mod_origin;
     
