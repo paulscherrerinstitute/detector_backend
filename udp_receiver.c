@@ -86,8 +86,15 @@ int get_message(int sd, jungfrau_packet * packet){
 }
 
 
-int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
-  
+int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t mod_size[2], int32_t mod_idx[2], int32_t gap_px_chips[2], int32_t gap_px_modules[2], int timeout){
+
+  /*
+#define GAP_PX_CHIPS_X 2
+#define GAP_PX_CHIPS_Y 2
+#define GAP_PX_MODULES_X 8
+#define GAP_PX_MODULES_Y 36
+  */
+
   int stats_frames = 10;
   int n_recv_frames = 0;
   uint64_t framenum_last = 0;
@@ -121,10 +128,18 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   int mod_size_x = mod_size[0], mod_size_y = mod_size[1];
   //int det_size_x = det_size[0];
   int det_size_y = det_size[1];
+
+  printf("det_size %d %d\n", det_size[0], det_size[1]);
+  printf("mod_size %d %d\n", mod_size[0], mod_size[1]);
+  printf("mod_idx %d %d\n", mod_idx[0], mod_idx[1]);
+
   int mod_number = mod_idx_x + mod_idx_y * det_size_y; //numbering inside the detctor, growing over the x-axis 
   int lines_per_packet = BUFFER_LENGTH / mod_size_y;
   
   int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_y * det_size_y;
+  // to be checked
+  mod_origin += mod_idx[1] * (3 * gap_px_chips[1] + gap_px_modules[1]); // inter_chip gaps plus inter_module gap
+  mod_origin += mod_idx[0] * (gap_px_chips[0] + gap_px_modules[0])* det_size[1] ; // inter_chip gaps plus inter_module gap
 
   uint64_t packets_lost_int1=0, packets_lost_int2=0;
   uint16_t empty_frame[det_size[0] * det_size[1]];
@@ -138,6 +153,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   tv.tv_usec = 50;
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
 
+  
   // creating an empty frame for initializing the rb slot
   for(int i=0; i<det_size[0]*det_size[1]; i++)
     empty_frame[i] = 0;
@@ -269,12 +285,20 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     }
     */
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      memcpy(p1 + i * det_size_y,
+      /*memcpy(p1 + i * det_size_y ,
 	     packet.data + int_line * det_size_y,
 	     data_size);
-      	int_line ++;
-      }
-    
+      int_line ++;
+      */
+    	memcpy(p1 + i * det_size[1],
+	       packet.data + int_line * det_size[1],
+	       data_size / 2);
+	//printf("bottom2: %d\n", i * det_size[1] + GAP_PX_CHIPS_Y + submod_size[1] / 2);
+	memcpy(p1 + i * det_size[1] + gap_px_chips[1] + det_size[1] / 2,
+	       packet.data + int_line * det_size[1] + det_size[1] / 2,
+	       data_size / 2);
+	int_line ++;
+    }
     // Copy the framenum and frame metadata
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;

@@ -17,6 +17,7 @@ import zmq
 import sys
 
 from time import time, sleep
+from copy import copy
 
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
@@ -34,7 +35,7 @@ _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 
 put_data_in_rb = _mod.put_data_in_rb
 # put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
-put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, ctypes.c_int)
+put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, ctypes.c_int32)
 put_data_in_rb.restype = ctypes.c_int
 
 
@@ -72,7 +73,6 @@ def define_quadrant(total_size, geometry, quadrant_index, index_axis=0):
     return np.array(q_idx, dtype=np.int32, order="C")
 
 
-
 class ModuleReceiver(DataFlowNode):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -84,6 +84,9 @@ class ModuleReceiver(DataFlowNode):
     module_size = List((512, 1024), config=True, reconfig=True)
     geometry = List((1, 1), config=True, reconfig=True)
     module_index = Int(0, config=True, reconfig=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
+
+    gap_px_chip = List((0, 0), config=True, reconfig=True)  # possibly not used
+    gap_px_module = List((0, 0), config=True, reconfig=True)
 
     bit_depth = Int(16, config=True, reconfig=True, help="")
     n_frames = Int(-1, config=True, reconfig=True, help="Frames to receive")
@@ -97,7 +100,6 @@ class ModuleReceiver(DataFlowNode):
 
     def _prepare_ringbuffer_header_files(self):
         files = [self.rb_head_file, ]
-        #print("MPI,", self.mpi_rank, self.create_and_delete_ringbuffer_header)
         if self.create_and_delete_ringbuffer_header is True:
             self.log.debug("create ringbuffer header files")
             for f in files:
@@ -118,6 +120,7 @@ class ModuleReceiver(DataFlowNode):
     
     def __init__(self, **kwargs):
         super(ModuleReceiver, self).__init__(**kwargs)
+        #self.detector_size = [(self.module_size[0] + self.gap_px_chip[0]) * self.geometry[0], (self.module_size[1] + self.gap_px_chip[1]) * self.geometry[1]]
         self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
 
         self.log.info("PID: %d IP: %s:%d" % (os.getpid(), self.ip, self.port))
@@ -156,7 +159,7 @@ class ModuleReceiver(DataFlowNode):
         # print(self.INDEX_ARRAY[0], idx[0])
         print("Receiver ID2: %d" % self.rb_writer_id)
         #print(self.n_elements_line, self.n_packets_frame)
-        
+
     def send(self, data):
         n_recv_frames = 0
 
@@ -164,14 +167,19 @@ class ModuleReceiver(DataFlowNode):
         self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
         #self.log.info("Timeout is %d" % self.timeout.value)
 
+        # without the copy it seems that it is possible to point to the last allocated memory array
         mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
-        det_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
-        mod_size = np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C'))
-        mod_idx = np.ctypeslib.as_ctypes(mod_indexes)
-        
+        det_size = copy(np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C')))
+        mod_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
+        mod_idx = copy(np.ctypeslib.as_ctypes(mod_indexes))
+        gap_px_chip_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_chip, dtype=np.int32, order='C')))
+        gap_px_module_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_module, dtype=np.int32, order='C')))
+
+        #int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout, int32_t *gap_px_chips, int32_t *gap_px_modules){
+
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
-                                       self.n_frames, det_size, mod_size, mod_idx, self.timeout)
+                                       self.n_frames, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
 
         self.log.debug("Current slot: %d" % self.rb_current_slot.value)
         if n_recv_frames != 0:

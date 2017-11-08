@@ -78,6 +78,9 @@ class ZMQSender(DataFlowNode):
     module_size = List((512, 1024), config=True, reconfig=True)
     geometry = List((1, 1), config=True, reconfig=True)
 
+    gap_px_chip = List((0, 0), config=True, reconfig=True)  # possibly not used
+    gap_px_module = List((0, 0), config=True, reconfig=True)
+
     rb_id = Int(0, config=True, reconfig=True, help="")
     rb_followers = List([1, ], config=True, reconfig=True, help="")
     bit_depth = Int(16, config=True, reconfig=True, help="")
@@ -120,6 +123,8 @@ class ZMQSender(DataFlowNode):
     def __init__(self, **kwargs):
         super(ZMQSender, self).__init__(**kwargs)
         self.detector_size = (self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1])
+        #self.detector_size = ((self.module_size[0] + self.gap_px_chip[0]) * self.geometry[0], (self.module_size[1] + self.gap_px_chip[1]) * self.geometry[1])
+
         app = XblBaseApplication.instance()
         self.worker_communicator = app.worker_communicator
         self.worker_communicator.barrier()
@@ -197,9 +202,11 @@ class ZMQSender(DataFlowNode):
         ref_time = time()
         frame_comp_time = time()
         frame_comp_counter = 0
-        #frames_with_missing_packets = 0
         is_good_frame = True
-        #total_missing_packets = 0
+
+        # for gain plus data masking
+        mask = int('0b' + 14 * '1', 2)
+        mask2 = int('0b' + 2 * '1', 2)
 
         # FIXME avoid infinit loop
         while True:
@@ -249,11 +256,8 @@ class ZMQSender(DataFlowNode):
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
-            print(self.activate_corrections)
             
             if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
-                mask = int('0b' + 14 * '1' , 2)
-                mask2 = int('0b' + 2 * '1' , 2)
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, mask, mask2)
                 self.log.info("Corrections done")
                 #if self.output_file != '':
