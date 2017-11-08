@@ -5,6 +5,7 @@ mpirun -n 4 mpi-dafld --config-file config_jf_0.5_fake.py
 import logging
 from mpi4py import MPI
 import sys
+import numpy as np
 
 
 #new_path = '/home/l_det/Work/dafl.jungfrau'
@@ -51,6 +52,11 @@ size = mpi_size - 2
 
 geometry = [1, 1]
 module_size = [512, 1024]
+
+gains = np.ones([3,] + module_size, dtype=np.float32)
+pedes = np.zeros([3, ] + module_size, dtype=np.float32)
+gains[0, :100, :200] = 10
+
 
 RECEIVER_RANKS = range(geometry[0] * geometry[1])
 SENDERS_RANKS = [RECEIVER_RANKS[-1] + 1, ]
@@ -100,8 +106,13 @@ elif rank in SENDERS_RANKS:
     c.ZMQSender.geometry = geometry
     c.ZMQSender.module_size = module_size
     c.ZMQSender.output_file = "test.h5"
-    c.ZMQSender.reset_framenum = True 
+    c.ZMQSender.reset_framenum = True
+    c.ZMQSender.gain_corrections_filename = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau/corrections.h5"
+    c.ZMQSender.pede_corrections_filename = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau/corrections.h5"
+    c.ZMQSender.gain_corrections_dataset = "gains"
+    c.ZMQSender.pede_corrections_dataset = "pedes"
     
+
 elif rank in PREVIEW_RANKS:
     c.DataFlow.nodelist = [
         ('preview', 'module_zmq.ZMQSender'),
@@ -118,3 +129,7 @@ elif rank in PREVIEW_RANKS:
     c.ZMQSender.geometry = geometry
     c.ZMQSender.module_size = module_size
     c.ZMQSender.send_every_n = 10
+    c.ZMQSender.gain_corrections_filename = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau/corrections.h5"
+    c.ZMQSender.pede_corrections_filename = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau/corrections.h5"
+    c.ZMQSender.gain_corrections_dataset = "gains"
+    c.ZMQSender.pede_corrections_dataset = "pedes"

@@ -41,17 +41,20 @@ HEADER = Mystruct * 10
 
 
 @jit(nopython=True, nogil=True, cache=True)
-def do_corrections(m, n, image, G, P):
+def do_corrections(m, n, image, G, P, mask, mask2):
     #m, n = image.shape
-    mask = int('0b' + 14 * '1' , 2)
-    gain_mask = np.right_shift(image, 14)
+    gain_mask = np.bitwise_and(np.right_shift(image, 14), mask2)
     data = np.bitwise_and(image, mask)
-    res = np.empty((m, n), dtype=np.uint16)
+    res = np.empty((m, n), dtype=np.float32)
 
     for i in range(m):
         for j in range(n):
             gm = gain_mask[i][j]
-            res[i][j] = (data[i][j] - P[gm - 1][i][j]) / G[gm - 1][i][j]
+            if gm == 3:
+                gm = 2
+            if G[gm][i][j] > 1:
+                print(gm, i, j, m, G[gm][i][j])
+            res[i][j] = (data[i][j] - P[gm][i][j]) / G[gm][i][j]
     return res
 
 
@@ -88,9 +91,16 @@ class ZMQSender(DataFlowNode):
     
     output_file = Unicode('', config=True, reconfig=True)
 
-    apply_corrections = Bool(False, config=True, reconfig=True, help="")
-    gain_corrections_list = List((0,), config=True, reconfig=True, help="" )
-    pedestal_corrections_list = List((0,), config=True, reconfig=True, help="" )
+    gain_corrections_filename = Unicode('', config=True, reconfig=True)
+    gain_corrections_dataset = Unicode('', config=True, reconfig=True)
+    pede_corrections_filename = Unicode('', config=True, reconfig=True)
+    pede_corrections_dataset = Unicode('', config=True, reconfig=True)
+
+    activate_corrections_preview = Bool(False, config=True, reconfig=True, help="")
+    activate_corrections = Bool(False, config=True, reconfig=True, help="")
+
+    #gain_corrections_list = List((0,), config=True, reconfig=True, help="")
+    #pedestal_corrections_list = List((0,), config=True, reconfig=True, help="")
     
     def open_sockets(self):
         self.log.info("CALLING OPEN")
@@ -145,12 +155,13 @@ class ZMQSender(DataFlowNode):
 
         self.recv_frames = 0
 
-        self.gain_corrections = np.array((0,))
-        self.pedestal_corrections = np.array((0,))
-        self.metrics.set("apply_corrections", self.apply_corrections)
+        self.gain_corrections = np.zeros([0, ])
+        self.pede_corrections = np.zeros([0, ])
+        self.metrics.set("activate_corrections", self.activate_corrections)
+        self.metrics.set("activate_corrections_preview", self.activate_corrections_preview)
         self.metrics.set("name", self.name)
 
-        if self.name == "preview":
+        if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
 
         #if self.output_file != '':
@@ -164,12 +175,17 @@ class ZMQSender(DataFlowNode):
             self.n_frames = settings["n_frames"]
         if "period" in settings:
             self.period = settings["period"] / 1e9
-        if "gain_corrections_list" in settings:
-            self.gain_corrections_list = settings["gain_corrections_list"]
-        if "pedestal_corrections_list" in settings:
-            self.pedestal_corrections_list = settings["pedestal_corrections_list"]
 
-        if self.name == "preview":
+        if "activate_corrections" in settings:
+            self.activate_corrections = settings["activate_corrections"]
+        if "activate_corrections_preview" in settings:
+            self.activate_corrections_preview = settings["activate_corrections_preview"]
+
+        if "gain_corrections_filename" in settings:
+            self.gain_corrections_filename = settings["gain_corrections_filename"]
+        if "pedestal_corrections_filename" in settings:
+            self.pedestal_corrections_filename = settings["pedestal_corrections_filename"]
+        if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
         self.first_frame = 0
         self.recv_frames = 0
@@ -233,10 +249,14 @@ class ZMQSender(DataFlowNode):
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
 
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
-
-            if self.apply_corrections:
-                do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pedestal_corrections)
-            #if self.output_file != '':
+            print(self.activate_corrections)
+            
+            if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
+                mask = int('0b' + 14 * '1' , 2)
+                mask2 = int('0b' + 2 * '1' , 2)
+                data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, mask, mask2)
+                self.log.info("Corrections done")
+                #if self.output_file != '':
             #    self.dst[self.counter] = data
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulseid": pulseid})
@@ -282,18 +302,26 @@ class ZMQSender(DataFlowNode):
         self.log.info("Reset done")
 
     def setup_corrections(self, ):
-        if (self.gain_corrections != self.gain_corrections_list).all():
-            self.gain_corrections = np.array(self.gain_corrections_list)
-        if (self.pedestal_corrections != self.pedestal_corrections_list).all():
-            self.pedestal_corrections = np.array(self.pedestal_corrections_list)
+        self.log.info("calling setup corrections")
+        self.log.info(self.gain_corrections_filename + " " + self.pede_corrections_filename)
+        self.log.info(self.gain_corrections_dataset + " " + self.pede_corrections_dataset)
+        # TODO add shape check
+        if self.gain_corrections_filename != "" and self.gain_corrections_dataset != "":
+            gain_corrections_file = h5py.File(self.gain_corrections_filename)
+            self.gain_corrections = gain_corrections_file[self.gain_corrections_dataset][:]
+            gain_corrections_file.close()
+        if self.pede_corrections_filename != "" and self.pede_corrections_dataset != "":
+            pede_corrections_file = h5py.File(self.pede_corrections_filename)
+            self.pede_corrections = pede_corrections_file[self.pede_corrections_dataset][:]
+            pede_corrections_file.close()
+
+        self.log.info("%s %s" % (self.gain_corrections.shape, self.pede_corrections.shape))
+
+        if len(self.gain_corrections.shape) != 3 or len(self.pede_corrections.shape) != 3:
+            self.log.error("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))
+            raise ValueError("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))
             
-        if self.gain_corrections_list != [0] or self.pedestal_corrections_list != [0]:
-            if len(self.gain_corrections.shape) != 3 or len(self.pedestal_corrections.shape) != 3:
-                self.log.error("Gain and pedestal corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pedestal_corrections.shape))
-                raise ValueError("Gain and pedestal corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pedestal_corrections.shape))
-                
-            self.apply_corrections = True
-            self.log.info("Gain and pedestal corrections will be applied")
-            self.metrics.set("pedestal_corrections", self.pedestal_corrections)
-            self.metrics.set("gain_corrections", self.gain_corrections)
-            self.metrics.set("apply_corrections", self.apply_corrections)
+        self.log.info("Gain and pede corrections will be applied")
+        self.metrics.set("activate_corrections", self.activate_corrections)
+        self.metrics.set("activate_corrections_preview", self.activate_corrections_preview)
+        
