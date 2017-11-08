@@ -85,6 +85,21 @@ int get_message(int sd, jungfrau_packet * packet){
   return nbytes;
 }
 
+int initialize_slot(int rb_current_slot, int rb_dbuffer_id, int rb_hbuffer_id, int mod_origin, int mod_number, int det_size[2], uint16_t * empty_frame){
+  jungfrau_header * ph;
+  uint16_t * p1;
+
+  p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+  ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
+  memcpy(p1 + mod_origin,
+	 empty_frame,
+	 det_size[0] * det_size[1] * sizeof(uint16_t));
+  ph += mod_number;
+  for(int i=0; i < 8; i++)
+    ph->framemetadata[i] = 0;
+
+  return 0;
+}
 
 int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t mod_size[2], int32_t mod_idx[2], int32_t gap_px_chips[2], int32_t gap_px_modules[2], int timeout){
 
@@ -143,6 +158,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
   uint64_t packets_lost_int1=0, packets_lost_int2=0;
   uint16_t empty_frame[det_size[0] * det_size[1]];
+
   
   data_size = det_size_y * sizeof(uint16_t);
 
@@ -155,9 +171,8 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
   
   // creating an empty frame for initializing the rb slot
-  for(int i=0; i<det_size[0]*det_size[1]; i++)
+  for(int i=0; i < det_size[0] * det_size[1]; i++)
     empty_frame[i] = 0;
-
   
   while(true){
     if(nframes != -1)
@@ -189,10 +204,17 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	return n_recv_frames;
 
       // initialize it
+      initialize_slot(*rb_current_slot, rb_dbuffer_id, rb_hbuffer_id, mod_origin, mod_number, det_size, empty_frame);
+	/*
       p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+      ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
       memcpy(p1 + mod_origin,
 	     empty_frame,
 	     sizeof(empty_frame));
+      ph += mod_number;
+      for(int i=0; i < 8; i++)
+	ph->framemetadata[i] = 0;
+	*/
     }
 
     timeout_i = time(NULL);
@@ -225,11 +247,13 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	return n_recv_frames;
           
       // initialize it
+      initialize_slot(*rb_current_slot, rb_dbuffer_id, rb_hbuffer_id, mod_origin, mod_number, det_size, empty_frame);
+      /*
       p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
       memcpy(p1 + mod_origin,
 	     empty_frame,
 	     sizeof(empty_frame));
-
+      */
 
       // refactor statistics
       if(total_packets != packets_frame){
@@ -263,10 +287,12 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       
     last_recorded_packet = packet.packetnum;
     total_packets ++;
+    
 
     // data copy
     ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
     p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+    printf("%d %lu new_frame_num %lu slot %d  framenum_stored %lu \n", getpid(), packet.framenum, framenum_last, *rb_current_slot, (ph + mod_number)->framemetadata[0]);
     
     line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
@@ -302,11 +328,9 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     else{
       ph->framemetadata[3] = packets_lost_int2 ^ mask;
       packets_lost_int2 = ph->framemetadata[3];
-      //ph->framemetadata[3] ^= mask;
     }
     ph->framemetadata[4] = packet.bunchid;
     ph->framemetadata[5] = (uint64_t) packet.debug;
-    //printf("%d debug: %u\n", getpid(), packet.debug);
 
     // Slot committing, if all packets acquired
     if(total_packets == packets_frame)

@@ -237,14 +237,14 @@ class ZMQSender(DataFlowNode):
             if self.reset_framenum:
                 framenum -= self.first_frame
 
-            self.log.debug("Received %d frames" % self.recv_frames)
             if self.recv_frames % self.send_every_n != 0:
                 self.recv_frames += 1
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
                 continue
             self.recv_frames += 1
-            
+            self.log.debug("Received %d frames" % self.recv_frames)
+
             # check if packets are missing
             missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
             is_good_frame = missing_packets == 0
