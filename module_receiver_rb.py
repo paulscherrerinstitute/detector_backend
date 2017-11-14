@@ -35,7 +35,7 @@ _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 
 put_data_in_rb = _mod.put_data_in_rb
 # put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
-put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, ctypes.c_int32)
+put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, ctypes.c_int32)
 put_data_in_rb.restype = ctypes.c_int
 
 
@@ -152,7 +152,8 @@ class ModuleReceiver(DataFlowNode):
 
         self.n_packets_frame = 128
         self.period = 1
-        
+
+        self.total_modules = self.geometry[0] * self.geometry[1]
         self.log.info("Packets per frame: %d" % self.n_packets_frame)
         # idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
         # self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
@@ -179,7 +180,7 @@ class ModuleReceiver(DataFlowNode):
 
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
-                                       self.n_frames, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
+                                       self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
 
         self.log.debug("Current slot: %d" % self.rb_current_slot.value)
         if n_recv_frames != 0:
