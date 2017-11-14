@@ -74,7 +74,7 @@ class ZMQSender(DataFlowNode):
     name = Unicode("ZMQSender", config=True, reconfig=True)
     uri = Unicode('tcp://192.168.10.1:9999', config=True, reconfig=True, help="URI which binds for ZMQ")
     socket_type = Unicode('PUB', config=True, reconfig=True, help="ZMQ socket type")
-    send_every_n = Float(1, config=True, reconfig=True, help="send every n-th frame")
+    send_every_s = Float(0, config=True, reconfig=True, help="send every n second")
     module_size = List((512, 1024), config=True, reconfig=True)
     geometry = List((1, 1), config=True, reconfig=True)
 
@@ -169,6 +169,7 @@ class ZMQSender(DataFlowNode):
         if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
 
+        self.send_time = 0
         #if self.output_file != '':
         #    self.log.info("writing to %s " % self.output_file)
         #    self.outfile = h5py.File(self.output_file, "w")
@@ -238,32 +239,32 @@ class ZMQSender(DataFlowNode):
                 framenum -= self.first_frame
 
             self.log.debug("Received %d frames" % self.recv_frames)
-            if self.recv_frames % self.send_every_n != 0:
+            if self.send_every_s != 0 and (time() - self.send_time) < self.send_every_s:
                 self.recv_frames += 1
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
                 continue
             self.recv_frames += 1
+            self.send_time = time()
             
             # check if packets are missing
             missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
             is_good_frame = missing_packets == 0
             if missing_packets != 0:
-                #self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
+                self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
                 self.frames_with_missing_packets += 1
                 self.total_missing_packets += missing_packets
 
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
             
             if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, mask, mask2)
                 self.log.info("Corrections done")
                 #if self.output_file != '':
-            #    self.dst[self.counter] = data
+                self.dst[self.counter] = data
             try:
-                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulseid": pulseid})
+                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid})
             except:
                 pass
             self.counter += 1

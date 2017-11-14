@@ -129,20 +129,20 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   //int det_size_x = det_size[0];
   int det_size_y = det_size[1];
 
-  printf("det_size %d %d\n", det_size[0], det_size[1]);
-  printf("mod_size %d %d\n", mod_size[0], mod_size[1]);
-  printf("mod_idx %d %d\n", mod_idx[0], mod_idx[1]);
+  //printf("det_size %d %d\n", det_size[0], det_size[1]);
+  //printf("mod_size %d %d\n", mod_size[0], mod_size[1]);
+  //printf("mod_idx %d %d\n", mod_idx[0], mod_idx[1]);
 
   int mod_number = mod_idx_x + mod_idx_y * det_size_y; //numbering inside the detctor, growing over the x-axis 
   int lines_per_packet = BUFFER_LENGTH / mod_size_y;
   
   int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_y * det_size_y;
   // to be checked
-  mod_origin += mod_idx[1] * (3 * gap_px_chips[1] + gap_px_modules[1]); // inter_chip gaps plus inter_module gap
-  mod_origin += mod_idx[0] * (gap_px_chips[0] + gap_px_modules[0])* det_size[1] ; // inter_chip gaps plus inter_module gap
+  //mod_origin += mod_idx[1] * (3 * gap_px_chips[1] + gap_px_modules[1]); // inter_chip gaps plus inter_module gap
+  //mod_origin += mod_idx[0] * (gap_px_chips[0] + gap_px_modules[0])* det_size[1] ; // inter_chip gaps plus inter_module gap
 
   uint64_t packets_lost_int1=0, packets_lost_int2=0;
-  uint16_t empty_frame[det_size[0] * det_size[1]];
+  uint16_t empty_frame[mod_size[0] * mod_size[1]];
   
   data_size = det_size_y * sizeof(uint16_t);
 
@@ -155,7 +155,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
   
   // creating an empty frame for initializing the rb slot
-  for(int i=0; i<det_size[0]*det_size[1]; i++)
+  for(int i=0; i<mod_size[0]*mod_size[1]; i++)
     empty_frame[i] = 0;
 
   
@@ -189,10 +189,12 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	return n_recv_frames;
 
       // initialize it
+      /*
       p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
       memcpy(p1 + mod_origin,
 	     empty_frame,
 	     sizeof(empty_frame));
+      */
     }
 
     timeout_i = time(NULL);
@@ -225,11 +227,14 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	return n_recv_frames;
           
       // initialize it
-      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-      memcpy(p1 + mod_origin,
-	     empty_frame,
-	     sizeof(empty_frame));
 
+      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+      //for(int i=0; i<det_size[0]*det_size[1]; i++)
+      //(p1 + mod_origin)[i] = 0;
+      memcpy(p1 + mod_origin,
+      	     empty_frame,
+          sizeof(empty_frame));
+      printf("sizeof %lu\n" , sizeof(empty_frame));
 
       // refactor statistics
       if(total_packets != packets_frame){
