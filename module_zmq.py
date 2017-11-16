@@ -223,13 +223,16 @@ class ZMQSender(DataFlowNode):
                                    ctypes.POINTER(HEADER))
 
             # check that all frame numbers are the same
+            daq_recs = [pointerh.contents[i].framemetadata[5] for i in range(self.n_modules)]
+            framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
+            pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_modules)]
             if self.check_framenum:
-                framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
                 is_good_frame = len(set(framenums)) == 1
-            print([pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)])
+            #print([pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)])
             framenum = copy(pointerh.contents[0].framemetadata[0])
             pulseid = pointerh.contents[0].framemetadata[4]
             daq_rec = pointerh.contents[0].framemetadata[5]
+            
 
             if self.first_frame == 0:
                 self.log.info("First frame got: %d" % framenum)
@@ -246,7 +249,7 @@ class ZMQSender(DataFlowNode):
             self.recv_frames += 1
             self.send_time = time()
             
-            self.log.debug("Received %d frames" % self.recv_frames)
+            self.log.info("Received %d frames" % self.recv_frames)
 
             # check if packets are missing
             missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
@@ -265,9 +268,10 @@ class ZMQSender(DataFlowNode):
                 #if self.output_file != '':
                 self.dst[self.counter] = data
             try:
-                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid})
+                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums})
             except:
-                pass
+                #pass
+                self.log.error(sys.exc_info()[1])
             self.counter += 1
             self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
 

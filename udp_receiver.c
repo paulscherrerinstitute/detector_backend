@@ -48,7 +48,8 @@ typedef struct _jungfrau_packet{
   uint64_t framenum;
   uint32_t exptime;
   uint32_t packetnum;
-  uint64_t bunchid;
+  //uint64_t bunchid;
+  double bunchid;
   uint64_t timestamp;
   uint16_t moduleID;
   uint16_t xCoord;
@@ -106,7 +107,7 @@ int check_framenums(int total_modules, jungfrau_header * ph, jungfrau_packet pac
   // checks frame numbers for all modules
   
   for (int mod=0; mod < total_modules; mod ++){
-    printf("   %d %lu\n", getpid, (ph + mod)->framemetadata[0]);
+    printf("%d CHECK mod %d framenum_stored %lu framenum_got %lu\n", getpid, mod, (ph + mod)->framemetadata[0], packet.framenum);
     // if the slot is empty, go on
     if((ph + mod)->framemetadata[0] == 0)
       continue;
@@ -299,7 +300,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     // compare frame nums for all modules
     int should_continue = 0;
     //should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
-    printf("%d %lu %d \n", getpid(), packet.framenum, should_continue);
+    printf("%d %lu \n", getpid(), packet.framenum);
 
     while(should_continue != 0){
       // this means got no slot
@@ -358,7 +359,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       ph->framemetadata[3] = packets_lost_int2 ^ mask;
       packets_lost_int2 = ph->framemetadata[3];
     }
-    ph->framemetadata[4] = packet.bunchid;
+    ph->framemetadata[4] = (uint64_t) packet.bunchid;
     ph->framemetadata[5] = (uint64_t) packet.debug;
 
     // Slot committing, if all packets acquired
