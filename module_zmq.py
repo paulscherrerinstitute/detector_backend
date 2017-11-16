@@ -52,8 +52,8 @@ def do_corrections(m, n, image, G, P, mask, mask2):
             gm = gain_mask[i][j]
             if gm == 3:
                 gm = 2
-            if G[gm][i][j] > 1:
-                print(gm, i, j, m, G[gm][i][j])
+            #if G[gm][i][j] > 1:
+            #    print(gm, i, j, m, G[gm][i][j])
             res[i][j] = (data[i][j] - P[gm][i][j]) / G[gm][i][j]
     return res
 
@@ -176,7 +176,7 @@ class ZMQSender(DataFlowNode):
         #    self.dst = self.outfile.create_dataset("/data", shape=(1000, ) + self.detector_size, dtype=np.uint16)
             
     def reconfigure(self, settings):
-        #self.log.info(settings)
+        self.log.info(settings)
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
         if "period" in settings:
@@ -189,8 +189,12 @@ class ZMQSender(DataFlowNode):
 
         if "gain_corrections_filename" in settings:
             self.gain_corrections_filename = settings["gain_corrections_filename"]
-        if "pedestal_corrections_filename" in settings:
-            self.pedestal_corrections_filename = settings["pedestal_corrections_filename"]
+        if "pede_corrections_filename" in settings:
+            self.pede_corrections_filename = settings["pede_corrections_filename"]
+        if "gain_corrections_dataset" in settings:
+            self.gain_corrections_dataset = settings["gain_corrections_dataset"]
+        if "pede_corrections_dataset" in settings:
+            self.pede_corrections_dataset = settings["pede_corrections_dataset"]
         if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
         self.first_frame = 0
@@ -205,6 +209,7 @@ class ZMQSender(DataFlowNode):
         frame_comp_counter = 0
         is_good_frame = True
 
+        # need to stay here because of numba
         # for gain plus data masking
         mask = int('0b' + 14 * '1', 2)
         mask2 = int('0b' + 2 * '1', 2)
@@ -266,7 +271,7 @@ class ZMQSender(DataFlowNode):
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, mask, mask2)
                 self.log.info("Corrections done")
                 #if self.output_file != '':
-                self.dst[self.counter] = data
+                #self.dst[self.counter] = data
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums})
             except:
@@ -325,7 +330,7 @@ class ZMQSender(DataFlowNode):
             self.pede_corrections = pede_corrections_file[self.pede_corrections_dataset][:]
             pede_corrections_file.close()
 
-        self.log.info("%s %s" % (self.gain_corrections.shape, self.pede_corrections.shape))
+        #self.log.info("%s %s" % (self.gain_corrections.shape, self.pede_corrections.shape))
 
         if len(self.gain_corrections.shape) != 3 or len(self.pede_corrections.shape) != 3:
             self.log.error("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))

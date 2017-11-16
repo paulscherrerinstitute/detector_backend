@@ -300,7 +300,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     // compare frame nums for all modules
     int should_continue = 0;
     //should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
-    printf("%d %lu \n", getpid(), packet.framenum);
+    //printf("%d %lu \n", getpid(), packet.framenum);
 
     while(should_continue != 0){
       // this means got no slot
