@@ -48,7 +48,8 @@ typedef struct _jungfrau_packet{
   uint64_t framenum;
   uint32_t exptime;
   uint32_t packetnum;
-  uint64_t bunchid;
+  //uint64_t bunchid;
+  double bunchid;
   uint64_t timestamp;
   uint16_t moduleID;
   uint16_t xCoord;
@@ -85,9 +86,56 @@ int get_message(int sd, jungfrau_packet * packet){
   return nbytes;
 }
 
+int initialize_slot(int rb_current_slot, int rb_dbuffer_id, int rb_hbuffer_id, int mod_origin, int mod_number, int det_size[2], uint16_t * empty_frame){
+  jungfrau_header * ph;
+  uint16_t * p1;
 
-int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout){
+  p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
+  ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
+  memcpy(p1 + mod_origin,
+	 empty_frame,
+	 sizeof(*empty_frame));
+  ph += mod_number;
+  for(int i=0; i < 8; i++)
+    ph->framemetadata[i] = 0;
+
+  return 0;
+}
+
+
+int check_framenums(int total_modules, jungfrau_header * ph, jungfrau_packet packet, int *rb_current_slot, int rb_writer_id){
+  // checks frame numbers for all modules
   
+  for (int mod=0; mod < total_modules; mod ++){
+    printf("%d CHECK mod %d framenum_stored %lu framenum_got %lu\n", getpid, mod, (ph + mod)->framemetadata[0], packet.framenum);
+    // if the slot is empty, go on
+    if((ph + mod)->framemetadata[0] == 0)
+      continue;
+    // if this is a late frame, discard
+    else if((ph + mod)->framemetadata[0] > packet.framenum)
+      return 2;
+    // if this is an early frame, advance slots
+    else if((ph + mod)->framemetadata[0] < packet.framenum){
+      rb_commit_slot(rb_writer_id, *rb_current_slot);
+      *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+      if(*rb_current_slot == -1)
+	return -1;
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t total_modules, int32_t det_size[2], int32_t mod_size[2], int32_t mod_idx[2], int32_t gap_px_chips[2], int32_t gap_px_modules[2], int timeout){
+
+  /*
+#define GAP_PX_CHIPS_X 2
+#define GAP_PX_CHIPS_Y 2
+#define GAP_PX_MODULES_X 8
+#define GAP_PX_MODULES_Y 36
+  */
+
   int stats_frames = 10;
   int n_recv_frames = 0;
   uint64_t framenum_last = 0;
@@ -121,13 +169,21 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   int mod_size_x = mod_size[0], mod_size_y = mod_size[1];
   //int det_size_x = det_size[0];
   int det_size_y = det_size[1];
+
+  //printf("det_size %d %d\n", det_size[0], det_size[1]);
+  //printf("mod_size %d %d\n", mod_size[0], mod_size[1]);
+  //printf("mod_idx %d %d\n", mod_idx[0], mod_idx[1]);
+
   int mod_number = mod_idx_x + mod_idx_y * det_size_y; //numbering inside the detctor, growing over the x-axis 
   int lines_per_packet = BUFFER_LENGTH / mod_size_y;
   
   int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_y * det_size_y;
+  // to be checked
+  //mod_origin += mod_idx[1] * (3 * gap_px_chips[1] + gap_px_modules[1]); // inter_chip gaps plus inter_module gap
+  //mod_origin += mod_idx[0] * (gap_px_chips[0] + gap_px_modules[0])* det_size[1] ; // inter_chip gaps plus inter_module gap
 
   uint64_t packets_lost_int1=0, packets_lost_int2=0;
-  uint16_t empty_frame[det_size[0] * det_size[1]];
+  uint16_t empty_frame[mod_size[0] * mod_size[1]];
   
   data_size = det_size_y * sizeof(uint16_t);
 
@@ -138,10 +194,10 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   tv.tv_usec = 50;
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
 
+  
   // creating an empty frame for initializing the rb slot
-  for(int i=0; i<det_size[0]*det_size[1]; i++)
+  for(int i=0; i<mod_size[0]*mod_size[1]; i++)
     empty_frame[i] = 0;
-
   
   while(true){
     if(nframes != -1)
@@ -173,10 +229,8 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	return n_recv_frames;
 
       // initialize it
-      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-      memcpy(p1 + mod_origin,
-	     empty_frame,
-	     sizeof(empty_frame));
+      initialize_slot(*rb_current_slot, rb_dbuffer_id, rb_hbuffer_id, mod_origin, mod_number, det_size, empty_frame);
+
     }
 
     timeout_i = time(NULL);
@@ -189,10 +243,9 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
     // New frame arrived
     if(packet.framenum != framenum_last){
-     
+
+      // commit the slot if not all the packets were received for the previous frame (dangling slot)
       if(total_packets != packets_frame){
-      
-	//printf("%d %lu new_frame_num %lu slot %d\n", getpid(), packet.framenum, framenum_last, rb_current_slot);
 	if(*rb_current_slot != -1)
 	  rb_commit_slot(rb_writer_id, *rb_current_slot);
       }
@@ -201,20 +254,16 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       packets_lost_int1 = 0;
       packets_lost_int2 = 0;
 
-
       // get new RB slot
       *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-      
+
+      // exit if got no slot
       if(*rb_current_slot == -1)
 	return n_recv_frames;
           
       // initialize it
-      p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-      memcpy(p1 + mod_origin,
-	     empty_frame,
-	     sizeof(empty_frame));
-
-
+      initialize_slot(*rb_current_slot, rb_dbuffer_id, rb_hbuffer_id, mod_origin, mod_number, det_size, empty_frame);
+     
       // refactor statistics
       if(total_packets != packets_frame){
 	lost_frames ++;
@@ -244,17 +293,39 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       total_packets = 0;
 
     } // end new frame if
-      
-    last_recorded_packet = packet.packetnum;
-    total_packets ++;
+    
+    // get memory slots
+    ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
 
-    // data copy
+    // compare frame nums for all modules
+    int should_continue = 0;
+    //should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
+    //printf("%d %lu \n", getpid(), packet.framenum);
+
+    while(should_continue != 0){
+      // this means got no slot
+      if(should_continue == -1)
+	return n_recv_frames;
+      // this means there is a late frame
+      if(should_continue == 2)
+	break;
+      should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
+      printf("%d %lu %d\n", getpid(), packet.framenum, should_continue);
+    }
+    // discard late frames
+    if(should_continue == 2)
+      continue;
+
+    // get them again, after RB slot is updated
     ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
     p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-    
+    //printf("%d %lu new_frame_num %lu slot %d  framenum_stored %lu \n", getpid(), packet.framenum, framenum_last, *rb_current_slot, (ph + mod_number)->framemetadata[0]);
+
     line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
-    //printf("line number %d\n", line_number);
+
+    last_recorded_packet = packet.packetnum;
+    total_packets ++;
     
     p1 += mod_origin;
     
@@ -269,12 +340,12 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     }
     */
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      memcpy(p1 + i * det_size_y,
+      memcpy(p1 + i * det_size_y ,
 	     packet.data + int_line * det_size_y,
 	     data_size);
-      	int_line ++;
-      }
-    
+      int_line ++;
+      
+    }
     // Copy the framenum and frame metadata
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;
@@ -287,11 +358,9 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     else{
       ph->framemetadata[3] = packets_lost_int2 ^ mask;
       packets_lost_int2 = ph->framemetadata[3];
-      //ph->framemetadata[3] ^= mask;
     }
-    ph->framemetadata[4] = packet.bunchid;
+    ph->framemetadata[4] = (uint64_t) packet.bunchid;
     ph->framemetadata[5] = (uint64_t) packet.debug;
-    //printf("%d debug: %u\n", getpid(), packet.debug);
 
     // Slot committing, if all packets acquired
     if(total_packets == packets_frame)

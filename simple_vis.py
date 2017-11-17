@@ -33,7 +33,7 @@ socket = ctx.socket(zmq.SUB)
 socket.set_hwm(1)
 
 socket.setsockopt(zmq.SUBSCRIBE, '')
-socket.connect("tcp://127.0.0.1:9999")
+socket.connect("tcp://127.0.0.1:10000")
 
 sleep(2)
 print "connected"
