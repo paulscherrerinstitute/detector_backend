@@ -54,7 +54,7 @@ def do_corrections(m, n, image, G, P, mask, mask2):
                 gm = 2
             #if G[gm][i][j] > 1:
             #    print(gm, i, j, m, G[gm][i][j])
-            res[i][j] = (data[i][j] - P[gm][i][j]) / G[gm][i][j]
+            res[i][j] = (data[i][j] - P[gm][i][j])# / G[gm][i][j]
     return res
 
 
@@ -254,7 +254,7 @@ class ZMQSender(DataFlowNode):
             self.recv_frames += 1
             self.send_time = time()
             
-            self.log.info("Received %d frames" % self.recv_frames)
+            self.log.debug("Received %d frames" % self.recv_frames)
 
             # check if packets are missing
             missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
@@ -269,7 +269,7 @@ class ZMQSender(DataFlowNode):
             
             if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, mask, mask2)
-                self.log.info("Corrections done")
+                self.log.debug("Corrections done")
                 #if self.output_file != '':
                 #self.dst[self.counter] = data
             try:
