@@ -40,7 +40,7 @@ HEADER = Mystruct * 10
 
 
 @jit(nopython=True, nogil=True, cache=True)
-def do_corrections(m, n, image, G, P, mask, mask2):
+def do_corrections(m, n, image, G, P, pede_mask, mask, mask2):
     #m, n = image.shape
     gain_mask = np.bitwise_and(np.right_shift(image, 14), mask2)
     data = np.bitwise_and(image, mask)
@@ -48,6 +48,9 @@ def do_corrections(m, n, image, G, P, mask, mask2):
 
     for i in range(m):
         for j in range(n):
+            if pede_mask[i][j] != 0:
+                res[i][j] = 0
+                continue
             gm = gain_mask[i][j]
             if gm == 3:
                 gm = 2
@@ -97,6 +100,7 @@ class ZMQSender(DataFlowNode):
     gain_corrections_dataset = Unicode('', config=True, reconfig=True)
     pede_corrections_filename = Unicode('', config=True, reconfig=True)
     pede_corrections_dataset = Unicode('', config=True, reconfig=True)
+    pede_mask_dataset = Unicode('', config=True, reconfig=True)
     
     activate_corrections_preview = Bool(False, config=True, reconfig=True, help="")
     activate_corrections = Bool(False, config=True, reconfig=True, help="")
@@ -170,6 +174,8 @@ class ZMQSender(DataFlowNode):
 
         self.gain_corrections = np.ones((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
+        self.pede_mask = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
+
         self.metrics.set("activate_corrections", self.activate_corrections)
         self.metrics.set("activate_corrections_preview", self.activate_corrections_preview)
         self.metrics.set("name", self.name)
@@ -205,6 +211,8 @@ class ZMQSender(DataFlowNode):
             self.gain_corrections_dataset = settings["gain_corrections_dataset"]
         if "pede_corrections_dataset" in settings:
             self.pede_corrections_dataset = settings["pede_corrections_dataset"]
+        if "pede_mask_dataset" in settings:
+            self.pede_mask_dataset = settings["pede_mask_dataset"]
 
         if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
@@ -212,10 +220,8 @@ class ZMQSender(DataFlowNode):
         self.recv_frames = 0
 
     def initialize(self):
-        print("AAAAAAAAAAAAa")
         self.log.warning("%s.initialize()",self.__class__.__name__)
         #super(ZMQSender, self).initialize()
-        print("AAAAAAAAAAAAaa")
 
     def reset(self):
         self.log.warning("%s.reset()",self.__class__.__name__)
@@ -235,6 +241,7 @@ class ZMQSender(DataFlowNode):
         
         self.gain_corrections = np.ones((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
+        self.pede_mask = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         
         self._reset_defaults()
 
@@ -255,6 +262,8 @@ class ZMQSender(DataFlowNode):
         if self.pede_corrections_filename != "" and self.pede_corrections_dataset != "":
             pede_corrections_file = h5py.File(self.pede_corrections_filename)
             self.pede_corrections = pede_corrections_file[self.pede_corrections_dataset][:]
+            if self.pede_mask_dataset != "":
+                self.pede_mask = pede_corrections_file[self.pede_mask_dataset][:]
             pede_corrections_file.close()
 
         #self.log.info("%s %s" % (self.gain_corrections.shape, self.pede_corrections.shape))
@@ -334,14 +343,11 @@ class ZMQSender(DataFlowNode):
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
 
-            #print("pulseid %d data[180, 330] %.2f pede %.2f gain %.2f " % (pulseid, data[180, 330], self.pede_corrections[0, 180, 330],
-            #                                                                                        self.gain_corrections[0, 180, 330]))
             if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
-                data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, mask, mask2)
-                #print("pulseid %d data_corr[180, 330] %.2f " % (pulseid, data[180, 330]))
+                t_i = time()
+                data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, self.pede_mask, mask, mask2)
                 self.log.debug("Corrections done")
-                #if self.output_file != '':
-                #self.dst[self.counter] = data
+                #self.log.info("Correction took .3f seconds" % (time() - t_i))
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums]})
             except:
