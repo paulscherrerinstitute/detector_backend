@@ -23,7 +23,6 @@ from numba import jit
 
 from copy import copy
 
-import warnings
 
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
@@ -54,7 +53,7 @@ def do_corrections(m, n, image, G, P, mask, mask2):
                 gm = 2
             #if G[gm][i][j] > 1:
             #    print(gm, i, j, m, G[gm][i][j])
-            res[i][j] = (data[i][j] - P[gm][i][j])# / G[gm][i][j]
+            res[i][j] = (data[i][j] - P[gm][i][j]) / G[gm][i][j]
     return res
 
 
@@ -71,6 +70,7 @@ def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
 class ZMQSender(DataFlowNode):
 
     #filename = Unicode(u'data.txt', config=True, reconfig=True, help='output filename with optional path')
+    defaults = {}
     name = Unicode("ZMQSender", config=True, reconfig=True)
     uri = Unicode('tcp://192.168.10.1:9999', config=True, reconfig=True, help="URI which binds for ZMQ")
     socket_type = Unicode('PUB', config=True, reconfig=True, help="ZMQ socket type")
@@ -90,17 +90,24 @@ class ZMQSender(DataFlowNode):
     rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
 
     check_framenum = Bool(True, config=True, reconfig=True, help="Check that the frame numbers of all the modules are the same")
+    defaults["check_framenum"] = check_framenum
     reset_framenum = Bool(True, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
-    
-    output_file = Unicode('', config=True, reconfig=True)
+    defaults["reset_framenum"] = reset_framenum
+    #output_file = Unicode('', config=True, reconfig=True)
 
     gain_corrections_filename = Unicode('', config=True, reconfig=True)
     gain_corrections_dataset = Unicode('', config=True, reconfig=True)
     pede_corrections_filename = Unicode('', config=True, reconfig=True)
     pede_corrections_dataset = Unicode('', config=True, reconfig=True)
-
+    defaults["gain_corrections_filename"] = gain_corrections_filename
+    defaults["gain_corrections_dataset"] = gain_corrections_dataset
+    defaults["pede_corrections_filename"] = gain_corrections_filename
+    defaults["pede_corrections_dataset"] = gain_corrections_dataset
+    
     activate_corrections_preview = Bool(False, config=True, reconfig=True, help="")
     activate_corrections = Bool(False, config=True, reconfig=True, help="")
+    defaults["activate_corrections_preview"] = activate_corrections_preview
+    defaults["activate_corrections"] = activate_corrections
 
     #gain_corrections_list = List((0,), config=True, reconfig=True, help="")
     #pedestal_corrections_list = List((0,), config=True, reconfig=True, help="")
@@ -160,8 +167,8 @@ class ZMQSender(DataFlowNode):
 
         self.recv_frames = 0
 
-        self.gain_corrections = np.zeros([0, ])
-        self.pede_corrections = np.zeros([0, ])
+        self.gain_corrections = np.ones([3, ] + self.detector_size, dtype=np.float32)
+        self.pede_corrections = np.zeros([3, ] + self.detector_size, dtype=np.float32)
         self.metrics.set("activate_corrections", self.activate_corrections)
         self.metrics.set("activate_corrections_preview", self.activate_corrections_preview)
         self.metrics.set("name", self.name)
@@ -182,19 +189,26 @@ class ZMQSender(DataFlowNode):
         if "period" in settings:
             self.period = settings["period"] / 1e9
 
-        if "activate_corrections" in settings:
-            self.activate_corrections = settings["activate_corrections"]
-        if "activate_corrections_preview" in settings:
-            self.activate_corrections_preview = settings["activate_corrections_preview"]
+        for k, v in settings:
+            if k in ["n_frames", "period"]:
+                continue
+            
+            self.__getattribute__(k) = v
 
-        if "gain_corrections_filename" in settings:
-            self.gain_corrections_filename = settings["gain_corrections_filename"]
-        if "pede_corrections_filename" in settings:
-            self.pede_corrections_filename = settings["pede_corrections_filename"]
-        if "gain_corrections_dataset" in settings:
-            self.gain_corrections_dataset = settings["gain_corrections_dataset"]
-        if "pede_corrections_dataset" in settings:
-            self.pede_corrections_dataset = settings["pede_corrections_dataset"]
+        #if "activate_corrections" in settings:
+        #    self.activate_corrections = settings["activate_corrections"]
+        #if "activate_corrections_preview" in settings:
+        #    self.activate_corrections_preview = settings["activate_corrections_preview"]
+
+        #if "gain_corrections_filename" in settings:
+        #    self.gain_corrections_filename = settings["gain_corrections_filename"]
+        #if "pede_corrections_filename" in settings:
+        #    self.pede_corrections_filename = settings["pede_corrections_filename"]
+        #if "gain_corrections_dataset" in settings:
+        #    self.gain_corrections_dataset = settings["gain_corrections_dataset"]
+        #if "pede_corrections_dataset" in settings:
+        #    self.pede_corrections_dataset = settings["pede_corrections_dataset"]
+
         if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
         self.first_frame = 0
@@ -202,7 +216,7 @@ class ZMQSender(DataFlowNode):
 
     def send(self, data):
         # FIXME
-        timeout = 1  # ctypes.c_int(max(int(2. * self.period), 1))
+        timeout = max(2. * self.period, 1)
 
         ref_time = time()
         frame_comp_time = time()
@@ -214,7 +228,7 @@ class ZMQSender(DataFlowNode):
         mask = int('0b' + 14 * '1', 2)
         mask2 = int('0b' + 2 * '1', 2)
 
-        # FIXME avoid infinit loop
+        # getting data from RB
         while True:
             if(self.counter >= self.n_frames and self.n_frames != -1) or (time() - ref_time > timeout):
                 break
@@ -310,6 +324,12 @@ class ZMQSender(DataFlowNode):
                                              "incomplete": self.frames_with_missing_packets,
                                              "packets_lost": self.total_missing_packets, "epoch": time()})
         self.metrics.set("sent_frames", self.sent_frames)
+
+        for k, v in self.defaults.iteritems():
+            self.__getattribute__(k) = v
+
+        self.gain_corrections = np.ones([3, ] + self.detector_size, dtype=np.float32)
+        self.pede_corrections = np.zeros([3, ] + self.detector_size, dtype=np.float32)
 
         self.close_sockets()
         sleep(0.1)

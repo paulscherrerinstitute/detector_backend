@@ -209,9 +209,8 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     // no data? Checks timeout 
     // FIXME: what to do when ringbuffer is full, and cannot get a slot? Exit and retry?
     if(data_len <= 0){
-      //printf("TIMEOUT %d %lu new_frame_num %lu slot %d %d \n", getpid(), packet.framenum, framenum_last, rb_current_slot, (int)time(NULL) - (int)timeout_i);
       if ((int)time(NULL) - (int)timeout_i > timeout){
-	//printf("TIMEOUT %d %lu new_frame_num %lu slot %d %d \n", getpid(), packet.framenum, framenum_last, rb_current_slot, (int)time(NULL) - (int)timeout_i);
+	printf("[%d][%d] C receiver got TIMEOUT for frame %lu new_frame_num %lu slot %d timeout %d \n", (int) time(NULL), getpid(), packet.framenum, framenum_last, rb_current_slot, (int)time(NULL) - (int)timeout_i);
 	
 	// flushes the last message - what happens if I commit an already committed slot?
 	if(*rb_current_slot != -1){
