@@ -205,7 +205,7 @@ class ModuleReceiver(DataFlowNode):
 
         
     def reset(self):
-        self.log.info("Restarting the socket connection")
+        self.log.error("Restarting the socket connection")
         self.sock.close()
         self.sock = socket.socket(socket.AF_INET,  # Internet
                                   socket.SOCK_DGRAM)  # UDP
