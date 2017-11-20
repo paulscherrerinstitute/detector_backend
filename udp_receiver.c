@@ -328,25 +328,6 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     
     p1 += mod_origin;
     
-    /*
-    for(i=line_number; i < line_number + lines_per_packet; i++){
-      
-      memcpy(p1 + i * det_size_y,
-	     packet.data + int_line * det_size_y,
-	     data_size);
-      
-      int_line ++;
-    }
-    */
-    /*
-    for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      memcpy(p1 + i * det_size_y ,
-	     packet.data + int_line * det_size_y,
-	     data_size);
-      int_line ++;
-      
-    }
-    */
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
       //printf("%d %d %d %d\n", i, 511 - i, line_number, lines_per_packet);
       memcpy(p1 + (511 - i) * det_size_y ,

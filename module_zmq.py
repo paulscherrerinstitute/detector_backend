@@ -3,7 +3,6 @@ from dafl.application import XblLoggingConfigurable
 from dafl.traits import Int, Unicode, Float, List, Bool, Unicode
 from dafl.dataflow import DataFlowNode, DataFlow
 from dafl.application import XblBaseApplication
-#import matplotlib.pyplot as plt
 
 import struct
 
@@ -55,8 +54,6 @@ def do_corrections(m, n, image, G, P, pede_mask, mask, mask2):
             if gm == 3:
                 gm = 2
             res[i][j] = (data[i][j] - P[gm][i][j]) / G[gm][i][j]
-            #if [i, j] == [0, 0] :
-            #    print("i,j: %d %d Gain_level %d Pede %.2f Gain %.2f Data %.2f CorrData %.2f" % (i, j, gm, P[gm][i][j], G[gm][i][j], data[i][j], res[i][j]))
     return res
 
 
@@ -129,7 +126,6 @@ class ZMQSender(DataFlowNode):
         self.skt.close(linger=0)
         #self.skt.destroy()
         while not self.skt.closed:
-            #print(self.skt.closed)
             sleep(1)
 
     def __init__(self, **kwargs):
@@ -266,8 +262,6 @@ class ZMQSender(DataFlowNode):
                 self.pede_mask = pede_corrections_file[self.pede_mask_dataset][:]
             pede_corrections_file.close()
 
-        #self.log.info("%s %s" % (self.gain_corrections.shape, self.pede_corrections.shape))
-
         if len(self.gain_corrections.shape) != 3 or len(self.pede_corrections.shape) != 3:
             self.log.error("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))
             raise ValueError("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))
@@ -309,7 +303,6 @@ class ZMQSender(DataFlowNode):
             pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_modules)]
             if self.check_framenum:
                 is_good_frame = len(set(framenums)) == 1
-            #print([pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)])
             framenum = copy(pointerh.contents[0].framemetadata[0])
             pulseid = pointerh.contents[0].framemetadata[4]
             daq_rec = pointerh.contents[0].framemetadata[5]
@@ -347,7 +340,7 @@ class ZMQSender(DataFlowNode):
                 t_i = time()
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, self.pede_mask, mask, mask2)
                 self.log.debug("Corrections done")
-                #self.log.info("Correction took .3f seconds" % (time() - t_i))
+                self.log.info("Correction took %.3f seconds" % (time() - t_i))
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums]})
             except:
