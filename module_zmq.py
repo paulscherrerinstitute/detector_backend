@@ -102,6 +102,7 @@ class ZMQSender(DataFlowNode):
     activate_corrections_preview = Bool(False, config=True, reconfig=True, help="")
     activate_corrections = Bool(False, config=True, reconfig=True, help="")
 
+    send_fake_data = Bool(False, config=True, reconfig=True, help="")
     #gain_corrections_list = List((0,), config=True, reconfig=True, help="")
     #pedestal_corrections_list = List((0,), config=True, reconfig=True, help="")
 
@@ -124,7 +125,8 @@ class ZMQSender(DataFlowNode):
         #self.skt.unbind(self.uri)
         self.log.info("CALLING CLOSE")
         self.skt.close(linger=0)
-        #self.skt.destroy()
+        self.skt.destroy()
+        self.log.debug(self.socket.closed)
         while not self.skt.closed:
             sleep(1)
 
@@ -163,7 +165,7 @@ class ZMQSender(DataFlowNode):
         self.total_missing_packets = 0
         self.first_frame = 0
 
-        self.fakedata = np.zeros([1536, 1024], dtype=np.uint16)
+        self.fake_data = np.zeros([1, ], dtype=np.uint16)
         self.entry_size_in_bytes = -1
 
         self.recv_frames = 0
@@ -241,6 +243,7 @@ class ZMQSender(DataFlowNode):
         
         self._reset_defaults()
 
+        self.send_fake_data = False
         #self.close_sockets()
         #sleep(0.2)
         #self.open_sockets()
@@ -335,6 +338,8 @@ class ZMQSender(DataFlowNode):
 
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
+            if self.send_fake_data:
+                data = self.fake_data
 
             if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
                 t_i = time()
