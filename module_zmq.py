@@ -165,7 +165,7 @@ class ZMQSender(DataFlowNode):
         self.total_missing_packets = 0
         self.first_frame = 0
 
-        self.fake_data = np.zeros([1, ], dtype=np.uint16)
+        self.fake_data = np.zeros([2, 2], dtype=np.uint16)
         self.entry_size_in_bytes = -1
 
         self.recv_frames = 0
@@ -214,6 +214,8 @@ class ZMQSender(DataFlowNode):
 
         if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
+        if "send_fake_data" in settings:
+            self.send_fake_data = settings["send_fake_data"]
         self.first_frame = 0
         self.recv_frames = 0
 
@@ -338,6 +340,7 @@ class ZMQSender(DataFlowNode):
 
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
+            #print(self.send_fake_data, self.fake_data.shape)
             if self.send_fake_data:
                 data = self.fake_data
 
