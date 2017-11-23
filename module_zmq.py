@@ -125,8 +125,8 @@ class ZMQSender(DataFlowNode):
         #self.skt.unbind(self.uri)
         self.log.info("CALLING CLOSE")
         self.skt.close(linger=0)
-        self.skt.destroy()
-        self.log.debug(self.socket.closed)
+        #self.skt.destroy()
+        #self.log.debug(self.socket.closed)
         while not self.skt.closed:
             sleep(1)
 
@@ -234,21 +234,26 @@ class ZMQSender(DataFlowNode):
         self.frames_with_missing_packets = 0
         self.total_missing_packets = 0
 
-        self.metrics.set("received_frames", {"total": self.counter,
+        self.metrics.set("received_frames", {"name": self.name, "total": self.counter,
                                              "incomplete": self.frames_with_missing_packets,
                                              "packets_lost": self.total_missing_packets, "epoch": time()})
-        self.metrics.set("sent_frames", self.sent_frames)
-        
-        self.gain_corrections = np.ones((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
+        self.metrics.set("sent_frames", {"name": self.name, "total": self.sent_frames, "epoch": time()})
+
+        # logging stats
+        self.log.info("%s" % {"received_frames": {"total": self.counter,
+                                                  "incomplete": self.frames_with_missing_packets,
+                                                  "packets_lost": self.total_missing_packets, "epoch": time()}
+                        })
+        self.log.info("%s" % {"sent_frames": self.sent_frames})
         self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_mask = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         
         self._reset_defaults()
-
+        
         self.send_fake_data = False
-        #self.close_sockets()
-        #sleep(0.2)
-        #self.open_sockets()
+        self.close_sockets()
+        sleep(0.2)
+        self.open_sockets()
         self.log.info("Reset done")
 
     def setup_corrections(self, ):
@@ -340,7 +345,9 @@ class ZMQSender(DataFlowNode):
 
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
-            #print(self.send_fake_data, self.fake_data.shape)
+            self.counter += 1
+            self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
+
             if self.send_fake_data:
                 data = self.fake_data
 
@@ -349,16 +356,16 @@ class ZMQSender(DataFlowNode):
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, self.pede_mask, mask, mask2)
                 self.log.debug("Corrections done")
                 self.log.info("Correction took %.3f seconds" % (time() - t_i))
+                self.sent_frames += 1
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums]})
             except:
                 #pass
                 self.log.error(sys.exc_info()[1])
-            self.counter += 1
-            self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
+            self.metrics.set("sent_frames", {"name": self.name, "total": self.sent_frames, "epoch": time()})        
 
-            if self.counter % 1000 == 0:
-                print(time(), " ", self.counter)
+            #if self.counter % 1000 == 0:
+            #    print(time(), " ", self.counter)
 
             frame_comp_counter += 1
             ref_time = time()

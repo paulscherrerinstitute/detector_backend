@@ -166,7 +166,7 @@ class ModuleReceiver(DataFlowNode):
 
         # cframenum = ctypes.c_uint16(-1)
         # as C time() is seconds
-        self.timeout = ctypes.c_int(max(int(2. * self.period), 1))
+        self.timeout = 1  #ctypes.c_int(max(int(2. * self.period), 1))
         #self.log.info("Timeout is %d" % self.timeout.value)
 
         # without the copy it seems that it is possible to point to the last allocated memory array
