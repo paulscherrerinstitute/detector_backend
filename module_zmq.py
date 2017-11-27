@@ -67,6 +67,28 @@ def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
     return socket.send(A, flags, copy=copy, track=track)
 
 
+
+
+def expand_image(image, mods, mod_gaps, chip_gaps, chips):
+    shape = [512 * mods[0], 1024 * mods[1]]
+    #chips = [2, 4]
+    new_shape = [shape[i] + (mod_gaps[i]) * (mods[i] - 1) + (chips[i] - 1) * chip_gaps[i] * mods[i] for i in range(2)]
+
+    res = np.zeros(new_shape)
+    #image = np.ones(new_shape)
+
+    m = [mod_gaps[i] - chip_gaps[i] for i in range(2)]
+    for i in range(mods[0] * chips[0]):
+        for j in range(mods[1] * chips[1]):
+            mod_size = [256, 256]  # [int(shape[0] / mods[0]), int(shape[1] / mods[1])]
+
+            disp = [int(i / chips[0]) * m[0] + i * chip_gaps[0], int(j / chips[1]) * m[1] + j * chip_gaps[1]]
+            init = [i * mod_size[0], j * mod_size[1]]
+            end = [(1 + i) * mod_size[0], (1 + j) * mod_size[1]]
+            res[disp[0] + init[0]: disp[0] + end[0], disp[1] + init[1]:disp[1] + end[1]] = image[init[0]:end[0], init[1]:end[1]]
+    return res
+
+
 class ZMQSender(DataFlowNode):
 
     #filename = Unicode(u'data.txt', config=True, reconfig=True, help='output filename with optional path')
@@ -112,6 +134,7 @@ class ZMQSender(DataFlowNode):
         self.gain_corrections_dataset = ''
         self.pede_corrections_filename = ''
         self.pede_corrections_dataset = ''
+        self.pede_mask_dataset = ''
         self.activate_corrections_preview = False
         self.activate_corrections = False
     
@@ -172,7 +195,7 @@ class ZMQSender(DataFlowNode):
 
         self.gain_corrections = np.ones((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
-        self.pede_mask = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
+        self.pede_mask = np.zeros((self.detector_size[0], self.detector_size[1]), dtype=np.int16)
 
         self.metrics.set("activate_corrections", self.activate_corrections)
         self.metrics.set("activate_corrections_preview", self.activate_corrections_preview)
@@ -246,7 +269,7 @@ class ZMQSender(DataFlowNode):
                         })
         self.log.info("%s" % {"sent_frames": self.sent_frames})
         self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
-        self.pede_mask = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
+        self.pede_mask = np.zeros((self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         
         self._reset_defaults()
         
@@ -294,9 +317,11 @@ class ZMQSender(DataFlowNode):
         mask = int('0b' + 14 * '1', 2)
         mask2 = int('0b' + 2 * '1', 2)
 
+        pulseid = -1
         # getting data from RB
         while True:
             if(self.counter >= self.n_frames and self.n_frames != -1) or (time() - ref_time > timeout):
+                #self.log.info("Timeout %d / %d, %.2f on pulseid %d" % (self.n_frames, self.counter, time() - ref_time, pulseid))
                 break
 
             self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
@@ -319,7 +344,7 @@ class ZMQSender(DataFlowNode):
             
 
             if self.first_frame == 0:
-                self.log.info("First frame got: %d" % framenum)
+                self.log.info("First frame got: %d pulse_id: %d" % (framenum, pulseid))
                 self.first_frame = framenum
 
             if self.reset_framenum:
@@ -333,7 +358,7 @@ class ZMQSender(DataFlowNode):
             self.recv_frames += 1
             self.send_time = time()
             
-            self.log.debug("Received %d frames" % self.recv_frames)
+            #self.log.debug("Received %d frames" % self.recv_frames)
 
             # check if packets are missing
             missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
@@ -345,24 +370,37 @@ class ZMQSender(DataFlowNode):
 
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
+            #self.log.info("Got Frame %d %d" % (framenum, pulseid))
+
             self.counter += 1
-            self.metrics.set("received_frames", {"total": self.counter, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
+            self.metrics.set("received_frames", {"total": self.recv_frames, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
 
             if self.send_fake_data:
                 data = self.fake_data
 
+            
             if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
                 t_i = time()
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, self.pede_mask, mask, mask2)
                 self.log.debug("Corrections done")
-                self.log.info("Correction took %.3f seconds" % (time() - t_i))
+                self.log.debug("Correction took %.3f seconds" % (time() - t_i))
                 self.sent_frames += 1
+
+            if self.name == "preview":
+                mod_gaps = [36, 36]
+                chip_gaps = [2, 2]
+                mods = [3, 1]
+                data = expand_image(data, mods, mod_gaps, chip_gaps, [2, 4])
+                #self.log.info(data.shape)
+
             try:
-                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums]})
+                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)]})
             except:
                 #pass
                 self.log.error(sys.exc_info()[1])
             self.metrics.set("sent_frames", {"name": self.name, "total": self.sent_frames, "epoch": time()})        
+
+
 
             #if self.counter % 1000 == 0:
             #    print(time(), " ", self.counter)

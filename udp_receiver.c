@@ -184,6 +184,8 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
   uint64_t packets_lost_int1=0, packets_lost_int2=0;
   uint16_t empty_frame[mod_size[0] * mod_size[1]];
+
+  int ret;
   
   data_size = det_size_y * sizeof(uint16_t);
 
@@ -214,7 +216,11 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	
 	// flushes the last message - what happens if I commit an already committed slot?
 	if(*rb_current_slot != -1){
-	  rb_commit_slot(rb_writer_id, *rb_current_slot);
+	  ret = rb_commit_slot(rb_writer_id, *rb_current_slot);
+	  //printf("%d slot commited 1 %d\n", getpid(), ret);
+	  *rb_current_slot = -1;
+	  if(ret == 0)
+	    n_recv_frames ++;
 	}
 	break;
       }
@@ -237,16 +243,20 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     if(last_recorded_packet == -1)
       last_recorded_packet = packet.packetnum;
       
-    if(framenum_last == 0)
+    if(framenum_last == 0){
       framenum_last = packet.framenum;    
-
+      //printf("%d %lu %d \n", getpid(), packet.framenum, packet.packetnum);
+    }
     // New frame arrived
     if(packet.framenum != framenum_last){
-
+      //printf("%d %lu %d \n", getpid(), packet.framenum, packet.packetnum);
+	   
       // commit the slot if not all the packets were received for the previous frame (dangling slot)
       if(total_packets != packets_frame){
-	if(*rb_current_slot != -1)
+	if(*rb_current_slot != -1){
 	  rb_commit_slot(rb_writer_id, *rb_current_slot);
+      	  //printf("%d slot commited 2\n", getpid());
+	}
       }
       
       // resetting encoded ints for packets lost
@@ -318,7 +328,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     // get them again, after RB slot is updated
     ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
     p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-    //printf("%d %lu new_frame_num %lu slot %d  framenum_stored %lu \n", getpid(), packet.framenum, framenum_last, *rb_current_slot, (ph + mod_number)->framemetadata[0]);
+    //printf("%d %lu %d \n", getpid(), packet.framenum, packet.packetnum);
 
     line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
@@ -354,9 +364,10 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     ph->framemetadata[5] = (uint64_t) packet.debug;
 
     // Slot committing, if all packets acquired
-    if(total_packets == packets_frame)
+    if(total_packets == packets_frame){
       rb_commit_slot(rb_writer_id, *rb_current_slot);
-
+      //printf("%d slot commited 3\n", getpid());
+    }
   } // end while
 
   //printf("%d\n", n_recv_frames);
