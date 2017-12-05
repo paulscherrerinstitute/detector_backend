@@ -148,6 +148,7 @@ class ModuleReceiver(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
         self.log.info("RB slots: %d" % nslots)
+        self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
         self.rb_current_slot = ctypes.c_int(-1)
 
         self.n_packets_frame = 128
@@ -159,6 +160,7 @@ class ModuleReceiver(DataFlowNode):
         # self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
         # print(self.INDEX_ARRAY[0], idx[0])
         print("Receiver ID2: %d" % self.rb_writer_id)
+        self.log.info("Module index: %s" % [int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]])
         #print(self.n_elements_line, self.n_packets_frame)
 
     def send(self, data):
@@ -183,7 +185,8 @@ class ModuleReceiver(DataFlowNode):
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
 
-        self.log.debug("Current slot: %d" % self.rb_current_slot.value)
+        if self.rb_current_slot.value != -1:
+            self.log.debug("Current slot: %d" % self.rb_current_slot.value)
         if n_recv_frames != 0:
             self.log.info("Received %d" % n_recv_frames)
 

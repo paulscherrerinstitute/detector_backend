@@ -93,8 +93,8 @@ int initialize_slot(int rb_current_slot, int rb_dbuffer_id, int rb_hbuffer_id, i
   p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, rb_current_slot);
   ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, rb_current_slot);
   memcpy(p1 + mod_origin,
-	 empty_frame,
-	 sizeof(*empty_frame));
+  	 empty_frame,
+  	 sizeof(*empty_frame));
   ph += mod_number;
   for(int i=0; i < 8; i++)
     ph->framemetadata[i] = 0;
@@ -174,10 +174,11 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   //printf("mod_size %d %d\n", mod_size[0], mod_size[1]);
   //printf("mod_idx %d %d\n", mod_idx[0], mod_idx[1]);
 
-  int mod_number = mod_idx_x + mod_idx_y * det_size_y; //numbering inside the detctor, growing over the x-axis 
+  int mod_number = mod_idx_x + mod_idx[1] + mod_idx[0] * ((det_size[1] / mod_size[1]) -1); //numbering inside the detctor, growing over the x-axis
   int lines_per_packet = BUFFER_LENGTH / mod_size_y;
   
-  int mod_origin = det_size_y * mod_idx_x * mod_size_x + mod_idx_y * det_size_y;
+  int mod_origin = mod_idx[0] * det_size[1] * mod_size[0] + mod_idx[1] * mod_size[1];
+  printf("[C RECV] module number %d [%d, %d] %d\n", mod_number, mod_idx_x, mod_idx_y, mod_origin);
   // to be checked
   //mod_origin += mod_idx[1] * (3 * gap_px_chips[1] + gap_px_modules[1]); // inter_chip gaps plus inter_module gap
   //mod_origin += mod_idx[0] * (gap_px_chips[0] + gap_px_modules[0])* det_size[1] ; // inter_chip gaps plus inter_module gap
@@ -187,7 +188,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
   int ret;
   
-  data_size = det_size_y * sizeof(uint16_t);
+  data_size = mod_size[1] * sizeof(uint16_t);
 
   timeout_i = time(NULL);
 
@@ -198,7 +199,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
   
   // creating an empty frame for initializing the rb slot
-  for(int i=0; i<mod_size[0]*mod_size[1]; i++)
+  for(int i=0; i < mod_size[0] * mod_size[1]; i++)
     empty_frame[i] = 0;
   
   while(true){
@@ -235,7 +236,6 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
       // initialize it
       initialize_slot(*rb_current_slot, rb_dbuffer_id, rb_hbuffer_id, mod_origin, mod_number, det_size, empty_frame);
-
     }
 
     timeout_i = time(NULL);
@@ -311,6 +311,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     //should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
     //printf("%d %lu \n", getpid(), packet.framenum);
 
+    // never executed atm
     while(should_continue != 0){
       // this means got no slot
       if(should_continue == -1)
@@ -339,15 +340,18 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     p1 += mod_origin;
     
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      //printf("%d %d %d %d\n", i, 511 - i, line_number, lines_per_packet);
-      memcpy(p1 + (511 - i) * det_size_y ,
-	     packet.data + int_line * det_size_y,
+      //printf("%d %d %d %d %d\n", getpid(), i, i * det_size[1], line_number, packet.packetnum);
+      //memcpy(p1 + (511 - i) * mod_size[1],
+      memcpy(p1 + (511 - i) * det_size[1],
+	     packet.data + int_line * mod_size[1],
 	     data_size);
+      
       int_line ++;
       
     }
 
     // Copy the framenum and frame metadata
+    
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;
     ph->framemetadata[1] = packets_frame - total_packets;
@@ -364,10 +368,12 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     ph->framemetadata[5] = (uint64_t) packet.debug;
 
     // Slot committing, if all packets acquired
+    
     if(total_packets == packets_frame){
       rb_commit_slot(rb_writer_id, *rb_current_slot);
       //printf("%d slot commited 3\n", getpid());
     }
+
   } // end while
 
   //printf("%d\n", n_recv_frames);

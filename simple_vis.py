@@ -33,7 +33,7 @@ socket = ctx.socket(zmq.SUB)
 socket.set_hwm(1)
 
 socket.setsockopt(zmq.SUBSCRIBE, '')
-socket.connect("tcp://127.0.0.1:10000")
+socket.connect("tcp://127.0.0.1:40000")
 
 sleep(2)
 print "connected"
@@ -42,7 +42,7 @@ print md
 
 fig = plt.figure(figsize=(10, 10))
 ax = fig.add_subplot(111)
-line1 = ax.imshow(data)
+line1 = ax.imshow(data, vmax=20000)
 
 plt.ion()
 plt.show()

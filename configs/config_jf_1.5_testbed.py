@@ -4,8 +4,8 @@ mpirun -n 6 mpi-dafld --config-file config_jf_1.5_testbed.py
 
 
 import sys
-new_path = '/home/l_det/Work/dafl.jungfrau'
-#new_path = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau"
+#new_path = '/home/l_det/Work/dafl.jungfrau'
+new_path = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau"
 if new_path not in sys.path:
     sys.path.append(new_path)
 
@@ -33,7 +33,7 @@ undef = dict(level=0)
 
 log_config = dict( loggers =
                    {
-                       'ModuleReceiver': info,
+                       'ModuleReceiver': debug,
                        'ZMQSender': info
                    }
 )
@@ -52,13 +52,13 @@ mpi_size = comm.Get_size()
 rank = mpi_rank
 size = mpi_size - 2
 
-geometry = [3, 1]
+geometry = [1, 3]
 module_size = [512, 1024]
 
 RECEIVER_RANKS = [0, 1, 2]
 SENDERS_RANKS = [3, ]
-ip = 3 * ["10.30.10.3", ]
-#ip = 3 * ["127.0.0.1", ]
+#ip = 3 * ["10.30.10.3", ]
+ip = 3 * ["127.0.0.1", ]
 port = [50004, 50005, 50006]
 
 
