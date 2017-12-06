@@ -1,4 +1,4 @@
-DST=/dev/shm/eiger/
+DST=/dev/shm/rb/
 #DST=/mnt/north
 
 mkdir $DST

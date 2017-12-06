@@ -19,8 +19,8 @@
 #include <arpa/inet.h>
 
 #define BUFFER_LENGTH    4096
-#define YSIZE 1024
-#define XSIZE 512
+//#define YSIZE 1024
+//#define XSIZE 512
 
 #define SERVER_PORT    50004
 #define SERVER_IP    "10.30.10.2"
@@ -178,7 +178,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   int lines_per_packet = BUFFER_LENGTH / mod_size_y;
   
   int mod_origin = mod_idx[0] * det_size[1] * mod_size[0] + mod_idx[1] * mod_size[1];
-  printf("[C RECV] module number %d [%d, %d] %d\n", mod_number, mod_idx_x, mod_idx_y, mod_origin);
+  //printf("[C RECV] module number %d [%d, %d] %d\n", mod_number, mod_idx_x, mod_idx_y, mod_origin);
   // to be checked
   //mod_origin += mod_idx[1] * (3 * gap_px_chips[1] + gap_px_modules[1]); // inter_chip gaps plus inter_module gap
   //mod_origin += mod_idx[0] * (gap_px_chips[0] + gap_px_modules[0])* det_size[1] ; // inter_chip gaps plus inter_module gap

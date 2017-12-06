@@ -120,6 +120,8 @@ class ZMQSender(DataFlowNode):
     #gain_corrections_list = List((0,), config=True, reconfig=True, help="")
     #pedestal_corrections_list = List((0,), config=True, reconfig=True, help="")
 
+    flip = List((0, 1), config=True, reconfig=True)
+
     def _reset_defaults(self):
         self.reset_framenum = True
         self.gain_corrections_filename = ''
@@ -378,6 +380,8 @@ class ZMQSender(DataFlowNode):
                 # mods = [3, 1]
                 data = expand_image(data, self.geometry, self.gap_px_module, self.gap_px_chip, self.chips_module)
 
+            if self.flip != (-1, -1):
+                data = np.ascontiguousarray(np.flip(np.flip(data, 0), 1))
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)]})
             except:
