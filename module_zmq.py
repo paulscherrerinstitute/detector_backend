@@ -120,7 +120,7 @@ class ZMQSender(DataFlowNode):
     #gain_corrections_list = List((0,), config=True, reconfig=True, help="")
     #pedestal_corrections_list = List((0,), config=True, reconfig=True, help="")
 
-    flip = List((0, 1), config=True, reconfig=True)
+    flip = List((-1, ), config=True, reconfig=True)
 
     def _reset_defaults(self):
         self.reset_framenum = True
@@ -225,6 +225,8 @@ class ZMQSender(DataFlowNode):
         if "pede_mask_dataset" in settings:
             self.pede_mask_dataset = settings["pede_mask_dataset"]
 
+        if "flip" in settings:
+            self.flip = settings["flip"]
         if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
         if "send_fake_data" in settings:
@@ -233,11 +235,11 @@ class ZMQSender(DataFlowNode):
         self.recv_frames = 0
 
     def initialize(self):
-        self.log.warning("%s.initialize()",self.__class__.__name__)
+        self.log.info("%s.initialize()", self.__class__.__name__)
         #super(ZMQSender, self).initialize()
 
     def reset(self):
-        self.log.warning("%s.reset()",self.__class__.__name__)
+        self.log.info("%s.reset()", self.__class__.__name__)
         #super(ZMQSender, self).reset()
         #if self.output_file != '':
         #    self.outfile.close()
@@ -260,7 +262,8 @@ class ZMQSender(DataFlowNode):
         self.log.info("%s" % {"sent_frames": self.sent_frames})
         self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_mask = np.zeros((self.detector_size[0], self.detector_size[1]), dtype=np.float32)
-        
+
+        self.flip = (-1, )
         self._reset_defaults()
         
         self.send_fake_data = False
@@ -346,8 +349,6 @@ class ZMQSender(DataFlowNode):
                 continue
             self.recv_frames += 1
             self.send_time = time()
-            
-            # self.log.debug("Received %d frames" % self.recv_frames)
 
             # check if packets are missing
             missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
@@ -359,7 +360,7 @@ class ZMQSender(DataFlowNode):
 
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
             data = np.ctypeslib.as_array(pointer, self.detector_size, )
-            #self.log.info("Got Frame %d %d" % (framenum, pulseid))
+            self.log.debug("Got Frame %d %d" % (framenum, pulseid))
 
             self.counter += 1
             self.metrics.set("received_frames", {"name": self.name, "total": self.recv_frames, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()})
@@ -370,28 +371,22 @@ class ZMQSender(DataFlowNode):
             if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
                 t_i = time()
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, self.pede_mask, mask, mask2)
-                self.log.debug("Corrections done")
                 self.log.debug("Correction took %.3f seconds" % (time() - t_i))
                 self.sent_frames += 1
 
             if self.name == "preview":
-                # mod_gaps = [36, 36]
-                # chip_gaps = [2, 2]
-                # mods = [3, 1]
                 data = expand_image(data, self.geometry, self.gap_px_module, self.gap_px_chip, self.chips_module)
 
-            if self.flip != (-1, -1):
-                data = np.ascontiguousarray(np.flip(np.flip(data, 0), 1))
+            if self.flip[0] != -1:
+                if len(self.flip) == 1:
+                    data = np.ascontiguousarray(np.flip(data, self.flip[0]))
+                else:
+                    data = np.ascontiguousarray(np.flip(np.flip(data, 0), 1))
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)]})
             except:
                 self.log.error("Error in sending array: %s" % sys.exc_info()[1])
             self.metrics.set("sent_frames", {"name": self.name, "total": self.sent_frames, "epoch": time()})
-
-
-
-            #if self.counter % 1000 == 0:
-            #    print(time(), " ", self.counter)
 
             frame_comp_counter += 1
             ref_time = time()
