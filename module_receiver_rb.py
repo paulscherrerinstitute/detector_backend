@@ -207,7 +207,6 @@ class ModuleReceiver(DataFlowNode):
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
 
-        
     def reset(self):
         self.log.error("Restarting the socket connection")
         self.sock.close()
@@ -216,6 +215,7 @@ class ModuleReceiver(DataFlowNode):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, str(10000 * 1024 * 1024))
         self.sock.bind((self.ip, self.port))
         self.log.info("Socket connection restarted")
+        self._prepare_ringbuffer_header_files(self)
 
-
+        
 
