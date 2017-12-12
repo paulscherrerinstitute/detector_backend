@@ -249,10 +249,10 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     }
     // New frame arrived
     if(packet.framenum != framenum_last){
-      //printf("%d %lu %d \n", getpid(), packet.framenum, packet.packetnum);
 	   
       // commit the slot if not all the packets were received for the previous frame (dangling slot)
       if(total_packets != packets_frame){
+	//printf("%d %lu %d %lf\n", getpid(), packet.framenum, packet.packetnum, packet.bunchid);
 	if(*rb_current_slot != -1){
 	  rb_commit_slot(rb_writer_id, *rb_current_slot);
       	  //printf("%d slot commited 2\n", getpid());
@@ -320,7 +320,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       if(should_continue == 2)
 	break;
       should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
-      printf("%d %lu %d\n", getpid(), packet.framenum, should_continue);
+      //printf("%d %lu %d\n", getpid(), packet.framenum, should_continue);
     }
     // discard late frames
     if(should_continue == 2)
@@ -370,6 +370,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     // Slot committing, if all packets acquired
     
     if(total_packets == packets_frame){
+      //printf("%d %lu %d %lf\n", getpid(), packet.framenum, packet.packetnum, packet.bunchid);
       rb_commit_slot(rb_writer_id, *rb_current_slot);
       //printf("%d slot commited 3\n", getpid());
     }

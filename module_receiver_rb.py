@@ -79,32 +79,31 @@ class ModuleReceiver(DataFlowNode):
 
     mpi_rank = comm.Get_rank()
 
-    ip = Unicode('192.168.10.10', config=True, reconfig=True, help="Ip to listen to for UDP packets")
-    port = Int(9000, config=True, reconfig=True, help="Port to listen to for UDP packets")
-    module_size = List((512, 1024), config=True, reconfig=True)
-    geometry = List((1, 1), config=True, reconfig=True)
-    module_index = Int(0, config=True, reconfig=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
+    ip = Unicode('192.168.10.10', config=True, help="Ip to listen to for UDP packets")
+    port = Int(9000, config=True, help="Port to listen to for UDP packets")
+    module_size = List((512, 1024), config=True)
+    geometry = List((1, 1), config=True)
+    module_index = Int(0, config=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
 
-    gap_px_chip = List((0, 0), config=True, reconfig=True)  # possibly not used
-    gap_px_module = List((0, 0), config=True, reconfig=True)
+    gap_px_chip = List((0, 0), config=True)  # possibly not used
+    gap_px_module = List((0, 0), config=True)
 
-    bit_depth = Int(16, config=True, reconfig=True, help="")
-    n_frames = Int(-1, config=True, reconfig=True, help="Frames to receive")
+    bit_depth = Int(16, config=True, help="")
+    n_frames = Int(-1, config=True, help="Frames to receive")
 
-    rb_id = Int(0, config=True, reconfig=True, help="")
-    rb_followers = List([1, ], config=True, reconfig=True, help="")
-    create_and_delete_ringbuffer_header = Bool(False, config=True, reconfig=True, help="Index within the module, with NW=0 and SE=3")
-    rb_head_file = Unicode('', config=True, reconfig=True, help="")
-    rb_imghead_file = Unicode('', config=True, reconfig=True, help="")
-    rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
+    rb_id = Int(0, config=True, help="")
+    rb_followers = List([1, ], config=True, help="")
+    create_and_delete_ringbuffer_header = Bool(False, config=True, help="Index within the module, with NW=0 and SE=3")
+    rb_head_file = Unicode('', config=True, help="")
+    rb_imghead_file = Unicode('', config=True, help="")
+    rb_imgdata_file = Unicode('', config=True, help="")
 
     def _prepare_ringbuffer_header_files(self):
         files = [self.rb_head_file, ]
         if self.create_and_delete_ringbuffer_header is True:
-            self.log.debug("create ringbuffer header files")
+            self.log.info("create ringbuffer header files")
             for f in files:
                 ret = rb.create_header_file(f)
-                print(ret)
                 if not ret:
                     self.log.error("Ring buffer files do not exist!")
                     raise RuntimeError("Ring buffer files do not exist!")
@@ -112,7 +111,7 @@ class ModuleReceiver(DataFlowNode):
             self.worker_communicator.barrier()
                 
         else:
-            self.log.debug("wait for ringbuffer header files to become available")
+            self.log.info("wait for ringbuffer header files to become available")
             self.worker_communicator.barrier()
             for f in files:
                 if not os.path.exists(f):
@@ -165,6 +164,7 @@ class ModuleReceiver(DataFlowNode):
         #print(self.n_elements_line, self.n_packets_frame)
 
     def send(self, data):
+        self.log.debug("Opened")
         n_recv_frames = 0
 
         # cframenum = ctypes.c_uint16(-1)
@@ -201,21 +201,55 @@ class ModuleReceiver(DataFlowNode):
         return(n_recv_frames)
 
     def reconfigure(self, settings):
+        super(ModuleReceiver, self).reconfigure(settings)
         #self.log.info(settings)
         if "period" in settings:
             self.period = settings["period"] / 1000000000
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
+        self._prepare_ringbuffer_header_files()
+
+        rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__('c_uint' + str(self.bit_depth)))
+
+        self.rb_header_id = rb.open_header_file(self.rb_head_file)
+        self.rb_writer_id = rb.create_writer(self.rb_header_id, self.rb_id, self.rb_followers)
+        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
+        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
+
+        # header data is 64b times n_modules. Each entry is a cache line owned by the receiving process
+        # TODO add asserts / exceptions
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * 64)
+        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
+        nslots = rb.adjust_nslots(self.rb_header_id)
+        self.log.info("RB slots: %d" % nslots)
+        self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+        self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+        self.rb_current_slot = ctypes.c_int(-1)
+
+        self.n_packets_frame = 128
+        self.period = 1
+
+        self.total_modules = self.geometry[0] * self.geometry[1]
+        self.log.info("Packets per frame: %d" % self.n_packets_frame)
+        # idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
+        # self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
+        # print(self.INDEX_ARRAY[0], idx[0])
+        print("Receiver ID2: %d" % self.rb_writer_id)
+        self.log.info("Module index: %s" % [int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]])
+        #print(self.n_elements_line, self.n_packets_frame)
+
 
     def reset(self):
-        self.log.error("Restarting the socket connection")
-        self.sock.close()
-        self.sock = socket.socket(socket.AF_INET,  # Internet
-                                  socket.SOCK_DGRAM)  # UDP
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, str(10000 * 1024 * 1024))
-        self.sock.bind((self.ip, self.port))
-        self.log.info("Socket connection restarted")
-        self._prepare_ringbuffer_header_files(self)
+        super(ModuleReceiver, self).reset()
+        #self.log.info("Restarting the socket connection")
+        #self.sock.shutdown(socket.SHUT_RD)
+        #self.sock.close()
+        #self.sock = socket.socket(socket.AF_INET,  # Internet
+        #                          socket.SOCK_DGRAM)  # UDP
+        #self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, str(10000 * 1024 * 1024))
+        #self.sock.bind((self.ip, self.port))
+        #self.log.info("Socket connection restarted")
+        rb.reset()
 
         
 

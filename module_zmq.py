@@ -84,24 +84,24 @@ def expand_image(image, mods, mod_gaps, chip_gaps, chips):
 class ZMQSender(DataFlowNode):
 
     #filename = Unicode(u'data.txt', config=True, reconfig=True, help='output filename with optional path')
-    name = Unicode("ZMQSender", config=True, reconfig=True)
-    uri = Unicode('tcp://192.168.10.1:9999', config=True, reconfig=True, help="URI which binds for ZMQ")
-    socket_type = Unicode('PUB', config=True, reconfig=True, help="ZMQ socket type")
-    send_every_s = Float(0, config=True, reconfig=True, help="send every n second")
-    module_size = List((512, 1024), config=True, reconfig=True)
-    geometry = List((1, 1), config=True, reconfig=True)
+    name = Unicode("ZMQSender", config=True)
+    uri = Unicode('tcp://192.168.10.1:9999', config=True, help="URI which binds for ZMQ")
+    socket_type = Unicode('PUB', config=True, help="ZMQ socket type")
+    send_every_s = Float(0, config=True, help="send every n second")
+    module_size = List((512, 1024), config=True)
+    geometry = List((1, 1), config=True)
 
     gap_px_chip = List((0, 0), config=True, reconfig=True)  # possibly not used
     gap_px_module = List((0, 0), config=True, reconfig=True)
     chips_module = List((2, 4), config=True, reconfig=True)
     
-    rb_id = Int(0, config=True, reconfig=True, help="")
-    rb_followers = List([1, ], config=True, reconfig=True, help="")
-    bit_depth = Int(16, config=True, reconfig=True, help="")
+    rb_id = Int(0, config=True, help="")
+    rb_followers = List([1, ], config=True, help="")
+    bit_depth = Int(16, config=True, help="")
 
-    rb_head_file = Unicode('', config=True, reconfig=True, help="")
-    rb_imghead_file = Unicode('', config=True, reconfig=True, help="")
-    rb_imgdata_file = Unicode('', config=True, reconfig=True, help="")
+    rb_head_file = Unicode('', config=True,help="")
+    rb_imghead_file = Unicode('', config=True, help="")
+    rb_imgdata_file = Unicode('', config=True, help="")
 
     check_framenum = Bool(True, config=True, reconfig=True, help="Check that the frame numbers of all the modules are the same")
     reset_framenum = Bool(True, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
@@ -121,6 +121,8 @@ class ZMQSender(DataFlowNode):
     #pedestal_corrections_list = List((0,), config=True, reconfig=True, help="")
 
     flip = List((-1, ), config=True, reconfig=True)
+
+    is_HG0 = Bool(False, config=True)
 
     def _reset_defaults(self):
         self.reset_framenum = True
@@ -225,6 +227,8 @@ class ZMQSender(DataFlowNode):
         if "pede_mask_dataset" in settings:
             self.pede_mask_dataset = settings["pede_mask_dataset"]
 
+        if "is_HG0" in settings:
+            self.is_HG0 = settings["is_HG0"]
         if "flip" in settings:
             self.flip = settings["flip"]
         if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
@@ -233,7 +237,19 @@ class ZMQSender(DataFlowNode):
             self.send_fake_data = settings["send_fake_data"]
         self.first_frame = 0
         self.recv_frames = 0
+        self.worker_communicator.barrier()
+        
+        self.rb_header_id = rb.open_header_file(self.rb_head_file)
+        self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
+        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
+        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
 
+        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
+                                     int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
+        rb.adjust_nslots(self.rb_header_id)
+
+        
     def initialize(self):
         self.log.info("%s.initialize()", self.__class__.__name__)
         #super(ZMQSender, self).initialize()
@@ -248,6 +264,7 @@ class ZMQSender(DataFlowNode):
         self.first_frame = 0
         self.frames_with_missing_packets = 0
         self.total_missing_packets = 0
+        self.is_HG0 = False
 
         self.metrics.set("received_frames", {"name": self.name, "total": self.counter,
                                              "incomplete": self.frames_with_missing_packets,
@@ -260,11 +277,12 @@ class ZMQSender(DataFlowNode):
                                                   "packets_lost": self.total_missing_packets, "epoch": time()}
                         })
         self.log.info("%s" % {"sent_frames": self.sent_frames})
-        self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
+        self.pede_corrections = np.zeros((4, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_mask = np.zeros((self.detector_size[0], self.detector_size[1]), dtype=np.float32)
 
-        self.flip = (-1, )
+        #self.flip = [-1, ]
         self._reset_defaults()
+
         
         self.send_fake_data = False
         self.close_sockets()
@@ -281,6 +299,7 @@ class ZMQSender(DataFlowNode):
             gain_corrections_file = h5py.File(self.gain_corrections_filename)
             self.gain_corrections = gain_corrections_file[self.gain_corrections_dataset][:]
             gain_corrections_file.close()
+
         if self.pede_corrections_filename != "" and self.pede_corrections_dataset != "":
             pede_corrections_file = h5py.File(self.pede_corrections_filename)
             self.pede_corrections = pede_corrections_file[self.pede_corrections_dataset][:]
@@ -289,8 +308,13 @@ class ZMQSender(DataFlowNode):
             pede_corrections_file.close()
 
         if len(self.gain_corrections.shape) != 3 or len(self.pede_corrections.shape) != 3:
-            self.log.error("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))
-            raise ValueError("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))
+            self.log.error("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2, HG0]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))
+            raise ValueError("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2, HG0]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))
+
+        if self.is_HG0:
+            self.log.info("Setup HG0 corrections")
+            self.pede_corrections[0] = self.pede_corrections[3]
+            self.gain_corrections[0] = self.gain_corrections[3]
             
         self.log.info("Gain and pede corrections will be applied")
         self.metrics.set("activate_corrections", self.activate_corrections)
@@ -314,12 +338,13 @@ class ZMQSender(DataFlowNode):
         # getting data from RB
         while True:
             if(self.counter >= self.n_frames and self.n_frames != -1) or (time() - ref_time > timeout):
-                # self.log.info("Timeout %d / %d, %.2f on pulseid %d" % (self.n_frames, self.counter, time() - ref_time, pulseid))
+                self.log.debug("Timeout %d / %d, %.2f on pulseid %d" % (self.n_frames, self.counter, time() - ref_time, pulseid))
                 break
 
             self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
 
             if self.rb_current_slot == -1:
+                #self.log.debug("No RB slot")
                 continue
 
             pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
@@ -368,6 +393,12 @@ class ZMQSender(DataFlowNode):
             if self.send_fake_data:
                 data = self.fake_data
 
+            if self.flip[0] != -1:
+                if len(self.flip) == 1:
+                    data = np.ascontiguousarray(np.flip(data, self.flip[0]))
+                else:
+                    data = np.ascontiguousarray(np.flip(np.flip(data, 0), 1))
+
             if self.activate_corrections or (self.name == "preview" and self.activate_corrections_preview):
                 t_i = time()
                 data = do_corrections(data.shape[0], data.shape[1], data, self.gain_corrections, self.pede_corrections, self.pede_mask, mask, mask2)
@@ -377,11 +408,6 @@ class ZMQSender(DataFlowNode):
             if self.name == "preview":
                 data = expand_image(data, self.geometry, self.gap_px_module, self.gap_px_chip, self.chips_module)
 
-            if self.flip[0] != -1:
-                if len(self.flip) == 1:
-                    data = np.ascontiguousarray(np.flip(data, self.flip[0]))
-                else:
-                    data = np.ascontiguousarray(np.flip(np.flip(data, 0), 1))
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)]})
             except:
