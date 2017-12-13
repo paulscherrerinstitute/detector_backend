@@ -10,35 +10,28 @@ import ringbuffer as rb
 import ctypes
 
 import socket
-import ctypes
 import numpy as np
 import os
-import zmq
 import sys
 
 from time import time, sleep
 from copy import copy
+
 
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
 HEADER_ARRAY = ctypes.c_char * 6
 INDEX_ARRAY = np.ctypeslib.as_ctypes(np.zeros(1024 * 512, dtype=np.int32))
 
-CACHE_LINE_SIZE = 64
-
-RB_HEAD_FILE = "rb_header.dat"
-RB_IMGHEAD_FILE = "rb_image_header.dat"
-RB_IMGDATA_FILE = "rb_image_data.dat"
-
-
+# the C library receiving udp packets
 _mod = ctypes.cdll.LoadLibrary(os.getcwd() + "/libudpreceiver.so")
 
 put_data_in_rb = _mod.put_data_in_rb
-# put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int32), ctypes.c_int16)
 put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, ctypes.c_int32)
 put_data_in_rb.restype = ctypes.c_int
 
 
+# not actually used, but I like it
 def define_quadrant(total_size, geometry, quadrant_index, index_axis=0):
     """
     Geometry is the module placement (e.g. 3x2)
@@ -99,6 +92,7 @@ class ModuleReceiver(DataFlowNode):
     rb_imgdata_file = Unicode('', config=True, help="")
 
     def _prepare_ringbuffer_header_files(self):
+        """Prepares the RB. An MPI barrier is needed to synchronize all the workers"""
         files = [self.rb_head_file, ]
         if self.create_and_delete_ringbuffer_header is True:
             self.log.info("create ringbuffer header files")
@@ -119,10 +113,9 @@ class ModuleReceiver(DataFlowNode):
     
     def __init__(self, **kwargs):
         super(ModuleReceiver, self).__init__(**kwargs)
-        #self.detector_size = [(self.module_size[0] + self.gap_px_chip[0]) * self.geometry[0], (self.module_size[1] + self.gap_px_chip[1]) * self.geometry[1]]
         self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
 
-        self.log.info("PID: %d IP: %s:%d" % (os.getpid(), self.ip, self.port))
+        self.log.info("%s PID: %d IP: %s:%d" % (self.name, os.getpid(), self.ip, self.port))
         # for setting up barriers
         app = XblBaseApplication.instance()
         self.worker_communicator = app.worker_communicator
@@ -156,15 +149,11 @@ class ModuleReceiver(DataFlowNode):
 
         self.total_modules = self.geometry[0] * self.geometry[1]
         self.log.info("Packets per frame: %d" % self.n_packets_frame)
-        # idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
-        # self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
-        # print(self.INDEX_ARRAY[0], idx[0])
-        print("Receiver ID2: %d" % self.rb_writer_id)
+
         self.log.info("Module index: %s" % [int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]])
         #print(self.n_elements_line, self.n_packets_frame)
 
     def send(self, data):
-        self.log.debug("Opened")
         n_recv_frames = 0
 
         # cframenum = ctypes.c_uint16(-1)
@@ -182,6 +171,7 @@ class ModuleReceiver(DataFlowNode):
 
         #int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout, int32_t *gap_px_chips, int32_t *gap_px_modules){
 
+        # calling the C function, which is an infinite loop with timeout
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
