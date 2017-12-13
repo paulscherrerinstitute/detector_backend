@@ -56,7 +56,7 @@ class DaflClient(object):
             return
 
         content = content.json()
-        #self.individual_state = content['individual_state']
+        self.individual_state = content['individual_state']
         return content["global_state"]
 
     def initialize(self, cfg={}):

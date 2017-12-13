@@ -29,6 +29,7 @@ HEADER_ARRAY = ctypes.c_char * 6
 
 CACHE_LINE_SIZE = 64
 
+
 class Mystruct(ctypes.Structure):
     _fields_ = [("framemetadata", ctypes.c_uint64 * 8), ]
 
@@ -206,10 +207,26 @@ class ZMQSender(DataFlowNode):
         self.log.info("%s.reconfigure()", self.__class__.__name__)
         super(ZMQSender, self).reconfigure(settings)
         self.log.info(settings)
-        if "n_frames" in settings:
-            self.n_frames = settings["n_frames"]
+
+        for k, v in settings.iteritems():
+            try:
+                _ = self.__getattribute__(k)
+            except AttributeError:
+                self.log.warning("%s has no %s configurable, ignoring" % (self.name, k))
+            if k.find("filename") != -1:
+                if not os.path.exists(v):
+                    self.worker_communicator.barrier()
+                    raise RuntimeError("File %s not available as %s. Please RESET and retry" % (v, k))
+
+            self.log.debug("Setting %s to %s" % (k, v))
+            setattr(self, k, v)
+
         if "period" in settings:
             self.period = settings["period"] / 1e9
+        """    
+        if "n_frames" in settings:
+            self.n_frames = settings["n_frames"]
+
 
         if "activate_corrections" in settings:
             self.activate_corrections = settings["activate_corrections"]
@@ -217,7 +234,7 @@ class ZMQSender(DataFlowNode):
             self.activate_corrections_preview = settings["activate_corrections_preview"]
 
         if "gain_corrections_filename" in settings:
-            self.gain_corrections_filename = settings["gain_corrections_filename"]
+            setattr(self, "gain_corrections_filename", settings["gain_corrections_filename"])
         if "pede_corrections_filename" in settings:
             self.pede_corrections_filename = settings["pede_corrections_filename"]
         if "gain_corrections_dataset" in settings:
@@ -231,10 +248,12 @@ class ZMQSender(DataFlowNode):
             self.is_HG0 = settings["is_HG0"]
         if "flip" in settings:
             self.flip = settings["flip"]
-        if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
-            self.setup_corrections()
         if "send_fake_data" in settings:
             self.send_fake_data = settings["send_fake_data"]
+        """
+        if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
+            self.setup_corrections()
+        
         self.first_frame = 0
         self.recv_frames = 0
         self.worker_communicator.barrier()
@@ -296,16 +315,14 @@ class ZMQSender(DataFlowNode):
         self.log.info(self.gain_corrections_dataset + " " + self.pede_corrections_dataset)
         # TODO add shape check
         if self.gain_corrections_filename != "" and self.gain_corrections_dataset != "":
-            gain_corrections_file = h5py.File(self.gain_corrections_filename)
-            self.gain_corrections = gain_corrections_file[self.gain_corrections_dataset][:]
-            gain_corrections_file.close()
+            with h5py.File(self.gain_corrections_filename) as gain_corrections_file:
+                           self.gain_corrections = gain_corrections_file[self.gain_corrections_dataset][:]
 
         if self.pede_corrections_filename != "" and self.pede_corrections_dataset != "":
-            pede_corrections_file = h5py.File(self.pede_corrections_filename)
-            self.pede_corrections = pede_corrections_file[self.pede_corrections_dataset][:]
-            if self.pede_mask_dataset != "":
-                self.pede_mask = pede_corrections_file[self.pede_mask_dataset][:]
-            pede_corrections_file.close()
+            with h5py.File(self.pede_corrections_filename) as pede_corrections_file:
+                self.pede_corrections = pede_corrections_file[self.pede_corrections_dataset][:]
+                if self.pede_mask_dataset != "":
+                    self.pede_mask = pede_corrections_file[self.pede_mask_dataset][:]
 
         if len(self.gain_corrections.shape) != 3 or len(self.pede_corrections.shape) != 3:
             self.log.error("Gain and pede corrections must be provided in a 3D array, e.g. [G0, G1, G2, HG0]. Provided respectively %s and %s. Will not apply corrections" % (self.gain_corrections.shape, self.pede_corrections.shape))

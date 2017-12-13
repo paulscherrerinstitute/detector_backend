@@ -15,7 +15,7 @@ c = get_config()  # @UndefinedVariable
 
 
 
-rb_fdir = "/dev/shm/eiger/"
+rb_fdir = "/dev/shm/rb/"
 #rb_fdir = "/mnt/north/"
 rb_head_file = rb_fdir + "rb_header.dat"
 rb_imghead_file = rb_fdir + "rb_image_header.dat"
@@ -34,7 +34,7 @@ undef = dict(level=0)
 log_config = dict( loggers =
                    {
                        'ModuleReceiver': debug,
-                       'ZMQSender': info
+                       'ZMQSender': debug
                    }
 )
 
