@@ -72,6 +72,7 @@ class ModuleReceiver(DataFlowNode):
 
     mpi_rank = comm.Get_rank()
 
+    name = Unicode('Receiver', config=True)
     ip = Unicode('192.168.10.10', config=True, help="Ip to listen to for UDP packets")
     port = Int(9000, config=True, help="Port to listen to for UDP packets")
     module_size = List((512, 1024), config=True)
