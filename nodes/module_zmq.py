@@ -376,6 +376,7 @@ class ZMQSender(DataFlowNode):
             framenum = copy(pointerh.contents[0].framemetadata[0])
             pulseid = pointerh.contents[0].framemetadata[4]
             daq_rec = pointerh.contents[0].framemetadata[5]
+            mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_modules)]
 
             if self.first_frame == 0:
                 self.log.info("First frame got: %d pulse_id: %d" % (framenum, pulseid))
@@ -426,7 +427,7 @@ class ZMQSender(DataFlowNode):
                 data = expand_image(data, self.geometry, self.gap_px_module, self.gap_px_chip, self.chips_module)
 
             try:
-                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)]})
+                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)], "module_number": mod_numbers})
             except:
                 self.log.error("Error in sending array: %s" % sys.exc_info()[1])
             self.metrics.set("sent_frames", {"name": self.name, "total": self.sent_frames, "epoch": time()})

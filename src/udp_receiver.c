@@ -36,6 +36,7 @@ typedef struct _jungfrau_header{
   // Field 3: packets counter 64-127
   // Field 4: pulse id
   // Field 5: debug (daq_rec) - gain flag
+  // Field 6: module number
   uint64_t framemetadata[8];
 } jungfrau_header;
 
@@ -107,7 +108,7 @@ int check_framenums(int total_modules, jungfrau_header * ph, jungfrau_packet pac
   // checks frame numbers for all modules
   
   for (int mod=0; mod < total_modules; mod ++){
-    printf("%d CHECK mod %d framenum_stored %lu framenum_got %lu\n", getpid, mod, (ph + mod)->framemetadata[0], packet.framenum);
+    printf("%d CHECK mod %d framenum_stored %lu framenum_got %lu\n", getpid(), mod, (ph + mod)->framemetadata[0], packet.framenum);
     // if the slot is empty, go on
     if((ph + mod)->framemetadata[0] == 0)
       continue;
@@ -165,17 +166,9 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   int line_number = 0;
   int int_line = 0;
   int data_size = 0;
-  int mod_idx_x = mod_idx[0], mod_idx_y = mod_idx[1];
-  int mod_size_x = mod_size[0], mod_size_y = mod_size[1];
-  //int det_size_x = det_size[0];
-  int det_size_y = det_size[1];
 
-  //printf("det_size %d %d\n", det_size[0], det_size[1]);
-  //printf("mod_size %d %d\n", mod_size[0], mod_size[1]);
-  //printf("mod_idx %d %d\n", mod_idx[0], mod_idx[1]);
-
-  int mod_number = mod_idx_x + mod_idx[1] + mod_idx[0] * ((det_size[1] / mod_size[1]) -1); //numbering inside the detctor, growing over the x-axis
-  int lines_per_packet = BUFFER_LENGTH / mod_size_y;
+  int mod_number = mod_idx[0] + mod_idx[1] + mod_idx[0] * ((det_size[1] / mod_size[1]) -1); //numbering inside the detctor, growing over the x-axis
+  int lines_per_packet = BUFFER_LENGTH / mod_size[0];
   
   int mod_origin = mod_idx[0] * det_size[1] * mod_size[0] + mod_idx[1] * mod_size[1];
   //printf("[C RECV] module number %d [%d, %d] %d\n", mod_number, mod_idx_x, mod_idx_y, mod_origin);
@@ -320,7 +313,6 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       if(should_continue == 2)
 	break;
       should_continue = check_framenums(total_modules, ph, packet, rb_current_slot, rb_writer_id);
-      //printf("%d %lu %d\n", getpid(), packet.framenum, should_continue);
     }
     // discard late frames
     if(should_continue == 2)
@@ -329,29 +321,24 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     // get them again, after RB slot is updated
     ph = (jungfrau_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
     p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-    //printf("%d %lu %d \n", getpid(), packet.framenum, packet.packetnum);
 
     line_number = lines_per_packet * (packets_frame - 1 - packet.packetnum);
     int_line = 0;
 
     last_recorded_packet = packet.packetnum;
     total_packets ++;
-    
+
+    // memory copy
     p1 += mod_origin;
-    
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      //printf("%d %d %d %d %d\n", getpid(), i, i * det_size[1], line_number, packet.packetnum);
-      //memcpy(p1 + (511 - i) * mod_size[1],
       memcpy(p1 + (511 - i) * det_size[1],
 	     packet.data + int_line * mod_size[1],
 	     data_size);
       
       int_line ++;
-      
     }
 
     // Copy the framenum and frame metadata
-    
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;
     ph->framemetadata[1] = packets_frame - total_packets;
@@ -366,18 +353,14 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     }
     ph->framemetadata[4] = (uint64_t) packet.bunchid;
     ph->framemetadata[5] = (uint64_t) packet.debug;
+    ph->framemetadata[6] = (uint64_t) mod_number;
 
     // Slot committing, if all packets acquired
-    
     if(total_packets == packets_frame){
-      //printf("%d %lu %d %lf\n", getpid(), packet.framenum, packet.packetnum, packet.bunchid);
       rb_commit_slot(rb_writer_id, *rb_current_slot);
-      //printf("%d slot commited 3\n", getpid());
     }
-
   } // end while
 
-  //printf("%d\n", n_recv_frames);
   return n_recv_frames;
 }
 
