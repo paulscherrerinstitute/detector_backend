@@ -176,15 +176,13 @@ class ModuleReceiver(DataFlowNode):
         gap_px_chip_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_chip, dtype=np.int32, order='C')))
         gap_px_module_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_module, dtype=np.int32, order='C')))
 
-        #int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, uint32_t nframes, int32_t det_size[2], int32_t *mod_size, int32_t *mod_idx, int timeout, int32_t *gap_px_chips, int32_t *gap_px_modules){
-
         # calling the C function, which is an infinite loop with timeout
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
                                        self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
 
-        if self.rb_current_slot.value != -1:
-            self.log.debug("Current slot: %d" % self.rb_current_slot.value)
+        #if self.rb_current_slot.value != -1:
+        self.log.debug("Current slot: %d" % self.rb_current_slot.value)
         if n_recv_frames != 0:
             self.log.info("Received %d" % n_recv_frames)
 

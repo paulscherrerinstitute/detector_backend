@@ -186,7 +186,6 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   int ret;
   
   data_size = mod_size[1] * sizeof(uint16_t);
-
   timeout_i = time(NULL);
 
   struct timeval tv;
@@ -220,6 +219,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	  if(ret == 0)
 	    n_recv_frames ++;
 	}
+	printf("PID %d breaking the timeout\n", getpid());
 	break;
       }
       continue;
