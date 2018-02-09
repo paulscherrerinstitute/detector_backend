@@ -100,6 +100,10 @@ int initialize_slot(int rb_current_slot, int rb_dbuffer_id, int rb_hbuffer_id, i
   for(int i=0; i < 8; i++)
     ph->framemetadata[i] = 0;
 
+  // initialize all bits to 1. For every packet received, later the bit will be turned to 0
+  ph->framemetadata[2] = ~((uint64_t)0);
+  ph->framemetadata[3] = ~((uint64_t)0);
+
   return 0;
 }
 
@@ -168,17 +172,17 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   int data_size = 0;
 
   int mod_number = mod_idx[0] + mod_idx[1] + mod_idx[0] * ((det_size[1] / mod_size[1]) -1); //numbering inside the detctor, growing over the x-axis
-  int lines_per_packet = BUFFER_LENGTH / mod_size[0];
+  int lines_per_packet = BUFFER_LENGTH / mod_size[1];
   
   int mod_origin = mod_idx[0] * det_size[1] * mod_size[0] + mod_idx[1] * mod_size[1];
-  //printf("[C RECV] module number %d [%d, %d] %d\n", mod_number, mod_idx_x, mod_idx_y, mod_origin);
+
   // to be checked
   //mod_origin += mod_idx[1] * (3 * gap_px_chips[1] + gap_px_modules[1]); // inter_chip gaps plus inter_module gap
   //mod_origin += mod_idx[0] * (gap_px_chips[0] + gap_px_modules[0])* det_size[1] ; // inter_chip gaps plus inter_module gap
 
-  uint64_t packets_lost_int1=0, packets_lost_int2=0;
+  // for singl epackets tracking
+  const uint64_t mask = 1;
   uint16_t empty_frame[mod_size[0] * mod_size[1]];
-
   int ret;
   
   data_size = mod_size[1] * sizeof(uint16_t);
@@ -252,10 +256,6 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	}
       }
       
-      // resetting encoded ints for packets lost
-      packets_lost_int1 = 0;
-      packets_lost_int2 = 0;
-
       // get new RB slot
       *rb_current_slot = rb_claim_next_slot(rb_writer_id);
 
@@ -342,14 +342,11 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     ph += mod_number;
     ph->framemetadata[0] = packet.framenum;
     ph->framemetadata[1] = packets_frame - total_packets;
-    int mask = 1 << packet.packetnum;
     if(packet.packetnum < 64){
-      ph->framemetadata[2] = packets_lost_int1 ^ mask;
-      packets_lost_int1 = ph->framemetadata[2];
+      ph->framemetadata[2] &= ~(mask << packet.packetnum);
     }
     else{
-      ph->framemetadata[3] = packets_lost_int2 ^ mask;
-      packets_lost_int2 = ph->framemetadata[3];
+      ph->framemetadata[3] &= ~(mask << (packet.packetnum - 64));
     }
     ph->framemetadata[4] = (uint64_t) packet.bunchid;
     ph->framemetadata[5] = (uint64_t) packet.debug;
