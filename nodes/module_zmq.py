@@ -344,7 +344,7 @@ class ZMQSender(DataFlowNode):
         ref_time = time()
         # frame_comp_time = time()
         frame_comp_counter = 0
-        is_good_frame = True
+        is_good_frame = int(True)
 
         # need to stay here because of numba
         # for gain plus data masking
@@ -372,7 +372,7 @@ class ZMQSender(DataFlowNode):
             framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
             pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_modules)]
             if self.check_framenum:
-                is_good_frame = len(set(framenums)) == 1
+                is_good_frame = int(len(set(framenums)) == 1)
             framenum = copy(pointerh.contents[0].framemetadata[0])
             pulseid = pointerh.contents[0].framemetadata[4]
             daq_rec = pointerh.contents[0].framemetadata[5]
@@ -385,11 +385,13 @@ class ZMQSender(DataFlowNode):
             if self.reset_framenum:
                 framenum -= self.first_frame
 
-            if self.send_every_s != 0 and pulseid % 100 != 0 and (time() - self.send_time) < self.send_every_s:
+            if self.send_every_s != 0 and (time() - self.send_time) < self.send_every_s and pulseid % 10 != 0:
+            #pulseid % 10 != 0 and (time() - self.send_time) < self.send_every_s:
                 self.recv_frames += 1
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                     self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
                 continue
+
             self.recv_frames += 1
             self.send_time = time()
 
@@ -427,7 +429,7 @@ class ZMQSender(DataFlowNode):
                 data = expand_image(data, self.geometry, self.gap_px_module, self.gap_px_chip, self.chips_module)
 
             try:
-                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": is_good_frame, "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)],
+                send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": int(is_good_frame), "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)],
                                                      "module_number": mod_numbers
                 })
             except:
