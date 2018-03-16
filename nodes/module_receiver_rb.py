@@ -183,8 +183,8 @@ class ModuleReceiver(DataFlowNode):
 
         #if self.rb_current_slot.value != -1:
         self.log.debug("Current slot: %d" % self.rb_current_slot.value)
-        if n_recv_frames != 0:
-            self.log.info("Received %d" % n_recv_frames)
+        #if n_recv_frames != 0:
+        #    self.log.info("Received %d" % n_recv_frames)
 
         # FIXME
         # This means that the put_Data_in_rb routine was not able to get a slot
@@ -229,7 +229,7 @@ class ModuleReceiver(DataFlowNode):
         # idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
         # self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
         # print(self.INDEX_ARRAY[0], idx[0])
-        print("Receiver ID2: %d" % self.rb_writer_id)
+        # print("Receiver ID2: %d" % self.rb_writer_id)
         self.log.info("Module index: %s" % [int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]])
         #print(self.n_elements_line, self.n_packets_frame)
 

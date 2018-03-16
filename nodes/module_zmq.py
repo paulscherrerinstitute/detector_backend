@@ -214,9 +214,10 @@ class ZMQSender(DataFlowNode):
             except AttributeError:
                 self.log.warning("%s has no %s configurable, ignoring" % (self.name, k))
             if k.find("filename") != -1:
-                if not os.path.exists(v):
-                    self.worker_communicator.barrier()
-                    raise RuntimeError("File %s not available as %s. Please RESET and retry" % (v, k))
+                if v != "":
+                    if not os.path.exists(v):
+                        self.worker_communicator.barrier()
+                        raise RuntimeError("File %s not available as %s. Please RESET and retry" % (v, k))
 
             self.log.debug("Setting %s to %s" % (k, v))
             setattr(self, k, v)
