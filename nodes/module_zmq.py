@@ -369,15 +369,22 @@ class ZMQSender(DataFlowNode):
                                    ctypes.POINTER(HEADER))
 
             # check that all frame numbers are the same
-            daq_recs = [pointerh.contents[i].framemetadata[5] for i in range(self.n_modules)]
-            framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
-            pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_modules)]
-            if self.check_framenum:
-                is_good_frame = int(len(set(framenums)) == 1)
-            framenum = copy(pointerh.contents[0].framemetadata[0])
-            pulseid = pointerh.contents[0].framemetadata[4]
-            daq_rec = pointerh.contents[0].framemetadata[5]
-            mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_modules)]
+            try:
+                daq_recs = [pointerh.contents[i].framemetadata[5] for i in range(self.n_modules)]
+                framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
+                pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_modules)]
+                if self.check_framenum:
+                    is_good_frame = int(len(set(framenums)) == 1)
+                    framenum = copy(pointerh.contents[0].framemetadata[0])
+                    pulseid = pointerh.contents[0].framemetadata[4]
+                    daq_rec = pointerh.contents[0].framemetadata[5]
+                    mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_modules)]
+            except:
+                # FIXME: not clear why I get here
+                self.log.error("[%s] Issues with getting the RB header pointer (it is %r), current_slot: %d, first frame %d, recv_frame: %d. Casting exception" % 
+                               (self.name, bool(pointerh), self.rb_current_slot, self.first_frame, self.recv_frames))
+                self.log.error(sys.exc_info())
+                raise RuntimeError
 
             if self.first_frame == 0:
                 self.log.info("First frame got: %d pulse_id: %d" % (framenum, pulseid))
