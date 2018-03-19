@@ -224,34 +224,7 @@ class ZMQSender(DataFlowNode):
 
         if "period" in settings:
             self.period = settings["period"] / 1e9
-        """    
-        if "n_frames" in settings:
-            self.n_frames = settings["n_frames"]
 
-
-        if "activate_corrections" in settings:
-            self.activate_corrections = settings["activate_corrections"]
-        if "activate_corrections_preview" in settings:
-            self.activate_corrections_preview = settings["activate_corrections_preview"]
-
-        if "gain_corrections_filename" in settings:
-            setattr(self, "gain_corrections_filename", settings["gain_corrections_filename"])
-        if "pede_corrections_filename" in settings:
-            self.pede_corrections_filename = settings["pede_corrections_filename"]
-        if "gain_corrections_dataset" in settings:
-            self.gain_corrections_dataset = settings["gain_corrections_dataset"]
-        if "pede_corrections_dataset" in settings:
-            self.pede_corrections_dataset = settings["pede_corrections_dataset"]
-        if "pede_mask_dataset" in settings:
-            self.pede_mask_dataset = settings["pede_mask_dataset"]
-
-        if "is_HG0" in settings:
-            self.is_HG0 = settings["is_HG0"]
-        if "flip" in settings:
-            self.flip = settings["flip"]
-        if "send_fake_data" in settings:
-            self.send_fake_data = settings["send_fake_data"]
-        """
         if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
             self.setup_corrections()
         
@@ -302,7 +275,6 @@ class ZMQSender(DataFlowNode):
 
         #self.flip = [-1, ]
         self._reset_defaults()
-
         
         self.send_fake_data = False
         self.close_sockets()
@@ -381,6 +353,8 @@ class ZMQSender(DataFlowNode):
                     mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_modules)]
             except:
                 # FIXME: not clear why I get here
+                print(rb.gf_perror())
+                self.log.error("[%s] RB got error %s" % (self.name, rb.gf_get_error()))
                 self.log.error("[%s] Issues with getting the RB header pointer (it is %r), current_slot: %d, first frame %d, recv_frame: %d. Casting exception" % 
                                (self.name, bool(pointerh), self.rb_current_slot, self.first_frame, self.recv_frames))
                 self.log.error(sys.exc_info())
