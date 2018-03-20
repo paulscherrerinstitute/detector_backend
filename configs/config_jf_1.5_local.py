@@ -33,8 +33,8 @@ undef = dict(level=0)
 
 log_config = dict( loggers =
                    {
-                       'ModuleReceiver': debug,
-                       'ZMQSender': debug
+                       'ModuleReceiver': info,
+                       'ZMQSender': info
                    }
 )
 
