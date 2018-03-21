@@ -33,7 +33,7 @@ def replay_jungfrau(data_dir, n_modules, n_packets=128):
     for ip, port in uri:
         print(i, ip, port)
         # run_replay(filename, ip, port, packet_length, sleep_time=0.01, nframes=100)
-        p.append(multiprocessing.Process(target=socket_replay.run_replay, args=(data_dir + l[i], ip, port, packet_length, 0.01, n_packets)))
+        p.append(multiprocessing.Process(target=socket_replay.run_replay, args=(data_dir + l[i], ip, port, packet_length, 0.005, n_packets)))
         i += 1
         p[-1].start()
 
@@ -41,7 +41,7 @@ def replay_jungfrau(data_dir, n_modules, n_packets=128):
 def recv_array(socket, flags=0, copy=True, track=False, modulo=10):
     """recv a numpy array"""
     md = socket.recv_json(flags=flags)
-    print(md)
+    # print(md)
     msg = socket.recv(copy=copy, track=track)
     buf = buffer(msg)
     A = np.frombuffer(buf, dtype=md['type'])
@@ -56,6 +56,8 @@ class BaseTests(unittest.TestCase):
         self.prepare_rb.wait()
         ctx = zmq.Context()
         self.zmq_recv = ctx.socket(zmq.PULL)
+        self.packets_frame = 128
+        self.n_frames = 10
         
     def tearDown(self):
         self.zmq_recv.close()
@@ -63,7 +65,7 @@ class BaseTests(unittest.TestCase):
         self.p.kill()
         self.p.wait()
 
-    def run_test(self, name, config, n_modules, reference, n_packets=128):
+    def run_test(self, name, config, n_modules, reference, n_frames=1, n_packets=128):
         data_dir = "../data/" + name + "/"
         self.p = subprocess.Popen(shlex.split("mpirun -n %d mpi-dafld --config-file %s" % (n_modules + 3, config)))
 
@@ -82,44 +84,53 @@ class BaseTests(unittest.TestCase):
 
         self.zmq_recv.connect("tcp://127.0.0.1:40000")
         sleep(1)
-        replay_jungfrau(data_dir, n_modules, n_packets=n_packets)
-        return recv_array(self.zmq_recv)
-        
+        replay_jungfrau(data_dir, n_modules, n_packets=n_packets*n_frames)
+        md_data = [[], []]
+        for i in range(n_frames):
+            md, data = recv_array(self.zmq_recv)
+            md_data[0].append(md)
+            md_data[1].append(data)
+            # print(md_data[-1])
+        return md_data
+
+    def return_test(self, name, md_data, reference):
+        np.save("result_%s.npy" % name, md_data)
+        reference_data = np.load(reference)
+        self.assertTrue((md_data[0] == reference_data[0]).all())
+        for i in range(self.n_frames):
+            self.assertTrue((md_data[1][i] == reference_data[1][i]).all())
+
     def test_reco4p5M(self):
         # self.data_dir = "../data/jungfrau_alvra_4p5/"
         name = "jungfrau_alvra_4p5"
         reference = "../data/jungfrau_alvra_4p5_reference.npy"
         n_modules = 9
-        md, data = self.run_test(name=name, n_modules=n_modules,
-                      config="../configs/config_jf_4.5_local.py", reference=reference)
-        np.save("result_%s.npy" % name, data)
-        reference_data = np.load(reference)
-        self.assertTrue((data == reference_data).all())
-        self.assertEqual(md["pulse_id_diff"], n_modules * [0, ])
-
+        md_data = self.run_test(name=name, n_modules=n_modules,
+                      config="../configs/config_jf_4.5_local.py", reference=reference, n_frames=self.n_frames)
+        np.save("result_%s.npy" % name, md_data)
+        self.return_test(name, md_data, reference)
+        
     def test_reco1p5M_testbed(self):
         # self.data_dir = "../data/jf_testbed_15_newfw/"
         name = "jf_testbed_15_newfw"
         reference = "../data/jf_testbed_15_newfw_reference.npy"
         n_modules = 3
         config = "../configs/config_jf_1.5_local.py"
-        md, data = self.run_test(name=name, n_modules=n_modules,
-                                 config=config, reference=reference)
-        np.save("result_%s.npy" % name, data)
-        reference_data = np.load(reference)
-        self.assertTrue((data == reference_data).all())
-        
+        md_data = self.run_test(name=name, n_modules=n_modules,
+                                 config=config, reference=reference, n_frames=self.n_frames)
+        np.save("result_%s.npy" % name, md_data)
+        self.return_test(name, md_data, reference)
+
     def test_packetloss(self, ):
         name = "jf_testbed_15_newfw"
         reference = "../data/jf_testbed_15_newfw_reference.npy"
         n_modules = 3
         config = "../configs/config_jf_1.5_local.py"
-        md, data = self.run_test(name=name, n_modules=n_modules,
-                                 config=config, reference=reference, n_packets=127)
-
-        np.save("result_%s.npy" % name, data)
-        self.assertEqual([bin(i) for i in md["missing_packets_1"]], n_modules * ['0b0', ])
-        self.assertEqual([bin(i) for i in md["missing_packets_2"]], n_modules * ['0b1' + 63 * '0', ])
+        md_data = self.run_test(name=name, n_modules=n_modules,
+                                 config=config, reference=reference, n_packets=127, n_frames=1)
+        np.save("result_%s.npy" % name, md_data)
+        self.assertEqual([bin(i) for i in md_data[0][0]["missing_packets_1"]], n_modules * ['0b0', ])
+        self.assertEqual([bin(i) for i in md_data[0][0]["missing_packets_2"]], n_modules * ['0b1' + 63 * '0', ])
 
     def test_moduleloss(self, ):
         name = "jf_testbed_15_newfw"
@@ -146,6 +157,7 @@ class BaseTests(unittest.TestCase):
         self.zmq_recv.connect("tcp://127.0.0.1:40000")
         sleep(1)
         replay_jungfrau(data_dir, n_modules - 1, )
+
         md, data = recv_array(self.zmq_recv)
 
         np.save("result_%s.npy" % name, data)

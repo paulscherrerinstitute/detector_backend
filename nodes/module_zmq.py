@@ -206,6 +206,7 @@ class ZMQSender(DataFlowNode):
     def reconfigure(self, settings):
         self.log.info("%s.reconfigure()", self.__class__.__name__)
         super(ZMQSender, self).reconfigure(settings)
+        rb.reset()
         self.log.info(settings)
 
         for k, v in settings.iteritems():
@@ -234,8 +235,12 @@ class ZMQSender(DataFlowNode):
         
         self.rb_header_id = rb.open_header_file(self.rb_head_file)
         self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
+        
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
+
+        self.log.info("[%s] RB buffers: Header %d Data %d" % (self.name, self.rb_hbuffer_id, self.rb_hbuffer_id))
+        
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
@@ -249,7 +254,10 @@ class ZMQSender(DataFlowNode):
 
     def reset(self):
         self.log.info("%s.reset()", self.__class__.__name__)
-        #super(ZMQSender, self).reset()
+        
+        super(ZMQSender, self).reset()
+        rb.reset()
+
         #if self.output_file != '':
         #    self.outfile.close()
         self.counter = 0
@@ -354,6 +362,7 @@ class ZMQSender(DataFlowNode):
             except:
                 # FIXME: not clear why I get here
                 print(rb.gf_perror())
+                self.log.error("[%s] RB buffers: Header %s Data %s" % (self.name, self.rb_hbuffer_id, self.rb_hbuffer_id))
                 self.log.error("[%s] RB got error %s" % (self.name, rb.gf_get_error()))
                 self.log.error("[%s] Issues with getting the RB header pointer (it is %r), current_slot: %d, first frame %d, recv_frame: %d. Casting exception" % 
                                (self.name, bool(pointerh), self.rb_current_slot, self.first_frame, self.recv_frames))
