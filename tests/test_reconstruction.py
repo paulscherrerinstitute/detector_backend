@@ -65,9 +65,10 @@ class BaseTests(unittest.TestCase):
         self.p.kill()
         self.p.wait()
 
-    def run_test(self, name, config, n_modules, reference, n_frames=1, n_packets=128):
+    def run_test(self, name, config, n_modules, reference, n_frames=1, n_packets=128, start_backend=True):
         data_dir = "../data/" + name + "/"
-        self.p = subprocess.Popen(shlex.split("mpirun -n %d mpi-dafld --config-file %s" % (n_modules + 3, config)))
+        if start_backend:
+            self.p = subprocess.Popen(shlex.split("mpirun -n %d mpi-dafld --config-file %s" % (n_modules + 3, config)))
 
         while self.client.state is None:
             sleep(2)
@@ -91,6 +92,8 @@ class BaseTests(unittest.TestCase):
             md_data[0].append(md)
             md_data[1].append(data)
             # print(md_data[-1])
+        self.client.reset()
+        self.assertEqual(self.client.state, "INITIALIZED")
         return md_data
 
     def return_test(self, name, md_data, reference):
@@ -110,16 +113,22 @@ class BaseTests(unittest.TestCase):
         np.save("result_%s.npy" % name, md_data)
         self.return_test(name, md_data, reference)
         
-    def test_reco1p5M_testbed(self):
+    def test_reco1p5M_testbed(self, start_backend=True):
         # self.data_dir = "../data/jf_testbed_15_newfw/"
         name = "jf_testbed_15_newfw"
         reference = "../data/jf_testbed_15_newfw_reference.npy"
         n_modules = 3
         config = "../configs/config_jf_1.5_local.py"
         md_data = self.run_test(name=name, n_modules=n_modules,
-                                 config=config, reference=reference, n_frames=self.n_frames)
+                                 config=config, reference=reference, n_frames=self.n_frames, start_backend=start_backend)
         np.save("result_%s.npy" % name, md_data)
         self.return_test(name, md_data, reference)
+
+    def test_multiple_runs(self):
+        first_run = True
+        for i in range(10):
+            self.test_reco1p5M_testbed(start_backend=first_run)
+            first_run = False
 
     def test_packetloss(self, ):
         name = "jf_testbed_15_newfw"
