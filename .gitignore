@@ -1,0 +1,4 @@
+*.pyc
+libudpreceiver.so
+*.dat
+*.npy

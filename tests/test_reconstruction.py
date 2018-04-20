@@ -70,6 +70,7 @@ class BaseTests(unittest.TestCase):
         if start_backend:
             self.p = subprocess.Popen(shlex.split("mpirun -n %d mpi-dafld --config-file %s" % (n_modules + 3, config)))
 
+        sleep(2)
         while self.client.state is None:
             sleep(2)
             continue
@@ -150,6 +151,7 @@ class BaseTests(unittest.TestCase):
         data_dir = "../data/" + name + "/"
         self.p = subprocess.Popen(shlex.split("mpirun -n %d mpi-dafld --config-file %s" % (n_modules + 3, config)))
 
+        sleep(2)
         while self.client.state is None:
             sleep(2)
             continue
