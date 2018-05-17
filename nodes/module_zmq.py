@@ -92,9 +92,9 @@ class ZMQSender(DataFlowNode):
     module_size = List((512, 1024), config=True)
     geometry = List((1, 1), config=True)
 
-    gap_px_chip = List((0, 0), config=True, reconfig=True)  # possibly not used
-    gap_px_module = List((0, 0), config=True, reconfig=True)
-    chips_module = List((2, 4), config=True, reconfig=True)
+    gap_px_chip = List((0, 0), config=True, reconfig=False)  # possibly not used
+    gap_px_module = List((0, 0), config=True, reconfig=False)
+    chips_module = List((2, 4), config=True, reconfig=False)
     
     rb_id = Int(0, config=True, help="")
     rb_followers = List([1, ], config=True, help="")
