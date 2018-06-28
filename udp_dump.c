@@ -162,7 +162,7 @@ int main(int argc, char *argv[]){
       
     }
 
-    if (recv_frames % 1000 == 0 && new_frame == 0){
+    if (recv_frames % 100 == 0 && new_frame == 0){
       lost_packets = 128 * recv_frames - recv_packets;
       printf("%d %d %d %.1f\n", getpid(), recv_frames, lost_packets, 100. * (float)(lost_packets) / (float)(128 * recv_frames));
       recv_packets = 0;

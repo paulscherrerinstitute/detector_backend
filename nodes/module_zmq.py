@@ -121,7 +121,7 @@ class ZMQSender(DataFlowNode):
     #gain_corrections_list = List((0,), config=True, reconfig=True, help="")
     #pedestal_corrections_list = List((0,), config=True, reconfig=True, help="")
 
-    flip = List((-1, ), config=True, reconfig=True)
+    flip = List((-1, ), config=True, reconfig=False)
 
     is_HG0 = Bool(False, config=True)
 
