@@ -21,27 +21,6 @@ rb_head_file = rb_fdir + "rb_header.dat"
 rb_imghead_file = rb_fdir + "rb_image_header.dat"
 rb_imgdata_file = rb_fdir + "rb_image_data.dat"
 
-c.RestGWApplication.rest_port = 8081
-c.RestGWApplication.rest_host = u'0.0.0.0'   # pass u'0.0.0.0' to listen on all interfaces
-c.RestGWApplication.trace_rest = True
-c.RPCBulletinBoardApplication.trace_metrics = True
-c.RPCDataflowApplication.initialize_dataflow_on_startup = True
-# =============================================================================================
-debug = dict(level='DEBUG')
-info  = dict(level='INFO')
-undef = dict(level=0)
-
-log_config = dict( loggers =
-                   {
-                       'ModuleReceiver': debug,
-                       'ZMQSender': debug
-                   }
-)
-
-c.XblBaseApplication.log_config = log_config
-
-# =============================================================================================
-
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 
@@ -54,13 +33,19 @@ size = mpi_size - 2
 
 geometry = [1, 3]
 module_size = [512, 1024]
+n_modules = geometry[0] * geometry[1]
 
-RECEIVER_RANKS = [0, 1, 2]
-SENDERS_RANKS = [3, ]
+IGNORED_MODULES = [2,]
+
+RECEIVER_RANKS = [i for i in range(n_modules)]
+FOLLOWERS = [i for i in range(n_modules)]
+SENDERS_RANKS = [RECEIVER_RANKS[-1] + 1, ]
 #ip = 3 * ["10.30.10.3", ]
-ip = 3 * ["127.0.0.1", ]
-port = [10001, 10002, 10003]
+ip = n_modules * ["127.0.0.1", ]
+port = [10001 + i for i in range(n_modules)]
 
+for mod in IGNORED_MODULES:
+    FOLLOWERS.remove(mod)
 
 c.BulletinBoardClient.prefix = u'backend'
 c.BulletinBoardClient.postfix = str(rank)
@@ -99,7 +84,8 @@ elif rank in SENDERS_RANKS:
     c.ZMQSender.socket_type = "PUSH"
 
     c.ZMQSender.rb_id = rank
-    c.ZMQSender.rb_followers = RECEIVER_RANKS[:-1]
+    c.ZMQSender.rb_followers = FOLLOWERS
+    print("FOLLOWERS rank %d:" % rank, FOLLOWERS)
     c.ZMQSender.rb_head_file = rb_head_file
     c.ZMQSender.rb_imghead_file = rb_imghead_file
     c.ZMQSender.rb_imgdata_file = rb_imgdata_file
@@ -112,5 +98,26 @@ elif rank in SENDERS_RANKS:
 #c.aliases = dict(maxitterations='DataFlow.maxitterations',
 #                 start='NumberGenerator.start',
 #                 stop='NumberGenerator.stop')
+
+c.RestGWApplication.rest_port = 8081
+c.RestGWApplication.rest_host = u'0.0.0.0'   # pass u'0.0.0.0' to listen on all interfaces
+c.RestGWApplication.trace_rest = True
+c.RPCBulletinBoardApplication.trace_metrics = True
+c.RPCDataflowApplication.initialize_dataflow_on_startup = True
+# =============================================================================================
+debug = dict(level='DEBUG')
+info  = dict(level='INFO')
+undef = dict(level=0)
+
+log_config = dict( loggers =
+                   {
+                       'ModuleReceiver': debug,
+                       'ZMQSender': debug
+                   }
+)
+
+c.XblBaseApplication.log_config = log_config
+
+# =============================================================================================
 
 

@@ -37,6 +37,7 @@ typedef struct _jungfrau_header{
   // Field 4: pulse id
   // Field 5: debug (daq_rec) - gain flag
   // Field 6: module number
+  // Field 7: module enabled
   uint64_t framemetadata[8];
 } jungfrau_header;
 
@@ -351,6 +352,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
     ph->framemetadata[4] = (uint64_t) packet.bunchid;
     ph->framemetadata[5] = (uint64_t) packet.debug;
     ph->framemetadata[6] = (uint64_t) mod_number;
+    ph->framemetadata[7] = (uint64_t) 1;
 
     // Slot committing, if all packets acquired
     if(total_packets == packets_frame){

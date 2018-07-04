@@ -359,6 +359,8 @@ class ZMQSender(DataFlowNode):
                     pulseid = pointerh.contents[0].framemetadata[4]
                     daq_rec = pointerh.contents[0].framemetadata[5]
                     mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_modules)]
+                    mod_enabled = [pointerh.contents[i].framemetadata[7] for i in range(self.n_modules)]
+
             except:
                 # FIXME: not clear why I get here
                 print(rb.gf_perror())
@@ -421,7 +423,8 @@ class ZMQSender(DataFlowNode):
 
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, "is_good_frame": int(is_good_frame), "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)],
-                                                     "module_number": mod_numbers
+                                                     "module_number": mod_numbers,
+                                                     "module_enabled": mod_enabled
                 })
             except:
                 self.log.error("Error in sending array: %s" % sys.exc_info()[1])

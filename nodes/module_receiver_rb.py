@@ -146,6 +146,7 @@ class ModuleReceiver(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
+        
         self.log.info("RB %d %d slots: %d" % (self.rb_header_id, self.rb_writer_id, nslots))
         self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
         self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
@@ -155,7 +156,8 @@ class ModuleReceiver(DataFlowNode):
         self.period = 1
 
         self.total_modules = self.geometry[0] * self.geometry[1]
-        self.log.info("Packets per frame: %d" % self.n_packets_frame)
+        if self.create_and_delete_ringbuffer_header:
+            self.log.info("Packets per frame: %d" % self.n_packets_frame)
 
         self.log.info("Module index: %s" % [int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]])
         #print(self.n_elements_line, self.n_packets_frame)
@@ -228,7 +230,8 @@ class ModuleReceiver(DataFlowNode):
         self.period = 1
 
         self.total_modules = self.geometry[0] * self.geometry[1]
-        self.log.info("Packets per frame: %d" % self.n_packets_frame)
+        if self.create_and_delete_ringbuffer_header:
+            self.log.info("Packets per frame: %d" % self.n_packets_frame)
         # idx = define_quadrant(self.detector_size, self.geometry, self.module_index)
         # self.INDEX_ARRAY = np.ctypeslib.as_ctypes(idx)
         # print(self.INDEX_ARRAY[0], idx[0])
