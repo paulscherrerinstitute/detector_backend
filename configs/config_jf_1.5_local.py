@@ -4,8 +4,7 @@ mpirun -n 6 mpi-dafld --config-file config_jf_1.5_testbed.py
 
 
 import sys
-#new_path = '/home/l_det/Work/dafl.jungfrau'
-new_path = "/home/sala/Work/GIT/psi/HPDI/dafl.jungfrau/nodes"
+new_path = "../nodes"
 if new_path not in sys.path:
     sys.path.append(new_path)
 

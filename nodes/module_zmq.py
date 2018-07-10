@@ -92,9 +92,9 @@ class ZMQSender(DataFlowNode):
     module_size = List((512, 1024), config=True)
     geometry = List((1, 1), config=True)
 
-    gap_px_chip = List((0, 0), config=True, reconfig=True)  # possibly not used
-    gap_px_module = List((0, 0), config=True, reconfig=True)
-    chips_module = List((2, 4), config=True, reconfig=True)
+    gap_px_chip = List((0, 0), config=True, reconfig=False)  # possibly not used
+    gap_px_module = List((0, 0), config=True, reconfig=False)
+    chips_module = List((2, 4), config=True, reconfig=False)
     
     rb_id = Int(0, config=True, help="")
     rb_followers = List([1, ], config=True, help="")
@@ -108,20 +108,20 @@ class ZMQSender(DataFlowNode):
     reset_framenum = Bool(True, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
     #output_file = Unicode('', config=True, reconfig=True)
 
-    gain_corrections_filename = Unicode('', config=True, reconfig=True)
-    gain_corrections_dataset = Unicode('', config=True, reconfig=True)
-    pede_corrections_filename = Unicode('', config=True, reconfig=True)
-    pede_corrections_dataset = Unicode('', config=True, reconfig=True)
-    pede_mask_dataset = Unicode('', config=True, reconfig=True)
+    gain_corrections_filename = Unicode('', config=True, reconfig=False)
+    gain_corrections_dataset = Unicode('', config=True, reconfig=False)
+    pede_corrections_filename = Unicode('', config=True, reconfig=False)
+    pede_corrections_dataset = Unicode('', config=True, reconfig=False)
+    pede_mask_dataset = Unicode('', config=True, reconfig=False)
     
-    activate_corrections_preview = Bool(False, config=True, reconfig=True, help="")
-    activate_corrections = Bool(False, config=True, reconfig=True, help="")
+    activate_corrections_preview = Bool(False, config=True, reconfig=False, help="")
+    activate_corrections = Bool(False, config=True, reconfig=False, help="")
 
     send_fake_data = Bool(False, config=True, reconfig=True, help="")
     #gain_corrections_list = List((0,), config=True, reconfig=True, help="")
     #pedestal_corrections_list = List((0,), config=True, reconfig=True, help="")
 
-    flip = List((-1, ), config=True, reconfig=True)
+    flip = List((-1, ), config=True, reconfig=False)
 
     is_HG0 = Bool(False, config=True)
 
@@ -239,7 +239,7 @@ class ZMQSender(DataFlowNode):
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
 
-        self.log.info("[%s] RB buffers: Header %d Data %d" % (self.name, self.rb_hbuffer_id, self.rb_hbuffer_id))
+        self.log.info("[%s] RB buffers: Header %d Data %d" % (self.name, self.rb_hbuffer_id, self.rb_dbuffer_id))
         
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
 
@@ -378,7 +378,7 @@ class ZMQSender(DataFlowNode):
             if self.reset_framenum:
                 framenum -= self.first_frame
 
-            if self.send_every_s != 0 and (time() - self.send_time) < self.send_every_s and pulseid % 10 != 0:
+            if self.send_every_s != 0 and (time() - self.send_time) < self.send_every_s:  # and pulseid % 10 != 0:
             #pulseid % 10 != 0 and (time() - self.send_time) < self.send_every_s:
                 self.recv_frames += 1
                 if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):

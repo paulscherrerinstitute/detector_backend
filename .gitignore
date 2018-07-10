@@ -1,0 +1,5 @@
+*.pyc
+libudpreceiver.so
+*.dat
+*.npy
+__pycache__
