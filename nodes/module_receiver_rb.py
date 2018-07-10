@@ -108,7 +108,7 @@ class ModuleReceiver(DataFlowNode):
                 if not ret:
                     self.log.error("Ring buffer files do not exist!")
                     raise RuntimeError("Ring buffer files do not exist!")
-                self.log.debug("created %s", f)
+                self.log.info("created %s", f)
             self.worker_communicator.barrier()
                 
         else:
@@ -146,10 +146,12 @@ class ModuleReceiver(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
-        
-        self.log.info("RB %d %d slots: %d" % (self.rb_header_id, self.rb_writer_id, nslots))
-        self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
-        self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+
+        if self.create_and_delete_ringbuffer_header:
+            self.log.info("RB %d %d slots: %d" % (self.rb_header_id, self.rb_writer_id, nslots))
+            self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+            self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+
         self.rb_current_slot = ctypes.c_int(-1)
 
         self.n_packets_frame = 128
@@ -193,6 +195,7 @@ class ModuleReceiver(DataFlowNode):
         #if rb.get_buffer_slot(self.rb_writer_id) == -1:
         #    self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
 
+        self.log.info("Received %d frames" % n_recv_frames)
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
@@ -223,10 +226,12 @@ class ModuleReceiver(DataFlowNode):
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
-        self.log.info("[%s] RB HeaderID: %d buffers: Header %d Data %d" % (self.name, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id))
-        self.log.info("RB slots: %d" % nslots)
-        self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
-        self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+      
+        if self.create_and_delete_ringbuffer_header:
+            self.log.info("[%s] RB HeaderID: %d buffers: Header %d Data %d" % (self.name, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id))
+            self.log.info("RB slots: %d" % nslots)
+            self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+            self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
         self.rb_current_slot = ctypes.c_int(-1)
 
         self.n_packets_frame = 128
