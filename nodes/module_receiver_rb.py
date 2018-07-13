@@ -195,7 +195,7 @@ class ModuleReceiver(DataFlowNode):
         #if rb.get_buffer_slot(self.rb_writer_id) == -1:
         #    self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
 
-        self.log.info("Received %d frames" % n_recv_frames)
+        #self.log.info("Received %d frames" % n_recv_frames)
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)

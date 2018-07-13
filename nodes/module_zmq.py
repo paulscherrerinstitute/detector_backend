@@ -441,8 +441,8 @@ class ZMQSender(DataFlowNode):
         #self.outfile.close()
 
         self.log.debug("Writer loop exited")
-        self.log.info("received_frames %s" % ({"name": self.name, "total": self.recv_frames, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()}))
-        self.log.info("sent_frames %s" % {"name": self.name, "total": self.sent_frames, "epoch": time()})
+        #self.log.info("received_frames %s" % ({"name": self.name, "total": self.recv_frames, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()}))
+        #self.log.info("sent_frames %s" % {"name": self.name, "total": self.sent_frames, "epoch": time()})
         self.pass_on(self.counter)
         return(self.counter)
     
