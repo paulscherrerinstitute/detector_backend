@@ -70,8 +70,8 @@ int get_message(int sd, jungfrau_packet * packet){
     struct sockaddr_in clientaddr;
     socklen_t clientaddrlen = sizeof(clientaddr);
 
-    //ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), MSG_DONTWAIT, (struct sockaddr *)&clientaddr, &clientaddrlen);
-    ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), 0, (struct sockaddr *)&clientaddr, &clientaddrlen);
+    ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), MSG_DONTWAIT, (struct sockaddr *)&clientaddr, &clientaddrlen);
+    //ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), 0, (struct sockaddr *)&clientaddr, &clientaddrlen);
     
 #ifdef DEBUG
     if(nbytes >= 0){
@@ -192,7 +192,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
   struct timeval tv;
   tv.tv_sec = 0;
   tv.tv_usec = 50;
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
+  //setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
 
   
   // creating an empty frame for initializing the rb slot
@@ -280,7 +280,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
       stat_total_frames ++;
       n_recv_frames ++;
 
-      if(n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
+      //if(n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
 	gettimeofday(&te, NULL);
 	if (lost_packets != 0){
 	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
@@ -292,7 +292,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 	tot_lost_frames = 0;
 	tot_lost_packets = 0;
 	stat_total_frames = 0;
-      } 
+	//} 
       total_packets = 0;
 
     } // end new frame if

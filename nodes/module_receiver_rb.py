@@ -194,8 +194,8 @@ class ModuleReceiver(DataFlowNode):
         # This means that the put_Data_in_rb routine was not able to get a slot
         #if rb.get_buffer_slot(self.rb_writer_id) == -1:
         #    self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
-
-        self.log.info("Received %d frames" % n_recv_frames)
+        if n_recv_frames != 0:
+            self.log.info("Received %d frames" % n_recv_frames)
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
@@ -232,6 +232,7 @@ class ModuleReceiver(DataFlowNode):
             self.log.info("RB slots: %d" % nslots)
             self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
             self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+
         self.rb_current_slot = ctypes.c_int(-1)
 
         self.n_packets_frame = 128
