@@ -409,7 +409,7 @@ class ZMQSender(DataFlowNode):
 
             # TODO: use milliseconds
             if self.send_every_s != 0:
-                if (framenum != 0 and (time() - self.send_time) < self.send_every_s)):
+                if framenum != 0 and (time() - self.send_time) < self.send_every_s:
                     self.recv_frames += 1
                     if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
                         self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
