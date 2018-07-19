@@ -73,7 +73,7 @@ int get_message(int sd, jungfrau_packet * packet){
     ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), MSG_DONTWAIT, (struct sockaddr *)&clientaddr, &clientaddrlen);
     //ssize_t nbytes = recvfrom(sd, packet, sizeof(*packet), 0, (struct sockaddr *)&clientaddr, &clientaddrlen);
     
-#ifdef DEBUG
+#ifdef DEBUG2
     if(nbytes >= 0){
       int stats_frames = 1000;
       printf("+ PID %d ", getpid());
@@ -142,7 +142,7 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 #define GAP_PX_MODULES_Y 36
   */
 
-  int stats_frames = 10;
+  int stats_frames = 100;
   int n_recv_frames = 0;
   uint64_t framenum_last = 0;
   int total_packets = 0;
@@ -282,12 +282,17 @@ int put_data_in_rb(int sock, int bit_depth, int *rb_current_slot, int rb_header_
 
       //if(n_recv_frames % stats_frames == 0 && n_recv_frames != 0){
 	gettimeofday(&te, NULL);
+	// more verbose if DEBUG
+#ifndef DEBUG
 	if (lost_packets != 0){
+#endif
 	  tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
 
 	  printf("| %d | %d | %lu | %.2f | %lu | %.1f |\n", sched_getcpu(), getpid(), framenum_last, (double) stats_frames / tdif, tot_lost_packets, 100. * (float)tot_lost_packets / (float)(packets_frame * stat_total_frames));
 	  lost_packets = 0;
+#ifndef DEBUG
 	}
+#endif
 	gettimeofday(&ti,NULL);
 	tot_lost_frames = 0;
 	tot_lost_packets = 0;
