@@ -254,6 +254,12 @@ class ZMQSender(DataFlowNode):
 
     def reset(self):
         self.log.info("%s.reset()", self.__class__.__name__)
+        # logging stats
+        self.log.info("%s" % {"received_frames": {"total": self.counter,
+                                                  "incomplete": self.frames_with_missing_packets,
+                                                  "packets_lost": self.total_missing_packets, "epoch": time()}
+                        })
+        self.log.info("%s" % {"sent_frames": self.sent_frames})
         
         super(ZMQSender, self).reset()
         rb.reset()
@@ -272,12 +278,6 @@ class ZMQSender(DataFlowNode):
                                              "packets_lost": self.total_missing_packets, "epoch": time()})
         self.metrics.set("sent_frames", {"name": self.name, "total": self.sent_frames, "epoch": time()})
 
-        # logging stats
-        self.log.info("%s" % {"received_frames": {"total": self.counter,
-                                                  "incomplete": self.frames_with_missing_packets,
-                                                  "packets_lost": self.total_missing_packets, "epoch": time()}
-                        })
-        self.log.info("%s" % {"sent_frames": self.sent_frames})
         self.pede_corrections = np.zeros((4, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_mask = np.zeros((self.detector_size[0], self.detector_size[1]), dtype=np.float32)
 
