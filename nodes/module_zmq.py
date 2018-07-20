@@ -80,35 +80,33 @@ def expand_image(image, mods, mod_gaps, chip_gaps, chips):
 
 
 def convert_stripsel(imgin):
-
-    imgout=np.zeros((86,(1024*3+18)),dtype=imgin.dtype)
-    ## 256 not divisible by 3, so we round up
-    ## 18 since we have 6 more pixels in H per gap
+    imgout = np.zeros((86, (1024 * 3 + 18)), dtype=imgin.dtype)
+    # 256 not divisible by 3, so we round up
+    # 18 since we have 6 more pixels in H per gap
 
     # first we fill the normal pixels, the gap ones will be overwritten later
-    for yin in range(256) :
-        for xin in range(1024) :
-            ichip=xin//256
-            xout=(ichip*774)+(xin%256)*3+yin%3
-            ## 774 is the chip period, 256*3+6
-            yout=yin//3
-            imgout[yout,xout]=imgin[yin,xin]
+    for yin in range(256):
+        for xin in range(1024):
+            ichip = xin // 256
+            xout = (ichip * 774) + (xin % 256) * 3 + yin % 3
+            # 774 is the chip period, 256*3+6
+            yout = yin // 3
+            imgout[yout, xout] = imgin[yin, xin]
     # now the gap pixels...
-    for igap in range(3) :
+    for igap in range(3):
         for yin in range(256):
-            yout=(yin//6)*2
-            #first the left side of gap
-            xin=igap*64+63
-            xout=igap*774+765+yin%6
-            imgout[yout,xout]=imgin[yin,xin]
-            imgout[yout+1,xout]=imgin[yin,xin]
+            yout = (yin // 6) * 2
+            # first the left side of gap
+            xin = igap * 64 + 63
+            xout = igap * 774 + 765 + yin % 6
+            imgout[yout, xout] = imgin[yin, xin]
+            imgout[yout + 1, xout] = imgin[yin, xin]
             #then the right side is mirrored
-            xin=igap*64+63+1
-            xout=igap*774+765+11-yin%6
-            imgout[yout,xout]=imgin[yin,xin]
-            imgout[yout+1,xout]=imgin[yin,xin]
-
-            ## imgout[yout,xout]=imgout[yout,xout]/2 if we want a proper normalization (the area of those pixels is double, so they see 2x the signal)
+            xin = igap * 64 + 63 + 1
+            xout = igap * 774 + 765 + 11 - yin % 6
+            imgout[yout, xout] = imgin[yin, xin]
+            imgout[yout + 1, xout] = imgin[yin, xin]
+            # imgout[yout,xout]=imgout[yout,xout]/2 if we want a proper normalization (the area of those pixels is double, so they see 2x the signal)
 
     return imgout
 
@@ -122,7 +120,7 @@ class ZMQSender(DataFlowNode):
     send_every_s = Float(0, config=True, help="send every n second")
     module_size = List((512, 1024), config=True)
     exp_module_size = List((0, 0), config=True) 
-    expand_gaps= Bool(True, config=True)
+    expand_gaps = Bool(True, config=True)
     geometry = List((1, 1), config=True)
 
     gap_px_chip = List((2, 2), config=True, reconfig=False)  # possibly not used
@@ -133,7 +131,7 @@ class ZMQSender(DataFlowNode):
     rb_followers = List([1, ], config=True, help="")
     bit_depth = Int(16, config=True, help="")
 
-    rb_head_file = Unicode('', config=True,help="")
+    rb_head_file = Unicode('', config=True, help="")
     rb_imghead_file = Unicode('', config=True, help="")
     rb_imgdata_file = Unicode('', config=True, help="")
 
