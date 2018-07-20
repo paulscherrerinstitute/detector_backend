@@ -79,9 +79,38 @@ def expand_image(image, mods, mod_gaps, chip_gaps, chips):
     return res
 
 
+def convert_stripsel(imgin):
 
+    imgout=np.zeros((86,(1024*3+18)),dtype=imgin.dtype)
+    ## 256 not divisible by 3, so we round up
+    ## 18 since we have 6 more pixels in H per gap
 
+    # first we fill the normal pixels, the gap ones will be overwritten later
+    for yin in range(256) :
+        for xin in range(1024) :
+            ichip=xin//256
+            xout=(ichip*774)+(xin%256)*3+yin%3
+            ## 774 is the chip period, 256*3+6
+            yout=yin//3
+            imgout[yout,xout]=imgin[yin,xin]
+    # now the gap pixels...
+    for igap in range(3) :
+        for yin in range(256):
+            yout=(yin//6)*2
+            #first the left side of gap
+            xin=igap*64+63
+            xout=igap*774+765+yin%6
+            imgout[yout,xout]=imgin[yin,xin]
+            imgout[yout+1,xout]=imgin[yin,xin]
+            #then the right side is mirrored
+            xin=igap*64+63+1
+            xout=igap*774+765+11-yin%6
+            imgout[yout,xout]=imgin[yin,xin]
+            imgout[yout+1,xout]=imgin[yin,xin]
 
+            ## imgout[yout,xout]=imgout[yout,xout]/2 if we want a proper normalization (the area of those pixels is double, so they see 2x the signal)
+
+    return imgout
 
 
 class ZMQSender(DataFlowNode):
@@ -131,6 +160,8 @@ class ZMQSender(DataFlowNode):
 
     modules_orig_x = List([], config=True, help="Modules origin for image assembly, X coordinate")
     modules_orig_y = List([], config=True, help="Modules origin for image assembly, Y coordinate")
+
+    stripsel_module = Bool(False, config=True)
 
     def _reset_defaults(self):
         self.reset_framenum = True
@@ -459,6 +490,9 @@ class ZMQSender(DataFlowNode):
                     
                     data = np.zeros((data_with_geom.shape[1],data_with_geom.shape[0]), dtype=data_with_geom.dtype)
                     data = np.rot90(data_with_geom).copy()
+
+                if self.stripsel_module:
+                    data = convert_stripsel(data)
 
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, 
