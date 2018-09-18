@@ -119,7 +119,7 @@ class BaseTests(unittest.TestCase):
         np.save("result_%s.npy" % name, md_data)
         self.return_test(name, md_data, reference)
         
-    def test_reco0p5M(self):
+    def atest_reco0p5M(self):
         # self.data_dir = "../data/jungfrau_alvra_4p5/"
         name = "jungfrau_alvra_4p5"
         reference = "../data/jungfrau_alvra_4p5_reference.npy"

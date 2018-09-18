@@ -122,6 +122,17 @@ typedef struct uint48 {
 
 // header struct for RB - to be updated to include the framenums of all modules
 
+typedef struct _detector{
+  char detector_name[10];
+  uint8_t submodule_n;
+  int32_t detector_size[2]; 
+  int32_t module_size[2]; 
+  int32_t submodule_size[2]; 
+  int32_t module_idx[2]; 
+  int32_t submodule_idx[2];
+
+} detector;
+
 typedef struct _eiger_header{
   // Field 0: frame number
   // Field 1: packets lost
@@ -257,11 +268,14 @@ typedef struct Counter{
 
 
 int jungfrau_get_message16(int sd, jungfrau_packet16 * packet){
+  
+  //jungfrau_packet16 * tp = (jungfrau_packet16*) packet;
   ssize_t nbytes = recv(sd, packet, sizeof(*packet), 0); //MSG_DONTWAIT);
 
+  //printf("%ld %ld\n", nbytes, sizeof(*(jungfrau_packet16*)packet));
  #ifdef DEBUG
   if(nbytes > 0){
-    printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), nbytes, packet->framenum, packet->packetnum);
+    printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), nbytes, ((jungfrau_packet16*)packet)->framenum, ((jungfrau_packet16*)packet)->packetnum);
   }
   #endif
 
@@ -404,43 +418,49 @@ barebone_packet get_put_data8(int sock, int rb_hbuffer_id, int *rb_current_slot,
 
 
 barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int lines_per_packet, int packets_frame, int32_t *det_size, int32_t *submod_size, int32_t *submod_idx, counter * counters){
+  int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det, void * packet){
   /*!
     gets the packet data and put it in the correct memory place in the RingBuffer
    */
-  jungfrau_packet16 packet;
+  //jungfrau_packet16 packet;
+  //void * packet;
   eiger_header * ph;
   //eiger_header header;
 
   uint16_t * p1;
-  int data_len;
+  int data_len = 0;
   int int_line = 0;
   int line_number;
   int i;
   bool commit_flag = false;
 
+  // can pass a void pointer, and dereference in the memory copy - useful?
+  uint16_t * data;
+  
   barebone_packet bpacket;
   uint64_t ones = ~((uint64_t)0);
   
-  data_len = jungfrau_get_message16(sock, &packet);
-  bpacket.data_len = data_len;
-  
+  if (strcmp(det.detector_name, "JUNGFRAU") == 0){
+    data_len = jungfrau_get_message16(sock, (jungfrau_packet16*)packet);
+    bpacket.data_len = data_len;
+    bpacket.framenum = ((jungfrau_packet16 *) packet)->framenum;
+    bpacket.packetnum = ((jungfrau_packet16 *) packet)->packetnum;
+    data = (uint16_t *)((jungfrau_packet16 *) packet)->data;
+  }
+  else{
+    printf("No detector selected\n");
+  }
   // ignoring the special eiger initial packet
-  if(bpacket.data_len <= HEADER_PACKET_SIZE){
-//    if(data_len != 0)
-//      printf("%d\n", bpacket.data_len);
+  if(data_len <= HEADER_PACKET_SIZE){
     return bpacket;
   }
 
-  //change to recv_packets?
   counters->recv_packets++;
-  bpacket.framenum = packet.framenum;
-  bpacket.packetnum = packet.packetnum;
 
   // this fails in case frame number is not updated by the detector (or its simulation)
   if(counters->recv_packets == packets_frame && bpacket.framenum == counters->current_frame){
     //this is the last packet of the frame
-    printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", packet.packetnum, counters->recv_packets, 
+    printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket.packetnum, counters->recv_packets, 
                                                                     packets_frame, bpacket.framenum, counters->current_frame);
     counters->recv_frames++;
     //counters->recv_packets = 0;
@@ -458,8 +478,6 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
         if(*rb_current_slot != -1){
           // add some checks here
           rb_commit_slot(rb_writer_id, *rb_current_slot);
-          // already done above
-          //counters->recv_frames++;
         }
         else
           printf("[ERROR] I should have been committing a dangling slot, but it is -1\n");
@@ -491,7 +509,7 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
 #endif
 #ifndef OLD_HEADER
   // assuming packetnum sequence is 0..N-1
-  line_number = lines_per_packet * (packets_frame - packet.packetnum - 1);
+  line_number = lines_per_packet * (packets_frame - bpacket.packetnum - 1);
 #endif
 
   // initializing - recv_packets already increased above
@@ -506,8 +524,8 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
   }
     
   // First half (up)
-  if((submod_idx[0] == 0 && submod_idx[1] == 0) ||
-      (submod_idx[0] == 0 && submod_idx[1] == 1)){
+  if((det.submodule_idx[0] == 0 && det.submodule_idx[1] == 0) ||
+      (det.submodule_idx[0] == 0 && det.submodule_idx[1] == 1)){
   /*  
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
       memcpy(p1 + i * det_size[1],
@@ -522,41 +540,42 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
     */  
     
          for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      memcpy(p1 + (511 - i) * det_size[1],
-	     packet.data + int_line * submod_size[1],
-	     submod_size[1] * sizeof(uint16_t));
+      memcpy(p1 + (511 - i) * det.detector_size[1],
+	     data + int_line * det.submodule_size[1],
+	     det.submodule_size[1] * sizeof(uint16_t));
       
       int_line ++;
       
     }
     
   }
+  /*
     // the other half
   else{
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
 // TODO remove the hardcoded 255
 //printf("up1: %d\n", (255 - i) * det_size[1]);
 //printf("up2: %d\n", (255 - i) * det_size[1] + GAP_PX_CHIPS_Y + submod_size[1] / 2);
-      memcpy(p1 + (255 - i) * det_size[1],
+      memcpy(p1 + (255 - i) * det.detector_size[1],
         packet.data + int_line * submod_size[1],
         submod_size[1] * sizeof(int16_t) / 2);
-      memcpy(p1 + (255 - i) * det_size[1] + GAP_PX_CHIPS_Y + submod_size[1] / 2,
+      memcpy(p1 + (255 - i) * det.detector_size[1] + GAP_PX_CHIPS_Y + submod_size[1] / 2,
         packet.data + int_line * submod_size[1] + submod_size[1] / 2,
         submod_size[1] * sizeof(int16_t) / 2);
       int_line ++;
     }
   }
-
+  */
   // updating counters
-  ph->framemetadata[0] = packet.framenum; // this could be avoided mayne
+  ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
   ph->framemetadata[1] = packets_frame - counters->recv_packets;
     
   const uint64_t mask = 1;
-  if(packet.packetnum < 64){
-    ph->framemetadata[2] &= ~(mask << packet.packetnum);
+  if(bpacket.packetnum < 64){
+    ph->framemetadata[2] &= ~(mask << bpacket.packetnum);
   }
   else{
-    ph->framemetadata[3] = ~(mask << (packet.packetnum - 64));
+    ph->framemetadata[3] = ~(mask << (bpacket.packetnum - 64));
     //packets_lost_int2 = ph->framemetadata[3];
   }
 
@@ -662,17 +681,14 @@ barebone_packet get_put_data32(int sock, int rb_hbuffer_id, int *rb_current_slot
 
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
-                    int16_t nframes, int32_t *det_size, int32_t *mod_size, int32_t *submod_size, 
-                    int32_t *mod_idx, int32_t *submod_idx, float timeout){
+                    int16_t nframes, float timeout, detector det){
   /*!
     Main routine to be called from python. Infinite loop with timeout calling for socket receive and putting data in memory, 
     checking that all packets are acquired.
-
-    TODO:
-    + add subchips number
-    + add detector type
    */
   
+  //printf("%s %d\n", det.detector_name, det.detector_size[0]);
+
   int stat_total_frames = 0;
   int tot_lost_packets = 0;
   
@@ -683,7 +699,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   double tdif=-1;
   
   //int lines_per_packet = 8 * BUFFER_LENGTH / (bit_depth * submod_size[1]);
-  int lines_per_packet = BUFFER_LENGTH / mod_size[1];
+  int lines_per_packet = BUFFER_LENGTH / det.module_size[1];
 
   counter counters;
 
@@ -691,22 +707,22 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   counters.recv_frames = 0;
 
   // Origin of the module within the detector, (0, 0) is bottom left
-  uint32_t mod_origin = det_size[1] * mod_idx[0] * mod_size[0] + mod_idx[1] * mod_size[1];
-  mod_origin += mod_idx[1] * (3 * GAP_PX_CHIPS_Y + GAP_PX_MODULES_Y); // inter_chip gaps plus inter_module gap
-  mod_origin += mod_idx[0] * (GAP_PX_CHIPS_X + GAP_PX_MODULES_X)* det_size[1] ; // inter_chip gaps plus inter_module gap
+  uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
+  mod_origin += det.module_idx[1] * (3 * GAP_PX_CHIPS_Y + GAP_PX_MODULES_Y); // inter_chip gaps plus inter_module gap
+  mod_origin += det.module_idx[0] * (GAP_PX_CHIPS_X + GAP_PX_MODULES_X)* det.detector_size[1] ; // inter_chip gaps plus inter_module gap
 
   // Origin of the submodule within the detector, relative to module origin
-  mod_origin += det_size[1] * submod_idx[0] * submod_size[0] + submod_idx[1] * submod_size[1];
-  if(submod_idx[1] != 0)
+  mod_origin += det.detector_size[1] * det.submodule_idx[0] * det.submodule_size[0] + det.submodule_idx[1] * det.submodule_size[1];
+  if(det.submodule_idx[1] != 0)
     mod_origin += 2 * GAP_PX_CHIPS_Y;  // 2* because there is the inter-quartermodule chip gap //GAP_PX_CHIPS_Y * submod_idx[1]; // the last takes into account extra space for chip gap within quarter module
-  if(submod_idx[0] != 0)
-    mod_origin += submod_idx[0] * det_size[1] * GAP_PX_CHIPS_X;
+  if(det.submodule_idx[0] != 0)
+    mod_origin += det.submodule_idx[0] * det.detector_size[1] * GAP_PX_CHIPS_X;
 
   //int mod_number = submod_idx[1] + submod_idx[0] * 2 +
-  //  4 * (mod_idx[1] + mod_idx[0] * det_size[1] / mod_size[1]); //numbering inside the detctor, growing over the x-axis
+  //  4 * (mod_idx[1] + mod_idx[0] * detector.detector_size[1] / mod_size[1]); //numbering inside the detctor, growing over the x-axis
 
   //JF
-  int mod_number = mod_idx[0] + mod_idx[1] + mod_idx[0] * ((det_size[1] / mod_size[1]) -1); //numbering inside the detctor, growing over the x-axis
+  int mod_number = det.module_idx[0] + det.module_idx[1] + det.module_idx[0] * ((det.detector_size[1] / det.module_size[1]) -1); //numbering inside the detctor, growing over the x-axis
   //mod_origin = det_size[1] * mod_idx[0] * mod_size[0] + mod_idx[1] * mod_size[1];
   //
 
@@ -741,12 +757,17 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       }
    
     // get data and copy to RB
+  /*
     if(bit_depth == 8)
       bpacket = get_put_data8(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin,
 			     lines_per_packet, packets_frame, det_size, submod_size, submod_idx);
-    else if(bit_depth == 16)
+    else if(bit_depth == 16){
+      */
+    jungfrau_packet16 packet;
+    uint16_t *data;
       bpacket = get_put_data16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       lines_per_packet, packets_frame, det_size, submod_size, submod_idx, &counters);
+			       lines_per_packet, packets_frame, /*det_size, submod_size, submod_idx,*/ &counters, det, &packet);
+  /*}
     else if(bit_depth == 32)
       bpacket = get_put_data32(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin,
 			     lines_per_packet, packets_frame, det_size, submod_size, submod_idx);
@@ -754,7 +775,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       printf("[UDP_RECEIVER][%d] please set up a bit_depth", getpid());
       return counters.recv_frames;
     }
-
+*/
     // no data? Checks timeout
     if(bpacket.data_len <= 0){
       gettimeofday(&tv_end, NULL);

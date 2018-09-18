@@ -18,6 +18,17 @@ from time import time, sleep
 from copy import copy
 
 
+class DETECTOR(ctypes.Structure):
+            _fields_ = [
+                ('detector_name', 10 * ctypes.c_char),
+                ('submodule_n', ctypes.c_uint8),
+                ('detector_size', 2 * ctypes.c_int),
+                ('module_size', 2 * ctypes.c_int),
+                ('submodule_size', 2 * ctypes.c_int),
+                ('module_idx', 2 * ctypes.c_int),
+                ('submodule_idx', 2 * ctypes.c_int),
+            ]
+
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
 HEADER_ARRAY = ctypes.c_char * 6
@@ -29,24 +40,9 @@ try:
     _mod = ctypes.cdll.LoadLibrary(os.path.dirname(os.path.realpath(__file__)) + "/../libudpreceiver.so")
 
     put_data_in_rb = _mod.put_data_in_rb
-    #put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
-    #               self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
-    #               self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
-    
-    #put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, 
-    #                        ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 
-    #                        2 * ctypes.c_int32, ctypes.c_int32)
-    #put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, 
-    #               self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, 
-    #               cframenum, np.ctypeslib.as_ctypes(dsize), np.ctypeslib.as_ctypes(msize),
-    #                                         np.ctypeslib.as_ctypes(smsize),
-    #                                         np.ctypeslib.as_ctypes(mod_indexes),
-    #                                         np.ctypeslib.as_ctypes(submod_indexes),
-    #                                         self.timeout)
     put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                  ctypes.c_int16,
-                                 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int,
-                                 ctypes.c_float)
+                                 ctypes.c_float, DETECTOR)
     put_data_in_rb.restype = ctypes.c_int
 
     put_data_in_rb.restype = ctypes.c_int
@@ -139,8 +135,18 @@ class ModuleReceiver(DataFlowNode):
     
     def __init__(self, **kwargs):
         super(ModuleReceiver, self).__init__(**kwargs)
-        self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+        self.detector = DETECTOR()
+        self.detector.detector_name = "JUNGFRAU"
+        self.detector.submodule_n  = 1
 
+        mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
+        self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+        self.detector.detector_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
+        self.detector.module_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
+        self.detector.module_idx = copy(np.ctypeslib.as_ctypes(mod_indexes))
+        self.detector.submodule_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
+        self.detector.submodule_idx = copy(np.ctypeslib.as_ctypes(np.array([0, 0], dtype=np.int32, order='C')))
+        
         self.log.info("%s PID: %d IP: %s:%d" % (self.name, os.getpid(), self.ip, self.port))
         # for setting up barriers
         app = XblBaseApplication.instance()
@@ -192,31 +198,12 @@ class ModuleReceiver(DataFlowNode):
         #self.log.info("Timeout is %d" % self.timeout.value)
 
         # without the copy it seems that it is possible to point to the last allocated memory array
-        mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
-        det_size = copy(np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C')))
-        mod_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
-        mod_idx = copy(np.ctypeslib.as_ctypes(mod_indexes))
-        gap_px_chip_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_chip, dtype=np.int32, order='C')))
-        gap_px_module_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_module, dtype=np.int32, order='C')))
-
-        # calling the C function, which is an infinite loop with timeout
-        #n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
-        #                               self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
-        #                               self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
-
         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, 
                                         self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, 
-                                        self.n_frames, det_size, mod_size, mod_size,
-                                        mod_idx, np.ctypeslib.as_ctypes(np.array([0, 0], dtype=np.int32, order='C')), self.timeout)
-
-        #         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, 
-        # self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, cframenum,
-        #                                     np.ctypeslib.as_ctypes(dsize),
-        #                                     np.ctypeslib.as_ctypes(msize),
-        #                                     np.ctypeslib.as_ctypes(smsize),
-        #                                     np.ctypeslib.as_ctypes(mod_indexes),
-        #                                     np.ctypeslib.as_ctypes(submod_indexes),
-        #                                     self.timeout)
+                                        self.n_frames, 
+                                        self.timeout,
+                                        self.detector
+                                        )
 
 
         #if self.rb_current_slot.value != -1:
