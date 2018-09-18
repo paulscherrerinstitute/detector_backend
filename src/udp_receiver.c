@@ -460,8 +460,11 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
   // this fails in case frame number is not updated by the detector (or its simulation)
   if(counters->recv_packets == packets_frame && bpacket.framenum == counters->current_frame){
     //this is the last packet of the frame
+#ifdef DEBUG
     printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket.packetnum, counters->recv_packets, 
                                                                     packets_frame, bpacket.framenum, counters->current_frame);
+#endif
+
     counters->recv_frames++;
     //counters->recv_packets = 0;
     counters->current_frame = 0; // this will cause getting a new slot afterwards
@@ -484,7 +487,9 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
 
         //do_stats with recv_packets -1
         counters->lost_frames = packets_frame - (counters->recv_packets - 1);
+#ifdef DEBUG
         printf("[UDPRECV][%d] %d %d %d\n", getpid(), packets_frame, counters->recv_packets, counters->lost_frames);
+#endif
       }
       counters->recv_packets = 1;
     }
@@ -517,15 +522,7 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
     for(i=0; i < 8; i++)
       ph->framemetadata[i] = 0;
 
-    /*
-    ph->framemetadata[2] = ~((uint64_t)0);
-    ph->framemetadata[3] = 0;
-
-    if(packets_frame > 64)
-      ph->framemetadata[3] = ~((uint64_t)0);
-*/
     ph->framemetadata[2] = ones >> (64 - packets_frame);
-    
     ph->framemetadata[3] = 0;
 
     if(packets_frame > 64)
@@ -535,46 +532,41 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
   // First half (up)
   if((det.submodule_idx[0] == 0 && det.submodule_idx[1] == 0) ||
       (det.submodule_idx[0] == 0 && det.submodule_idx[1] == 1)){
-  /*  
-    for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      memcpy(p1 + i * det_size[1],
-        packet.data + int_line * submod_size[1],
-        submod_size[1] * sizeof(int16_t) / 2);
 
-      memcpy(p1 + i * det_size[1] + GAP_PX_CHIPS_Y + submod_size[1] / 2,
-        packet.data + int_line * submod_size[1] + submod_size[1] / 2,
-        submod_size[1] * sizeof(int16_t) / 2);
-      int_line ++;
-      }
-    */  
-    
-         for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-      memcpy(p1 + (511 - i) * det.detector_size[1],
-	     data + int_line * det.submodule_size[1],
-	     det.submodule_size[1] * sizeof(uint16_t));
-      
-      int_line ++;
-      
+        if(det.submodule_n == 4){
+          for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
+            memcpy(p1 + i * det.detector_size[1],
+              data + int_line * det.submodule_size[1],
+              det.submodule_size[1] * sizeof(int16_t) / 2);
+
+            memcpy(p1 + i * det.detector_size[1] + GAP_PX_CHIPS_Y + det.submodule_size[1] / 2,
+              data + int_line * det.submodule_size[1] + det.submodule_size[1] / 2,
+              det.submodule_size[1] * sizeof(int16_t) / 2);
+            int_line ++;
+            }
+        }
+        else{
+          for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
+            memcpy(p1 + (det.submodule_size[0] - 1 - i) * det.detector_size[1],
+                  data + int_line * det.submodule_size[1],
+                  det.submodule_size[1] * sizeof(uint16_t));
+            int_line ++;
+        }
+      }      
     }
-    
-  }
-  /*
     // the other half
   else{
     for(i=line_number + lines_per_packet - 1; i >= line_number; i--){
-// TODO remove the hardcoded 255
-//printf("up1: %d\n", (255 - i) * det_size[1]);
-//printf("up2: %d\n", (255 - i) * det_size[1] + GAP_PX_CHIPS_Y + submod_size[1] / 2);
-      memcpy(p1 + (255 - i) * det.detector_size[1],
-        packet.data + int_line * submod_size[1],
-        submod_size[1] * sizeof(int16_t) / 2);
-      memcpy(p1 + (255 - i) * det.detector_size[1] + GAP_PX_CHIPS_Y + submod_size[1] / 2,
-        packet.data + int_line * submod_size[1] + submod_size[1] / 2,
-        submod_size[1] * sizeof(int16_t) / 2);
+      memcpy(p1 + (det.submodule_size[0] - 1 - i) * det.detector_size[1],
+        data + int_line * det.submodule_size[1],
+        det.submodule_size[1] * sizeof(int16_t) / 2);
+      memcpy(p1 + (det.submodule_size[0] - 1 - i) * det.detector_size[1] + GAP_PX_CHIPS_Y + det.submodule_size[1] / 2,
+        data + int_line * det.submodule_size[1] + det.submodule_size[1] / 2,
+        det.submodule_size[1] * sizeof(int16_t) / 2);
       int_line ++;
     }
   }
-  */
+
   // updating counters
   ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
   ph->framemetadata[1] = packets_frame - counters->recv_packets;
