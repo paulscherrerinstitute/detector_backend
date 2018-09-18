@@ -517,8 +517,17 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
     for(i=0; i < 8; i++)
       ph->framemetadata[i] = 0;
 
-    ph->framemetadata[2] = ones >> (64 - packets_frame);
+    /*
+    ph->framemetadata[2] = ~((uint64_t)0);
     ph->framemetadata[3] = 0;
+
+    if(packets_frame > 64)
+      ph->framemetadata[3] = ~((uint64_t)0);
+*/
+    ph->framemetadata[2] = ones >> (64 - packets_frame);
+    
+    ph->framemetadata[3] = 0;
+
     if(packets_frame > 64)
       ph->framemetadata[3] = ones >> (128 - packets_frame);
   }
@@ -575,8 +584,7 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
     ph->framemetadata[2] &= ~(mask << bpacket.packetnum);
   }
   else{
-    ph->framemetadata[3] = ~(mask << (bpacket.packetnum - 64));
-    //packets_lost_int2 = ph->framemetadata[3];
+    ph->framemetadata[3] &= ~(mask << (bpacket.packetnum - 64));
   }
 
   // commit the slot if this is the last packet of the frame
