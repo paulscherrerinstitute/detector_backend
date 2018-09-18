@@ -80,7 +80,7 @@ class BaseTests(unittest.TestCase):
         sleep(2)
         self.assertEqual(self.client.state, "INITIALIZED")
 
-        self.client.configure({"settings": {}})
+        self.client.configure({"settings": {"bit_depth": 16}})
         sleep(2)
         self.assertEqual(self.client.state, "CONFIGURED")
         self.client.open()
@@ -119,6 +119,17 @@ class BaseTests(unittest.TestCase):
         np.save("result_%s.npy" % name, md_data)
         self.return_test(name, md_data, reference)
         
+    def test_reco0p5M(self):
+        # self.data_dir = "../data/jungfrau_alvra_4p5/"
+        name = "jungfrau_alvra_4p5"
+        reference = "../data/jungfrau_alvra_4p5_reference.npy"
+        n_modules = 1
+        # maybe use picke.dump here
+        md_data = self.run_test(name=name, n_modules=n_modules,
+                      config="../configs/config_jf_0.5_local.py", reference=reference, n_frames=self.n_frames)
+        np.save("result_%s.npy" % name, md_data)
+        self.return_test(name, md_data, reference)
+
     def test_reco1p5M_testbed(self, start_backend=True):
         # self.data_dir = "../data/jf_testbed_15_newfw/"
         name = "jf_testbed_15_newfw"

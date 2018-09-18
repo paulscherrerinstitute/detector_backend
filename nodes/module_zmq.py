@@ -399,7 +399,7 @@ class ZMQSender(DataFlowNode):
             self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
 
             if self.rb_current_slot == -1:
-                self.log.debug("No RB slot")
+                #self.log.debug("No RB slot")
                 continue
 
             pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),

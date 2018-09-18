@@ -29,7 +29,26 @@ try:
     _mod = ctypes.cdll.LoadLibrary(os.path.dirname(os.path.realpath(__file__)) + "/../libudpreceiver.so")
 
     put_data_in_rb = _mod.put_data_in_rb
-    put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, ctypes.c_int32)
+    #put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
+    #               self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
+    #               self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
+    
+    #put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, 
+    #                        ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 
+    #                        2 * ctypes.c_int32, ctypes.c_int32)
+    #put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, 
+    #               self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, 
+    #               cframenum, np.ctypeslib.as_ctypes(dsize), np.ctypeslib.as_ctypes(msize),
+    #                                         np.ctypeslib.as_ctypes(smsize),
+    #                                         np.ctypeslib.as_ctypes(mod_indexes),
+    #                                         np.ctypeslib.as_ctypes(submod_indexes),
+    #                                         self.timeout)
+    put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                 ctypes.c_int16,
+                                 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int, 2 * ctypes.c_int,
+                                 ctypes.c_float)
+    put_data_in_rb.restype = ctypes.c_int
+
     put_data_in_rb.restype = ctypes.c_int
 except:
     print(os.path.dirname(os.path.realpath(__file__)) + "/../libudpreceiver.so")
@@ -169,7 +188,7 @@ class ModuleReceiver(DataFlowNode):
 
         # cframenum = ctypes.c_uint16(-1)
         # as C time() is seconds
-        self.timeout = 1  #ctypes.c_int(max(int(2. * self.period), 1))
+        self.timeout = 1.0  #ctypes.c_int(max(int(2. * self.period), 1))
         #self.log.info("Timeout is %d" % self.timeout.value)
 
         # without the copy it seems that it is possible to point to the last allocated memory array
@@ -181,9 +200,24 @@ class ModuleReceiver(DataFlowNode):
         gap_px_module_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_module, dtype=np.int32, order='C')))
 
         # calling the C function, which is an infinite loop with timeout
-        n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
-                                       self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
-                                       self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
+        #n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
+        #                               self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
+        #                               self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
+
+        n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, 
+                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, 
+                                        self.n_frames, det_size, mod_size, mod_size,
+                                        mod_idx, np.ctypeslib.as_ctypes(np.array([0, 0], dtype=np.int32, order='C')), self.timeout)
+
+        #         n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, self.rb_header_id, 
+        # self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, cframenum,
+        #                                     np.ctypeslib.as_ctypes(dsize),
+        #                                     np.ctypeslib.as_ctypes(msize),
+        #                                     np.ctypeslib.as_ctypes(smsize),
+        #                                     np.ctypeslib.as_ctypes(mod_indexes),
+        #                                     np.ctypeslib.as_ctypes(submod_indexes),
+        #                                     self.timeout)
+
 
         #if self.rb_current_slot.value != -1:
         self.log.debug("Current slot: %d" % self.rb_current_slot.value)
