@@ -58,6 +58,8 @@ def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
     metadata["type"] = str(A.dtype)
     metadata["shape"] = A.shape
 
+    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", metadata)
+
     socket.send_json(metadata, flags | zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
@@ -122,6 +124,7 @@ class ZMQSender(DataFlowNode):
     exp_module_size = List((0, 0), config=True) 
     expand_gaps = Bool(True, config=True)
     geometry = List((1, 1), config=True)
+    detector_size = List((-1, -1), config=True)
 
     gap_px_chip = List((2, 2), config=True, reconfig=False)  # possibly not used
     gap_px_module = List((0, 0), config=True, reconfig=False)
@@ -185,7 +188,8 @@ class ZMQSender(DataFlowNode):
 
     def __init__(self, **kwargs):
         super(ZMQSender, self).__init__(**kwargs)
-        self.detector_size = (self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1])
+        if self.detector_size == [-1, -1]:
+            self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
 
         app = XblBaseApplication.instance()
         self.worker_communicator = app.worker_communicator
@@ -456,8 +460,11 @@ class ZMQSender(DataFlowNode):
                 self.frames_with_missing_packets += 1
                 self.total_missing_packets += missing_packets
 
+            entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-            data = np.ctypeslib.as_array(pointer, self.detector_size, )
+            #data = np.ctypeslib.as_array(pointer, self.detector_size, )
+            data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), ).reshape(self.detector_size)
+
             self.log.debug("Got Frame %d %d" % (framenum, pulseid))
 
             self.counter += 1
@@ -502,6 +509,7 @@ class ZMQSender(DataFlowNode):
                                                     "module_enabled": mod_enabled
                                                  }, copy=True
                        )
+                
             except:
                 self.log.error("Error in sending array: %s" % sys.exc_info()[1])
 

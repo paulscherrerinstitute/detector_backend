@@ -99,6 +99,7 @@ class ModuleReceiver(DataFlowNode):
     module_size = List((512, 1024), config=True)
     geometry = List((1, 1), config=True)
     module_index = Int(0, config=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
+    detector_size = List((-1, -1), config=True)
 
     gap_px_chip = List((0, 0), config=True)  # possibly not used
     gap_px_module = List((0, 0), config=True)
@@ -140,7 +141,9 @@ class ModuleReceiver(DataFlowNode):
         self.detector.submodule_n  = 1
 
         mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
-        self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+        if self.detector_size == [-1, -1]:
+            self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+
         self.detector.detector_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
         self.detector.module_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
         self.detector.module_idx = copy(np.ctypeslib.as_ctypes(mod_indexes))

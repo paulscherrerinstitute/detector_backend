@@ -1,16 +1,14 @@
 """
 # single module
-mpirun -n 7 mpi-dafld --config-file config_eiger.py
+mpirun -n 7 mpi-dafld --config-file config_mpi.py
 
 # 1.5
-mpirun -n 15 mpi-dafld --config-file config_eiger.py
+mpirun -n 15 mpi-dafld --config-file config_mpi.py
 """
 
 
 import sys
-new_path = '/home/l_det/Work/dafl.psieiger/nodes'
-#new_path = '/home/l_sala/code/dafl.psieiger/nodes'
-#new_path = '/home/sala/Work/GIT/psi/HPDI/dafl.psieiger/nodes'
+new_path = '/home/l_sala/code/dafl.psieiger/nodes'
 if new_path not in sys.path:
     sys.path.append(new_path)
 
@@ -33,25 +31,23 @@ mpi_size = comm.Get_size()
 rank = mpi_rank
 size = mpi_size - 2
 
-GEOMETRY = [1, 1]
-c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y
+GEOMETRY = [6, 3]
 module_size = [512, 1024]
 
-#c.ModuleReceiver.bit_depth = 16
-#c.ZMQSender.bit_depth = 16
+c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y 
+#c.ZMQSender.module_size = [512, 1024]
 c.ZMQSender.detector_size = [module_size[0] * GEOMETRY[0], module_size[1] * GEOMETRY[1]]
-
 
 RECEIVER_RANKS = [x for x in range(4 * c.ModuleReceiver.geometry[0] * c.ModuleReceiver.geometry[1])]  # [0, 1, 2, 3]
 SENDERS_RANKS = [RECEIVER_RANKS[-1] +  1, ]
 
 
 n_modules = c.ModuleReceiver.geometry[0] * c.ModuleReceiver.geometry[1]
-receiver_ips = 2 * ["10.0.30.210"] + 2 * ["10.0.30.210"]
+receiver_ips = 2 * ["10.0.30.210"] + 2 * ["10.0.40.210"]
 receiver_ips = n_modules * receiver_ips
 # submodule numeration differs from the one in the setup file
-receiver_ports = [50001 + i for i in range(4)]
-# receiver_ports[2:] = receiver_ports[:1:-1]
+receiver_ports = [50011 + i for i in range(4)]
+#receiver_ports[2:] = receiver_ports[:1:-1]
 for m in range(1, n_modules):
     receiver_ports += [i + m*4 for i in receiver_ports[:4]]
 submodule_index = n_modules * [0, 1, 2, 3]
@@ -90,14 +86,17 @@ elif rank in SENDERS_RANKS:
         ('ZMQ', 'module_zmq.ZMQSender'),
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
-    #c.ZMQSender.uri = "tcp://10.0.30.210:9999"
-    c.ZMQSender.uri = "tcp://127.0.0.1:40000"
-    c.ZMQSender.socket_type = "PUB"
+    c.ZMQSender.uri = "tcp://10.0.30.210:9999"
+    #c.ZMQSender.uri = "ipc:///tmp/msg/0"
+    c.ZMQSender.socket_type = "PUSH"
+    #c.ZMQSender.socket_type = "PUB"
     c.ZMQSender.rb_id = rank
     c.ZMQSender.rb_followers = rb_writers_id
     c.ZMQSender.rb_head_file = rb_head_file
     c.ZMQSender.rb_imghead_file = rb_imghead_file
     c.ZMQSender.rb_imgdata_file = rb_imgdata_file
+    # FIXME
+    #c.ZMQSender.module_size = [512 *c.ModuleReceiver.geometry[0] , 1024 * *c.ModuleReceiver.geometry[1]]
 
     
 c.BulletinBoardClient.prefix = u'backend'
@@ -117,11 +116,11 @@ undef = dict(level=0)
 
 log_config = dict( loggers =
                    {
-                       'RestGWApplication' :           undef,
-                       'RPCDataflowApplication' :      undef,
-                       'DataFlow' :                    undef,
-                       'ZMQSender':                    info,
-                       'ModuleReceiver':                 debug,
+                       'RestGWApplication' :           info,
+                       'RPCDataflowApplication' :      info,
+                       'DataFlow' :                    info,
+                       'ZMQSender':                    debug,
+                       'ModuleReceiver':               debug,
                    }
 )
 

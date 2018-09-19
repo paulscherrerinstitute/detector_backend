@@ -718,11 +718,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   if(det.submodule_idx[0] != 0)
     mod_origin += det.submodule_idx[0] * det.detector_size[1] * GAP_PX_CHIPS_X;
 
-  //int mod_number = submod_idx[1] + submod_idx[0] * 2 +
-  //  4 * (mod_idx[1] + mod_idx[0] * detector.detector_size[1] / mod_size[1]); //numbering inside the detctor, growing over the x-axis
+  int mod_number = det.submodule_idx[1] + det.submodule_idx[0] * 2 +
+    det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); //numbering inside the detctor, growing over the x-axis
 
   //JF
-  int mod_number = det.module_idx[0] + det.module_idx[1] + det.module_idx[0] * ((det.detector_size[1] / det.module_size[1]) -1); //numbering inside the detctor, growing over the x-axis
+  //int mod_number = det.module_idx[0] + det.module_idx[1] + det.module_idx[0] * ((det.detector_size[1] / det.module_size[1]) -1); //numbering inside the detctor, growing over the x-axis
   //mod_origin = det_size[1] * mod_idx[0] * mod_size[0] + mod_idx[1] * mod_size[1];
   //
 

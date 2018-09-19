@@ -8,9 +8,9 @@ mpirun -n 15 mpi-dafld --config-file config_eiger.py
 
 
 import sys
-new_path = '/home/l_det/Work/dafl.psieiger/nodes'
-#new_path = '/home/l_sala/code/dafl.psieiger/nodes'
-#new_path = '/home/sala/Work/GIT/psi/HPDI/dafl.psieiger/nodes'
+#new_path = '/home/l_det/Work/dafl.psieiger/nodes'
+new_path = '/home/sala/Work/GIT/psi/HPDI/dafl.psieiger/nodes'
+new_path
 if new_path not in sys.path:
     sys.path.append(new_path)
 
@@ -33,13 +33,29 @@ mpi_size = comm.Get_size()
 rank = mpi_rank
 size = mpi_size - 2
 
-GEOMETRY = [1, 1]
-c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y
+GEOMETRY = [2, 2]
+#c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y
 module_size = [512, 1024]
+gap_chips = [2, 2]
+gap_modules = [36, 8]
+#gap_chips = [0, 0]
+#gap_modules = [0, 0]
+module_size_wgaps = [module_size[0] + gap_chips[0], module_size[1] + gap_chips[1] + 4]
+#module_size_wgaps = [module_size[0], module_size[1]]
+detector_size = [module_size_wgaps[0] * GEOMETRY[0], module_size_wgaps[1] * GEOMETRY[1]]
+detector_size = [(GEOMETRY[0] - 1) * gap_modules[0] + detector_size[0],
+                 (GEOMETRY[1] - 1) * gap_modules[1] + detector_size[1]]
+
+c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y
+c.ModuleReceiver.module_size = module_size
+c.ModuleReceiver.detector_size = detector_size
+c.ZMQSender.module_size = module_size
+c.ZMQSender.detector_size = detector_size
+c.ZMQSender.geometry = GEOMETRY  # number of modules, x and y
 
 #c.ModuleReceiver.bit_depth = 16
 #c.ZMQSender.bit_depth = 16
-c.ZMQSender.detector_size = [module_size[0] * GEOMETRY[0], module_size[1] * GEOMETRY[1]]
+#c.ZMQSender.detector_size = [module_size[0] * GEOMETRY[0], module_size[1] * GEOMETRY[1]]
 
 
 RECEIVER_RANKS = [x for x in range(4 * c.ModuleReceiver.geometry[0] * c.ModuleReceiver.geometry[1])]  # [0, 1, 2, 3]
@@ -47,13 +63,13 @@ SENDERS_RANKS = [RECEIVER_RANKS[-1] +  1, ]
 
 
 n_modules = c.ModuleReceiver.geometry[0] * c.ModuleReceiver.geometry[1]
-receiver_ips = 2 * ["10.0.30.210"] + 2 * ["10.0.30.210"]
+receiver_ips = 4 * ["127.0.0.1"]
 receiver_ips = n_modules * receiver_ips
 # submodule numeration differs from the one in the setup file
-receiver_ports = [50001 + i for i in range(4)]
+receiver_ports = [50011 + i for i in range(4)]
 # receiver_ports[2:] = receiver_ports[:1:-1]
 for m in range(1, n_modules):
-    receiver_ports += [i + m*4 for i in receiver_ports[:4]]
+    receiver_ports += [i + m * 4 for i in receiver_ports[:4]]
 submodule_index = n_modules * [0, 1, 2, 3]
 
 # Ring Buffers settings
@@ -83,6 +99,7 @@ if rank in RECEIVER_RANKS:
     c.ModuleReceiver.rb_head_file = rb_head_file
     c.ModuleReceiver.rb_imghead_file = rb_imghead_file
     c.ModuleReceiver.rb_imgdata_file = rb_imgdata_file
+    c.ModuleReceiver.timeout = 0.5
 
     
 elif rank in SENDERS_RANKS:
@@ -90,9 +107,8 @@ elif rank in SENDERS_RANKS:
         ('ZMQ', 'module_zmq.ZMQSender'),
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
-    #c.ZMQSender.uri = "tcp://10.0.30.210:9999"
-    c.ZMQSender.uri = "tcp://127.0.0.1:40000"
-    c.ZMQSender.socket_type = "PUB"
+    c.ZMQSender.uri = "tcp://127.0.0.1:9999"
+    c.ZMQSender.socket_type = "PUSH"
     c.ZMQSender.rb_id = rank
     c.ZMQSender.rb_followers = rb_writers_id
     c.ZMQSender.rb_head_file = rb_head_file
@@ -120,7 +136,7 @@ log_config = dict( loggers =
                        'RestGWApplication' :           undef,
                        'RPCDataflowApplication' :      undef,
                        'DataFlow' :                    undef,
-                       'ZMQSender':                    info,
+                       'ZMQSender':                    debug,
                        'ModuleReceiver':                 debug,
                    }
 )

@@ -3,3 +3,5 @@ libudpreceiver.so
 *.dat
 *.npy
 __pycache__
+*~
+*.log
