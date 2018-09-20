@@ -28,14 +28,16 @@ mpi_size = comm.Get_size()
 rank = mpi_rank
 size = mpi_size - 2
 
+detector_name = "EIGER"
+submodule_n = 4
 GEOMETRY = [6, 3]
 module_size = [512, 1024]
-gap_chips = [2, 2]
-gap_modules = [36, 8]
-#gap_chips = [0, 0]
-#gap_modules = [0, 0]
-module_size_wgaps = [module_size[0] + gap_chips[0], module_size[1] + gap_chips[1] + 4]
-#module_size_wgaps = [module_size[0], module_size[1]]
+#gap_chips = [2, 2]
+#gap_modules = [36, 8]
+gap_chips = [0, 0]
+gap_modules = [0, 0]
+#module_size_wgaps = [module_size[0] + gap_chips[0], module_size[1] + gap_chips[1] + 4]
+module_size_wgaps = [module_size[0], module_size[1]]
 detector_size = [module_size_wgaps[0] * GEOMETRY[0], module_size_wgaps[1] * GEOMETRY[1]]
 detector_size = [(GEOMETRY[0] - 1) * gap_modules[0] + detector_size[0],
                  (GEOMETRY[1] - 1) * gap_modules[1] + detector_size[1]]
@@ -78,6 +80,9 @@ if rank in RECEIVER_RANKS:
         c.ModuleReceiver.create_and_delete_ringbuffer_header = True
 
     c.DataFlow.targets_per_node = {'RECV' : []}
+    c.ModuleReceiver.detector_name = detector_name
+    c.ModuleReceiver.submodule_n = submodule_n
+    c.ModuleReceiver.submodule_size = [256, 512]
     c.ModuleReceiver.ip = receiver_ips[rank]
     c.ModuleReceiver.port = receiver_ports[rank]
     c.ModuleReceiver.submodule_index = submodule_index[rank]

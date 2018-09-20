@@ -97,9 +97,13 @@ class ModuleReceiver(DataFlowNode):
     ip = Unicode('192.168.10.10', config=True, help="Ip to listen to for UDP packets")
     port = Int(9000, config=True, help="Port to listen to for UDP packets")
     module_size = List((512, 1024), config=True)
+    submodule_size = List((512, 1024), config=True)
     geometry = List((1, 1), config=True)
     module_index = Int(0, config=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
     detector_size = List((-1, -1), config=True)
+    detector_name = Unicode('', config=True)
+    submodule_n = Int(1, config=True)
+    submodule_index = Int(0, config=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
 
     gap_px_chip = List((0, 0), config=True)  # possibly not used
     gap_px_module = List((0, 0), config=True)
@@ -137,18 +141,27 @@ class ModuleReceiver(DataFlowNode):
     def __init__(self, **kwargs):
         super(ModuleReceiver, self).__init__(**kwargs)
         self.detector = DETECTOR()
-        self.detector.detector_name = "JUNGFRAU"
-        self.detector.submodule_n  = 1
+        self.detector.detector_name = self.detector_name
+        if self.detector_name == "":
+            raise RuntimeError("No detector has been selected")
+        self.detector.submodule_n  = self.submodule_n
 
-        mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
+        # Column-first numeration
+        if self.detector_name == "EIGER":
+            mod_indexes = np.array([self.module_index % self.geometry[0], int(self.module_index / self.geometry[0])], dtype=np.int32, order='C')
+        # Row-first numeration
+        else:
+            mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
+    
         if self.detector_size == [-1, -1]:
             self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
 
         self.detector.detector_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
         self.detector.module_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
         self.detector.module_idx = copy(np.ctypeslib.as_ctypes(mod_indexes))
-        self.detector.submodule_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
-        self.detector.submodule_idx = copy(np.ctypeslib.as_ctypes(np.array([0, 0], dtype=np.int32, order='C')))
+
+        self.detector.submodule_size = copy(np.ctypeslib.as_ctypes(np.array(self.submodule_size, dtype=np.int32, order='C')))
+        self.detector.submodule_idx = copy(np.ctypeslib.as_ctypes(np.array([int(self.submodule_index / 2), self.submodule_index % 2], dtype=np.int32, order='C')))
         
         self.log.info("%s PID: %d IP: %s:%d" % (self.name, os.getpid(), self.ip, self.port))
         # for setting up barriers

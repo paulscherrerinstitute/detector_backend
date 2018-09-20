@@ -91,11 +91,7 @@ commit_flag
 #endif
 
 // size of the data buffer, in bytes
-#define BUFFER_LENGTH    4096
-// size of the quarter module, in pixels
-//#define YSIZE 512
-//#define XSIZE 256
-
+#define BUFFER_LENGTH    8192
 
 // gap pixels between chips and modules. move this to a struct and pass it as argument
 
@@ -308,11 +304,11 @@ int get_message16(int sd, eiger_packet16 * packet){
   packet->framenum = (unsigned long long) packet->framenum2.v;
 #endif
 
- //#ifdef DEBUG
+ #ifdef DEBUG
   if(nbytes > 0){
     printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), nbytes, packet->framenum, packet->packetnum);
   }
-  //#endif
+ #endif
 
   return nbytes;
 }
@@ -416,7 +412,6 @@ barebone_packet get_put_data8(int sock, int rb_hbuffer_id, int *rb_current_slot,
 }
 
 
-
 barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det, void * packet){
   /*!
@@ -436,19 +431,28 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
 
   // can pass a void pointer, and dereference in the memory copy - useful?
   uint16_t * data;
-  
   barebone_packet bpacket;
   uint64_t ones = ~((uint64_t)0);
-  
+  jungfrau_packet16 packet_jungfrau;
+  eiger_packet16 packet_eiger;
+
   if (strcmp(det.detector_name, "JUNGFRAU") == 0){
-    data_len = jungfrau_get_message16(sock, (jungfrau_packet16*)packet);
+    data_len = jungfrau_get_message16(sock, &packet_jungfrau);
     bpacket.data_len = data_len;
-    bpacket.framenum = ((jungfrau_packet16 *) packet)->framenum;
-    bpacket.packetnum = ((jungfrau_packet16 *) packet)->packetnum;
-    data = (uint16_t *)((jungfrau_packet16 *) packet)->data;
+    bpacket.framenum = packet_jungfrau.framenum;
+    bpacket.packetnum = packet_jungfrau.packetnum;
+    data = (uint16_t *)packet_jungfrau.data;
+  }
+  else if (strcmp(det.detector_name, "EIGER") == 0){
+    data_len = get_message16(sock, &packet_eiger);
+    bpacket.data_len = data_len;
+    bpacket.framenum = packet_eiger.framenum;
+    bpacket.packetnum = packet_eiger.packetnum;
+    data = (uint16_t *)packet_eiger.data;
   }
   else{
-    printf("No detector selected\n");
+    // FIXME: improve treatment of this error
+    printf("Detector %s is not supported\n", det.detector_name);
   }
   // ignoring the special eiger initial packet
   if(data_len <= HEADER_PACKET_SIZE){
@@ -519,12 +523,10 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1){
-    for(i=0; i < 8; i++)
-      ph->framemetadata[i] = 0;
+    for(i=0; i < 8; i++) ph->framemetadata[i] = 0;
 
     ph->framemetadata[2] = ones >> (64 - packets_frame);
     ph->framemetadata[3] = 0;
-
     if(packets_frame > 64)
       ph->framemetadata[3] = ones >> (128 - packets_frame);
   }
@@ -679,7 +681,6 @@ barebone_packet get_put_data32(int sock, int rb_hbuffer_id, int *rb_current_slot
 }
 
 
-
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
                     int16_t nframes, float timeout, detector det){
   /*!
@@ -697,9 +698,18 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   
   struct  timeval ti, te; //for timing
   double tdif=-1;
+
+  int buffer_length = BUFFER_LENGTH;
+  jungfrau_packet16 packet_jungfrau;
+  eiger_packet16 packet_eiger;
   
-  //int lines_per_packet = 8 * BUFFER_LENGTH / (bit_depth * submod_size[1]);
-  int lines_per_packet = BUFFER_LENGTH / det.module_size[1];
+  if(strcmp(det.detector_name, "EIGER") == 0){
+    buffer_length = BUFFER_LENGTH / 2;
+  }
+
+
+  int lines_per_packet = 8 * buffer_length / (bit_depth * det.submodule_size[1]);
+  //int lines_per_packet = BUFFER_LENGTH / det.module_size[1];
 
   counter counters;
 
@@ -708,7 +718,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   // Origin of the module within the detector, (0, 0) is bottom left
   uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
-  mod_origin += det.module_idx[1] * (3 * GAP_PX_CHIPS_Y + GAP_PX_MODULES_Y); // inter_chip gaps plus inter_module gap
+  mod_origin += det.module_idx[1] * ((det.submodule_n - 1) * GAP_PX_CHIPS_Y + GAP_PX_MODULES_Y); // inter_chip gaps plus inter_module gap
   mod_origin += det.module_idx[0] * (GAP_PX_CHIPS_X + GAP_PX_MODULES_X)* det.detector_size[1] ; // inter_chip gaps plus inter_module gap
 
   // Origin of the submodule within the detector, relative to module origin
@@ -718,15 +728,25 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   if(det.submodule_idx[0] != 0)
     mod_origin += det.submodule_idx[0] * det.detector_size[1] * GAP_PX_CHIPS_X;
 
-  int mod_number = det.submodule_idx[1] + det.submodule_idx[0] * 2 +
+  int mod_number = det.submodule_idx[0] * 2 + det.submodule_idx[1] + 
     det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); //numbering inside the detctor, growing over the x-axis
+//  int mod_number = submod_idx[1] + submod_idx[0] * 2 +
+//    4 * (mod_idx[1] + mod_idx[0] * det_size[1] / mod_size[1]); //numbering inside the detctor, growing over the x-axis
 
   //JF
   //int mod_number = det.module_idx[0] + det.module_idx[1] + det.module_idx[0] * ((det.detector_size[1] / det.module_size[1]) -1); //numbering inside the detctor, growing over the x-axis
   //mod_origin = det_size[1] * mod_idx[0] * mod_size[0] + mod_idx[1] * mod_size[1];
   //
 
-  packets_frame = 128;//submod_size[0] * submod_size[1] / (8 * BUFFER_LENGTH / bit_depth);
+  /*
+  int mod_number = mod_idx[0] + mod_idx[1] + mod_idx[0] * ((det_size[1] / mod_size[1]) -1); //numbering inside the detctor, growing over the x-axis
+  int lines_per_packet = BUFFER_LENGTH / mod_size[1];
+  
+  int mod_origin = mod_idx[0] * det_size[1] * mod_size[0] + mod_idx[1] * mod_size[1];
+
+  */
+
+  packets_frame = det.submodule_size[0] * det.submodule_size[1] / (8 * buffer_length / bit_depth);
   bpacket.data_len = 0;
 
   // Timeout for blocking sock recv
@@ -743,6 +763,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   printf("[UDPRECEIVER][%d] entered at %.3f s\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec));
   // infinite loop, with timeout
+
+  
   while(true){
 
     if(nframes != -1)
@@ -763,10 +785,16 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 			     lines_per_packet, packets_frame, det_size, submod_size, submod_idx);
     else if(bit_depth == 16){
       */
-    jungfrau_packet16 packet;
     uint16_t *data;
+  if(strcmp(det.detector_name, "EIGER") == 0){
       bpacket = get_put_data16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       lines_per_packet, packets_frame, /*det_size, submod_size, submod_idx,*/ &counters, det, &packet);
+			       lines_per_packet, packets_frame, /*det_size, submod_size, submod_idx,*/ &counters, det, &packet_eiger);
+
+  }
+  else if(strcmp(det.detector_name, "JUNGFRAU") == 0){
+      bpacket = get_put_data16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
+			       lines_per_packet, packets_frame, /*det_size, submod_size, submod_idx,*/ &counters, det, &packet_eiger);
+  }
   /*}
     else if(bit_depth == 32)
       bpacket = get_put_data32(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin,
