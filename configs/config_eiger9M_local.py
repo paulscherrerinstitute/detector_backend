@@ -92,7 +92,6 @@ if rank in RECEIVER_RANKS:
     c.ModuleReceiver.rb_head_file = rb_head_file
     c.ModuleReceiver.rb_imghead_file = rb_imghead_file
     c.ModuleReceiver.rb_imgdata_file = rb_imgdata_file
-
     
 elif rank in SENDERS_RANKS:
     c.DataFlow.nodelist = [

@@ -146,6 +146,7 @@ class ModuleReceiver(DataFlowNode):
             raise RuntimeError("No detector has been selected")
         self.detector.submodule_n  = self.submodule_n
 
+        # FIXME: change to row and columnwise option
         # Column-first numeration
         if self.detector_name == "EIGER":
             mod_indexes = np.array([self.module_index % self.geometry[0], int(self.module_index / self.geometry[0])], dtype=np.int32, order='C')
