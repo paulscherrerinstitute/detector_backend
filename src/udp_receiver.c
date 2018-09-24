@@ -16,7 +16,7 @@
 // for serveraddr
 #include <arpa/inet.h>
 #include <sched.h>
-
+#include "detectors.h"
 
   /*
   Logic:
@@ -116,126 +116,6 @@ typedef struct uint48 {
 } __attribute__((packed)) uint48;
 #endif
 
-// header struct for RB - to be updated to include the framenums of all modules
-
-typedef struct _detector{
-  char detector_name[10];
-  uint8_t submodule_n;
-  int32_t detector_size[2]; 
-  int32_t module_size[2]; 
-  int32_t submodule_size[2]; 
-  int32_t module_idx[2]; 
-  int32_t submodule_idx[2];
-
-} detector;
-
-typedef struct _eiger_header{
-  // Field 0: frame number
-  // Field 1: packets lost
-  // Field 2: packets counter 0-63
-  // Field 3: packets counter 64-127
-  // Field 4: pulse id
-  // Field 5: debug (daq_rec) - gain flag
-  uint64_t framemetadata[8];
-} eiger_header;
-
-/*
-typedef struct _eiger_header{
-  uint64_t framenum;
-  uint16_t packetnum;
-  int8_t padding[64 - 8 - 1];
-} eiger_header;
-*/
-
-#pragma pack(push)
-#pragma pack(2)
-typedef struct _jungfrau_packet16{
-//Jungfrau
-  char emptyheader[6];
-  uint64_t framenum;
-  uint32_t exptime;
-  uint32_t packetnum;
-  //uint64_t bunchid;
-  double bunchid;
-  uint64_t timestamp;
-  uint16_t moduleID;
-  uint16_t xCoord;
-  uint16_t yCoord;
-  uint16_t zCoord;
-  uint32_t debug;
-  uint16_t roundRobin;
-  uint8_t detectortype;
-  uint8_t headerVersion;
-  uint16_t data[4096];
-} jungfrau_packet16;
-#pragma pack(pop)
-
-
-// various structs for eiger packets, one per bit dept
-// 4bits still unsupported!
-typedef struct _eiger_packet8{
-  uint64_t framenum;
-  uint32_t exptime;
-  uint32_t packetnum;
-  uint64_t bunchid;
-  uint64_t timestamp;
-  uint16_t moduleID;
-  uint16_t xCoord;
-  uint16_t yCoord;
-  uint16_t zCoord;
-  uint32_t debug;
-  uint16_t roundRobin;
-  uint8_t detectortype;
-  uint8_t headerVersion;
-  uint8_t data[4096];
-} eiger_packet8;
-
-typedef struct _eiger_packet16{
-#ifdef OLD_HEADER
-  uint32_t subframenum;
-  uint16_t internal1;
-  uint8_t memaddress;
-  uint8_t internal2;
-  uint16_t data[2048];
-  uint48 framenum2;
-  uint16_t packetnum;
-  uint64_t framenum;
-#endif
-#ifndef OLD_HEADER
-  uint64_t framenum;
-  uint32_t exptime;
-  uint32_t packetnum;
-  uint64_t bunchid;
-  uint64_t timestamp;
-  uint16_t moduleID;
-  uint16_t xCoord;
-  uint16_t yCoord;
-  uint16_t zCoord;
-  uint32_t debug;
-  uint16_t roundRobin;
-  uint8_t detectortype;
-  uint8_t headerVersion;
-  uint16_t data[2048];
-#endif
-} eiger_packet16;
-
-
-typedef struct _eiger_packet32{
-  uint64_t framenum;
-  uint32_t exptime;
-  uint32_t packetnum;
-  uint64_t bunchid;
-  uint64_t timestamp;
-  uint16_t moduleID;
-  uint16_t xCoord;
-  uint16_t yCoord;
-  uint16_t zCoord;
-  uint32_t debug;
-  uint16_t roundRobin;
-  uint8_t detectortype;
-  uint8_t headerVersion;
-  uint32_t data[1024];
-} eiger_packet32;
 
 // the essential info needed for a packet
 typedef struct _barebone_packet{
@@ -263,7 +143,7 @@ typedef struct Counter{
 } counter;
 
 
-void initialize_counters(counter *counters, eiger_header *ph, int packets_frame){
+void initialize_counters(counter *counters, rb_header *ph, int packets_frame){
   uint64_t ones = ~((uint64_t)0);
 
   if (counters->recv_packets == 1){
@@ -277,7 +157,6 @@ void initialize_counters(counter *counters, eiger_header *ph, int packets_frame)
 }
 
 int jungfrau_get_message16(int sd, jungfrau_packet16 * packet){
-  
   //jungfrau_packet16 * tp = (jungfrau_packet16*) packet;
   ssize_t nbytes = recv(sd, packet, sizeof(*packet), 0); //MSG_DONTWAIT);
 
@@ -374,7 +253,52 @@ void copy_data(detector det, int line_number, int lines_per_packet, void * p1, v
 }
 
 
-void update_counters(eiger_header * ph, barebone_packet bpacket, int packets_frame, counter *counters){
+bool act_on_new_frame(counter *counters, int packets_frame, barebone_packet *bpacket, 
+                      int *rb_current_slot, int rb_writer_id){
+
+  bool commit_flag=false;
+
+    // this fails in case frame number is not updated by the detector (or its simulation)
+  if(counters->recv_packets == packets_frame && bpacket->framenum == counters->current_frame){
+    //this is the last packet of the frame
+#ifdef DEBUG
+    printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket->packetnum, counters->recv_packets, 
+                                                                    packets_frame, bpacket->framenum, counters->current_frame);
+#endif
+
+    counters->recv_frames++;
+    //counters->recv_packets = 0;
+    counters->current_frame = 0; // this will cause getting a new slot afterwards
+    commit_flag = true; // for committing the slot later
+    counters->lost_frames = 0;
+  }
+  // this means we are in a new frame
+  else if (counters->current_frame != bpacket->framenum){        
+    if(counters->recv_packets != packets_frame && counters->recv_packets != 1){
+      // this means we lost some packets before, and we have a dangling slot. Current frame is set to 0 when a complete frame is committed
+      if(counters->current_frame != 0){
+        if(*rb_current_slot != -1){
+          // add some checks here
+          rb_commit_slot(rb_writer_id, *rb_current_slot);
+        }
+        else
+          printf("[ERROR] I should have been committing a dangling slot, but it is -1\n");
+
+        //do_stats with recv_packets -1
+        counters->lost_frames = packets_frame - (counters->recv_packets - 1);
+      }
+      counters->recv_packets = 1;
+    }
+    counters->current_frame = bpacket->framenum;
+    *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+    while(*rb_current_slot == -1){
+      *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+    }
+  }
+  return commit_flag;
+}
+
+void update_counters(rb_header * ph, barebone_packet bpacket, int packets_frame, counter *counters){
   // updating counters
   ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
   ph->framemetadata[1] = packets_frame - counters->recv_packets;
@@ -389,12 +313,12 @@ void update_counters(eiger_header * ph, barebone_packet bpacket, int packets_fra
 }
 
 
-barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det, int bit_depth){
+barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+  int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
   /*!
     gets the packet data and put it in the correct memory place in the RingBuffer
    */
-  eiger_header * ph;
+  rb_header * ph;
 
   uint16_t * p1;
   int data_len = 0;
@@ -404,77 +328,24 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
   // can pass a void pointer, and dereference in the memory copy - useful?
   uint16_t * data;
   barebone_packet bpacket;
-  jungfrau_packet16 packet_jungfrau;
   eiger_packet16 packet_eiger;
 
-  if (strcmp(det.detector_name, "JUNGFRAU") == 0){
-    data_len = jungfrau_get_message16(sock, &packet_jungfrau);
-    bpacket.data_len = data_len;
-    bpacket.framenum = packet_jungfrau.framenum;
-    bpacket.packetnum = packet_jungfrau.packetnum;
-    data = (uint16_t *)packet_jungfrau.data;
-  }
-  else if (strcmp(det.detector_name, "EIGER") == 0){
-    data_len = get_message16(sock, &packet_eiger);
-    bpacket.data_len = data_len;
-    bpacket.framenum = packet_eiger.framenum;
-    bpacket.packetnum = packet_eiger.packetnum;
-    data = (uint16_t *)packet_eiger.data;
-  }
-  else{
-    // FIXME: improve treatment of this error
-    printf("Detector %s is not supported\n", det.detector_name);
-  }
+  data_len = get_message16(sock, &packet_eiger);
+  bpacket.data_len = data_len;
+  bpacket.framenum = packet_eiger.framenum;
+  bpacket.packetnum = packet_eiger.packetnum;
+  data = (uint16_t *)packet_eiger.data;
+
   // ignoring the special eiger initial packet
   if(data_len <= HEADER_PACKET_SIZE){
     return bpacket;
   }
 
   counters->recv_packets++;
-
-  // this fails in case frame number is not updated by the detector (or its simulation)
-  if(counters->recv_packets == packets_frame && bpacket.framenum == counters->current_frame){
-    //this is the last packet of the frame
-#ifdef DEBUG
-    printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket.packetnum, counters->recv_packets, 
-                                                                    packets_frame, bpacket.framenum, counters->current_frame);
-#endif
-
-    counters->recv_frames++;
-    //counters->recv_packets = 0;
-    counters->current_frame = 0; // this will cause getting a new slot afterwards
-    commit_flag = true; // for committing the slot later
-    counters->lost_frames = 0;
-  }
-  // this means we are in a new frame
-  else if (counters->current_frame != bpacket.framenum){        
-    if(counters->recv_packets != packets_frame && counters->recv_packets != 1){
-      // this means we lost some packets before, 
-      // and we have a dangling slot. Current frame is set to 0 when a complete frame is
-      // committed
-      if(counters->current_frame != 0){
-        if(*rb_current_slot != -1){
-          // add some checks here
-          rb_commit_slot(rb_writer_id, *rb_current_slot);
-        }
-        else
-          printf("[ERROR] I should have been committing a dangling slot, but it is -1\n");
-
-        //do_stats with recv_packets -1
-        counters->lost_frames = packets_frame - (counters->recv_packets - 1);
-      }
-      counters->recv_packets = 1;
-    }
-    counters->current_frame = bpacket.framenum;
-    *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-    while(*rb_current_slot == -1){
-      *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-    }
-  }
-
+  commit_flag = act_on_new_frame(counters, packets_frame, &bpacket, rb_current_slot, rb_writer_id);
   // Data copy
   // getting the pointers in RB for header and data - must be done after slots are committed / assigned
-  ph = (eiger_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
+  ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
   p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
@@ -493,15 +364,84 @@ barebone_packet get_put_data16(int sock, int rb_hbuffer_id, int *rb_current_slot
   initialize_counters(counters, ph, packets_frame);
   
   // First half (up)
+  // notice this is reversed wrt jungfrau
   if((det.submodule_idx[0] == 0 && det.submodule_idx[1] == 0) ||
       (det.submodule_idx[0] == 0 && det.submodule_idx[1] == 1)){
-      copy_data(det, line_number, lines_per_packet, p1, data, 16, -1);
+      copy_data(det, line_number, lines_per_packet, p1, data, 16, 1);
   }
   // the other half
   else{
-      copy_data(det, line_number, lines_per_packet, p1, data, 16, 1);
+      copy_data(det, line_number, lines_per_packet, p1, data, 16, -1);
   }
 
+  // updating counters
+  update_counters(ph, bpacket, packets_frame, counters);
+
+  // commit the slot if this is the last packet of the frame
+  if(commit_flag){
+    if(*rb_current_slot != -1){
+    // add some checks here
+      rb_commit_slot(rb_writer_id, *rb_current_slot);
+    }
+    else
+      printf("[ERROR] I should have been committing a slot, but it is -1\n");
+    commit_flag = false;
+  }
+  return bpacket;
+}
+
+
+barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+  int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
+  /*!
+    gets the packet data and put it in the correct memory place in the RingBuffer
+   */
+  rb_header * ph;
+
+  uint16_t * p1;
+  int data_len = 0;
+  int line_number;
+  bool commit_flag = false;
+
+  // can pass a void pointer, and dereference in the memory copy - useful?
+  uint16_t * data;
+  barebone_packet bpacket;
+  jungfrau_packet16 packet_jungfrau;
+
+  data_len = jungfrau_get_message16(sock, &packet_jungfrau);
+  bpacket.data_len = data_len;
+  bpacket.framenum = packet_jungfrau.framenum;
+  bpacket.packetnum = packet_jungfrau.packetnum;
+  data = (uint16_t *)packet_jungfrau.data;
+
+  // ignoring the special eiger initial packet
+  if(data_len <= HEADER_PACKET_SIZE){
+    return bpacket;
+  }
+
+  counters->recv_packets++;
+  commit_flag = act_on_new_frame(counters, packets_frame, &bpacket, rb_current_slot, rb_writer_id);
+  // Data copy
+  // getting the pointers in RB for header and data - must be done after slots are committed / assigned
+  ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
+  p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  // computing the origin and stride of memory locations
+  ph += mod_number;
+  p1 += mod_origin;
+
+    // assuming packetnum sequence is 1..N
+#ifdef OLD_HEADER
+  line_number = lines_per_packet * (packets_frame - packet.packetnum);
+#endif
+#ifndef OLD_HEADER
+  // assuming packetnum sequence is 0..N-1
+  line_number = lines_per_packet * (packets_frame - bpacket.packetnum - 1);
+#endif
+
+  // initializing - recv_packets already increased above
+  initialize_counters(counters, ph, packets_frame);
+  copy_data(det, line_number, lines_per_packet, p1, data, 16, 1);
+  
   // updating counters
   update_counters(ph, bpacket, packets_frame, counters);
 
@@ -538,8 +478,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   double tdif=-1;
 
   int buffer_length = BUFFER_LENGTH;
-  jungfrau_packet16 packet_jungfrau;
-  eiger_packet16 packet_eiger;
   
   if(strcmp(det.detector_name, "EIGER") == 0){
     buffer_length = BUFFER_LENGTH / 2;
@@ -568,21 +506,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   int mod_number = det.submodule_idx[0] * 2 + det.submodule_idx[1] + 
     det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); //numbering inside the detctor, growing over the x-axis
-//  int mod_number = submod_idx[1] + submod_idx[0] * 2 +
-//    4 * (mod_idx[1] + mod_idx[0] * det_size[1] / mod_size[1]); //numbering inside the detctor, growing over the x-axis
-
-  //JF
-  //int mod_number = det.module_idx[0] + det.module_idx[1] + det.module_idx[0] * ((det.detector_size[1] / det.module_size[1]) -1); //numbering inside the detctor, growing over the x-axis
-  //mod_origin = det_size[1] * mod_idx[0] * mod_size[0] + mod_idx[1] * mod_size[1];
-  //
-
-  /*
-  int mod_number = mod_idx[0] + mod_idx[1] + mod_idx[0] * ((det_size[1] / mod_size[1]) -1); //numbering inside the detctor, growing over the x-axis
-  int lines_per_packet = BUFFER_LENGTH / mod_size[1];
-  
-  int mod_origin = mod_idx[0] * det_size[1] * mod_size[0] + mod_idx[1] * mod_size[1];
-
-  */
 
   packets_frame = det.submodule_size[0] * det.submodule_size[1] / (8 * buffer_length / bit_depth);
   bpacket.data_len = 0;
@@ -623,8 +546,13 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 			     lines_per_packet, packets_frame, det_size, submod_size, submod_idx);
     else if(bit_depth == 16){
       */
-      bpacket = get_put_data16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       lines_per_packet, packets_frame, &counters, det, bit_depth);
+     if (strcmp(det.detector_name, "JUNGFRAU") == 0)
+        bpacket = get_put_data_jf16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
+			       lines_per_packet, packets_frame, &counters, det);
+     else if (strcmp(det.detector_name, "EIGER") == 0){
+        bpacket = get_put_data_eiger16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
+			       lines_per_packet, packets_frame, &counters, det);
+     }
   /*}
     else if(bit_depth == 32)
       bpacket = get_put_data32(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin,
