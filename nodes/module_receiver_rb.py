@@ -19,15 +19,21 @@ from copy import copy
 
 
 class DETECTOR(ctypes.Structure):
-            _fields_ = [
-                ('detector_name', 10 * ctypes.c_char),
-                ('submodule_n', ctypes.c_uint8),
-                ('detector_size', 2 * ctypes.c_int),
-                ('module_size', 2 * ctypes.c_int),
-                ('submodule_size', 2 * ctypes.c_int),
-                ('module_idx', 2 * ctypes.c_int),
-                ('submodule_idx', 2 * ctypes.c_int),
-            ]
+    _fields_ = [
+        ('detector_name', 10 * ctypes.c_char),
+        ('submodule_n', ctypes.c_uint8),
+        ('detector_size', 2 * ctypes.c_int),
+        ('module_size', 2 * ctypes.c_int),
+        ('submodule_size', 2 * ctypes.c_int),
+        ('module_idx', 2 * ctypes.c_int),
+        ('submodule_idx', 2 * ctypes.c_int),
+        ('gap_px_chips', 2 * ctypes.c_uint16),
+        ('gap_px_modules', 2 * ctypes.c_uint16),
+    ]
+
+    gap_px_chips = [0, 0]
+    gap_px_modules = [0, 0]
+
 
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
@@ -105,8 +111,8 @@ class ModuleReceiver(DataFlowNode):
     submodule_n = Int(1, config=True)
     submodule_index = Int(0, config=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
 
-    gap_px_chip = List((0, 0), config=True)  # possibly not used
-    gap_px_module = List((0, 0), config=True)
+    gap_px_chips = List((0, 0), config=True)  # possibly not used
+    gap_px_modules = List((0, 0), config=True)
 
     bit_depth = Int(16, config=True, help="")
     n_frames = Int(-1, config=True, help="Frames to receive")
@@ -154,8 +160,8 @@ class ModuleReceiver(DataFlowNode):
         else:
             mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
     
-        if self.detector_size == [-1, -1]:
-            self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+        #if self.detector_size == [-1, -1]:
+        #    self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
 
         self.detector.detector_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
         self.detector.module_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
@@ -164,6 +170,9 @@ class ModuleReceiver(DataFlowNode):
         self.detector.submodule_size = copy(np.ctypeslib.as_ctypes(np.array(self.submodule_size, dtype=np.int32, order='C')))
         self.detector.submodule_idx = copy(np.ctypeslib.as_ctypes(np.array([int(self.submodule_index / 2), self.submodule_index % 2], dtype=np.int32, order='C')))
         
+        self.detector.gap_px_chips = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_chips, dtype=np.uint16, order="C")))
+        self.detector.gap_px_modules = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_modules, dtype=np.uint16, order="C")))
+
         self.log.info("%s PID: %d IP: %s:%d" % (self.name, os.getpid(), self.ip, self.port))
         # for setting up barriers
         app = XblBaseApplication.instance()

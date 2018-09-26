@@ -32,15 +32,16 @@ detector_name = "EIGER"
 submodule_n = 4
 GEOMETRY = [6, 3]
 module_size = [512, 1024]
-#gap_chips = [2, 2]
-#gap_modules = [36, 8]
+gap_chips = [2, 2]
+gap_modules = [36, 8]
 gap_chips = [0, 0]
 gap_modules = [0, 0]
 #module_size_wgaps = [module_size[0] + gap_chips[0], module_size[1] + gap_chips[1] + 4]
 module_size_wgaps = [module_size[0], module_size[1]]
-detector_size = [module_size_wgaps[0] * GEOMETRY[0], module_size_wgaps[1] * GEOMETRY[1]]
-detector_size = [(GEOMETRY[0] - 1) * gap_modules[0] + detector_size[0],
-                 (GEOMETRY[1] - 1) * gap_modules[1] + detector_size[1]]
+detector_size = [(GEOMETRY[0] - 1) * gap_modules[0] + module_size_wgaps[0] * GEOMETRY[0], 
+                (GEOMETRY[1] - 1) * gap_modules[1] + module_size_wgaps[1] * GEOMETRY[1]]
+#detector_size = [(GEOMETRY[0] - 1) * gap_modules[0] + detector_size[0],
+#                 (GEOMETRY[1] - 1) * gap_modules[1] + detector_size[1]]
 
 c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y
 c.ModuleReceiver.module_size = module_size
@@ -92,7 +93,9 @@ if rank in RECEIVER_RANKS:
     c.ModuleReceiver.rb_head_file = rb_head_file
     c.ModuleReceiver.rb_imghead_file = rb_imghead_file
     c.ModuleReceiver.rb_imgdata_file = rb_imgdata_file
-    
+    c.ModuleReceiver.gap_px_chips = gap_chips
+    c.ModuleReceiver.gap_px_modules = gap_modules
+
 elif rank in SENDERS_RANKS:
     c.DataFlow.nodelist = [
         ('ZMQ', 'module_zmq.ZMQSender'),

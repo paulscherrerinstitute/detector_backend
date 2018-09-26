@@ -104,11 +104,12 @@ commit_flag
 //#define GAP_PX_MODULES_Y 36
 */
 
+/*
 #define GAP_PX_CHIPS_X 0
 #define GAP_PX_CHIPS_Y 0
 #define GAP_PX_MODULES_X 0
 #define GAP_PX_MODULES_Y 0
-
+*/
 // only needed for the old UDP eader
 #ifdef OLD_HEADER
 typedef struct uint48 {
@@ -218,6 +219,7 @@ int get_message32(int sd, eiger_packet32 * packet){
   return nbytes;
 }
 
+
 void copy_data(detector det, int line_number, int lines_per_packet, void * p1, void * data, int bit_depth, int reverse){
   int int_line = 0;
   int data_len = 0;
@@ -234,7 +236,7 @@ void copy_data(detector det, int line_number, int lines_per_packet, void * p1, v
 
         memcpy((uint16_t *) p1 + (reverse_factor + reverse * i) * det.detector_size[1],
           (uint16_t *) data + int_line * det.submodule_size[1], data_len / 2);
-        memcpy((uint16_t *)p1 + (reverse_factor + reverse * i) * det.detector_size[1] + GAP_PX_CHIPS_Y + det.submodule_size[1] / 2,
+        memcpy((uint16_t *)p1 + (reverse_factor + reverse * i) * det.detector_size[1] + det.gap_px_chips[1] + det.submodule_size[1] / 2,
           (uint16_t *)data + int_line * det.submodule_size[1] + det.submodule_size[1] / 2, data_len / 2);
         int_line ++;
         }
@@ -440,7 +442,7 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
 
   // initializing - recv_packets already increased above
   initialize_counters(counters, ph, packets_frame);
-  copy_data(det, line_number, lines_per_packet, p1, data, 16, 1);
+  copy_data(det, line_number, lines_per_packet, p1, data, 16, -1);
   
   // updating counters
   update_counters(ph, bpacket, packets_frame, counters);
@@ -494,15 +496,15 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   // Origin of the module within the detector, (0, 0) is bottom left
   uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
-  mod_origin += det.module_idx[1] * ((det.submodule_n - 1) * GAP_PX_CHIPS_Y + GAP_PX_MODULES_Y); // inter_chip gaps plus inter_module gap
-  mod_origin += det.module_idx[0] * (GAP_PX_CHIPS_X + GAP_PX_MODULES_X)* det.detector_size[1] ; // inter_chip gaps plus inter_module gap
+  mod_origin += det.module_idx[1] * ((det.submodule_n - 1) * det.gap_px_chips[1] + det.gap_px_modules[1]); // inter_chip gaps plus inter_module gap
+  mod_origin += det.module_idx[0] * (det.gap_px_chips[0] + det.gap_px_modules[0])* det.detector_size[1] ; // inter_chip gaps plus inter_module gap
 
   // Origin of the submodule within the detector, relative to module origin
   mod_origin += det.detector_size[1] * det.submodule_idx[0] * det.submodule_size[0] + det.submodule_idx[1] * det.submodule_size[1];
   if(det.submodule_idx[1] != 0)
-    mod_origin += 2 * GAP_PX_CHIPS_Y;  // 2* because there is the inter-quartermodule chip gap //GAP_PX_CHIPS_Y * submod_idx[1]; // the last takes into account extra space for chip gap within quarter module
+    mod_origin += 2 * det.gap_px_chips[1];  // 2* because there is the inter-quartermodule chip gap //GAP_PX_CHIPS_Y * submod_idx[1]; // the last takes into account extra space for chip gap within quarter module
   if(det.submodule_idx[0] != 0)
-    mod_origin += det.submodule_idx[0] * det.detector_size[1] * GAP_PX_CHIPS_X;
+    mod_origin += det.submodule_idx[0] * det.detector_size[1] * det.gap_px_chips[0];
 
   int mod_number = det.submodule_idx[0] * 2 + det.submodule_idx[1] + 
     det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); //numbering inside the detctor, growing over the x-axis

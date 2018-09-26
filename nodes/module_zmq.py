@@ -188,8 +188,8 @@ class ZMQSender(DataFlowNode):
 
     def __init__(self, **kwargs):
         super(ZMQSender, self).__init__(**kwargs)
-        if self.detector_size == [-1, -1]:
-            self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+        #if self.detector_size == [-1, -1]:
+        #    self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
 
         app = XblBaseApplication.instance()
         self.worker_communicator = app.worker_communicator
@@ -501,8 +501,10 @@ class ZMQSender(DataFlowNode):
 
             try:
                 send_array(self.skt, data, metadata={"frame": framenum, 
-                                                     "is_good_frame": int(is_good_frame), "daq_rec": daq_rec, "pulse_id": pulseid, "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, 
-                                                     "pulse_id_diff": [pulseids[0] - i for i in pulseids], "framenum_diff": [framenums[0] - i for i in framenums], 
+                                                     "is_good_frame": int(is_good_frame), "daq_rec": daq_rec, "pulse_id": pulseid, 
+                                                     "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, 
+                                                     "pulse_id_diff": [pulseids[0] - i for i in pulseids], 
+                                                     "framenum_diff": [framenums[0] - i for i in framenums], 
                                                      "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], 
                                                      "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)],
                                                      "module_number": mod_numbers,

@@ -33,7 +33,7 @@ mpi_size = comm.Get_size()
 rank = mpi_rank
 size = mpi_size - 2
 
-GEOMETRY = [2, 2]
+GEOMETRY = [1, 1]
 #c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y
 module_size = [512, 1024]
 gap_chips = [2, 2]
