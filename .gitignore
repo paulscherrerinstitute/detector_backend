@@ -1,5 +1,7 @@
 *.pyc
 libudpreceiver.so
 *.dat
-*.npy
 __pycache__
+*~
+*.log
+tests/*.npy

@@ -73,6 +73,7 @@ if rank in RECEIVER_RANKS:
     c.ModuleReceiver.geometry = geometry
     c.ModuleReceiver.module_size = module_size
     c.ModuleReceiver.module_index = rank # FIXME
+    c.ModuleReceiver.detector_name = "JUNGFRAU"
 
 elif rank in SENDERS_RANKS:
     c.DataFlow.nodelist = [

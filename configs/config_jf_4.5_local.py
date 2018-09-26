@@ -13,7 +13,7 @@ import logging
 c = get_config()  # @UndefinedVariable
 
 
-
+detector_name = "JUNGFRAU"
 rb_fdir = "/dev/shm/rb/"
 #rb_fdir = "/mnt/north/"
 rb_head_file = rb_fdir + "rb_header.dat"
@@ -74,7 +74,7 @@ if rank in RECEIVER_RANKS:
     ]
     c.DataFlow.targets_per_node = { 'RECV' : []}
 
-    #c.ModuleReceiver.ip = "192.168.10.10"
+    c.ModuleReceiver.detector_name = detector_name
     c.ModuleReceiver.ip = ip[rank]
     c.ModuleReceiver.port = port[rank]
 

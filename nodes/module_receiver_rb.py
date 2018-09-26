@@ -18,6 +18,23 @@ from time import time, sleep
 from copy import copy
 
 
+class DETECTOR(ctypes.Structure):
+    _fields_ = [
+        ('detector_name', 10 * ctypes.c_char),
+        ('submodule_n', ctypes.c_uint8),
+        ('detector_size', 2 * ctypes.c_int),
+        ('module_size', 2 * ctypes.c_int),
+        ('submodule_size', 2 * ctypes.c_int),
+        ('module_idx', 2 * ctypes.c_int),
+        ('submodule_idx', 2 * ctypes.c_int),
+        ('gap_px_chips', 2 * ctypes.c_uint16),
+        ('gap_px_modules', 2 * ctypes.c_uint16),
+    ]
+
+    gap_px_chips = [0, 0]
+    gap_px_modules = [0, 0]
+
+
 BUFFER_LENGTH = 4096
 DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
 HEADER_ARRAY = ctypes.c_char * 6
@@ -29,7 +46,11 @@ try:
     _mod = ctypes.cdll.LoadLibrary(os.path.dirname(os.path.realpath(__file__)) + "/../libudpreceiver.so")
 
     put_data_in_rb = _mod.put_data_in_rb
-    put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, 2 * ctypes.c_int32, ctypes.c_int32)
+    put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                 ctypes.c_int16,
+                                 ctypes.c_float, DETECTOR)
+    put_data_in_rb.restype = ctypes.c_int
+
     put_data_in_rb.restype = ctypes.c_int
 except:
     print(os.path.dirname(os.path.realpath(__file__)) + "/../libudpreceiver.so")
@@ -82,11 +103,16 @@ class ModuleReceiver(DataFlowNode):
     ip = Unicode('192.168.10.10', config=True, help="Ip to listen to for UDP packets")
     port = Int(9000, config=True, help="Port to listen to for UDP packets")
     module_size = List((512, 1024), config=True)
+    submodule_size = List((512, 1024), config=True)
     geometry = List((1, 1), config=True)
     module_index = Int(0, config=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
+    detector_size = List((-1, -1), config=True)
+    detector_name = Unicode('', config=True)
+    submodule_n = Int(1, config=True)
+    submodule_index = Int(0, config=True, help="Index within the detector, in the form of e.g. [[0,1,2,3][4,5,6,7]]")
 
-    gap_px_chip = List((0, 0), config=True)  # possibly not used
-    gap_px_module = List((0, 0), config=True)
+    gap_px_chips = List((0, 0), config=True)  # possibly not used
+    gap_px_modules = List((0, 0), config=True)
 
     bit_depth = Int(16, config=True, help="")
     n_frames = Int(-1, config=True, help="Frames to receive")
@@ -120,7 +146,32 @@ class ModuleReceiver(DataFlowNode):
     
     def __init__(self, **kwargs):
         super(ModuleReceiver, self).__init__(**kwargs)
-        self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+        self.detector = DETECTOR()
+        self.detector.detector_name = self.detector_name
+        if self.detector_name == "":
+            raise RuntimeError("No detector has been selected")
+        self.detector.submodule_n  = self.submodule_n
+
+        # FIXME: change to row and columnwise option
+        # Column-first numeration
+        if self.detector_name == "EIGER":
+            mod_indexes = np.array([self.module_index % self.geometry[0], int(self.module_index / self.geometry[0])], dtype=np.int32, order='C')
+        # Row-first numeration
+        else:
+            mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
+    
+        #if self.detector_size == [-1, -1]:
+        #    self.detector_size = [self.module_size[0] * self.geometry[0], self.module_size[1] * self.geometry[1]]
+
+        self.detector.detector_size = np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C'))
+        self.detector.module_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
+        self.detector.module_idx = copy(np.ctypeslib.as_ctypes(mod_indexes))
+
+        self.detector.submodule_size = copy(np.ctypeslib.as_ctypes(np.array(self.submodule_size, dtype=np.int32, order='C')))
+        self.detector.submodule_idx = copy(np.ctypeslib.as_ctypes(np.array([int(self.submodule_index / 2), self.submodule_index % 2], dtype=np.int32, order='C')))
+        
+        self.detector.gap_px_chips = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_chips, dtype=np.uint16, order="C")))
+        self.detector.gap_px_modules = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_modules, dtype=np.uint16, order="C")))
 
         self.log.info("%s PID: %d IP: %s:%d" % (self.name, os.getpid(), self.ip, self.port))
         # for setting up barriers
@@ -169,21 +220,17 @@ class ModuleReceiver(DataFlowNode):
 
         # cframenum = ctypes.c_uint16(-1)
         # as C time() is seconds
-        self.timeout = 1  #ctypes.c_int(max(int(2. * self.period), 1))
+        self.timeout = 1.0  #ctypes.c_int(max(int(2. * self.period), 1))
         #self.log.info("Timeout is %d" % self.timeout.value)
 
         # without the copy it seems that it is possible to point to the last allocated memory array
-        mod_indexes = np.array([int(self.module_index / self.geometry[1]), self.module_index % self.geometry[1]], dtype=np.int32, order='C')
-        det_size = copy(np.ctypeslib.as_ctypes(np.array(self.detector_size, dtype=np.int32, order='C')))
-        mod_size = copy(np.ctypeslib.as_ctypes(np.array(self.module_size, dtype=np.int32, order='C')))
-        mod_idx = copy(np.ctypeslib.as_ctypes(mod_indexes))
-        gap_px_chip_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_chip, dtype=np.int32, order='C')))
-        gap_px_module_c = copy(np.ctypeslib.as_ctypes(np.array(self.gap_px_module, dtype=np.int32, order='C')))
+        n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, self.rb_current_slot, 
+                                        self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id, 
+                                        self.n_frames, 
+                                        self.timeout,
+                                        self.detector
+                                        )
 
-        # calling the C function, which is an infinite loop with timeout
-        n_recv_frames = put_data_in_rb(self.sock.fileno(), self.bit_depth, ctypes.byref(self.rb_current_slot),
-                                       self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id, self.rb_writer_id,
-                                       self.n_frames, self.total_modules, det_size, mod_size, mod_idx, gap_px_chip_c, gap_px_module_c, self.timeout)
 
         #if self.rb_current_slot.value != -1:
         self.log.debug("Current slot: %d" % self.rb_current_slot.value)
@@ -195,7 +242,9 @@ class ModuleReceiver(DataFlowNode):
         #if rb.get_buffer_slot(self.rb_writer_id) == -1:
         #    self.log.error("Was not able to get a buffer slot: is Ringbuffer full???")
 
-        #self.log.info("Received %d frames" % n_recv_frames)
+        if n_recv_frames != 0:
+            self.log.info("Received %d frames" % n_recv_frames)
+
         self.pass_on(n_recv_frames)
         # needed
         return(n_recv_frames)
@@ -232,6 +281,7 @@ class ModuleReceiver(DataFlowNode):
             self.log.info("RB slots: %d" % nslots)
             self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
             self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+
         self.rb_current_slot = ctypes.c_int(-1)
 
         self.n_packets_frame = 128

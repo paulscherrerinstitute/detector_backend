@@ -1,10 +1,16 @@
 """
-mpirun -n 4 mpi-dafld --config-file config_mpi.py
+# single module
+mpirun -n 7 mpi-dafld --config-file config_eiger.py
+
+# 1.5
+mpirun -n 15 mpi-dafld --config-file config_eiger.py
 """
 
 
 import sys
-new_path = '/home/l_det/code/dafl.psieiger'
+new_path = '/home/l_det/Work/dafl.psieiger/nodes'
+#new_path = '/home/l_sala/code/dafl.psieiger/nodes'
+#new_path = '/home/sala/Work/GIT/psi/HPDI/dafl.psieiger/nodes'
 if new_path not in sys.path:
     sys.path.append(new_path)
 
@@ -13,8 +19,11 @@ import logging
 c = get_config()  # @UndefinedVariable
 
 
+import mpi4py
 
 from mpi4py import MPI
+
+#mpi4py.profile(logfile="test")
 comm = MPI.COMM_WORLD
 
 # rank (size - 1)  runs the rest gateway, rank (size -2) runs the bulletin board - ignore both and decrease size by two
@@ -24,31 +33,31 @@ mpi_size = comm.Get_size()
 rank = mpi_rank
 size = mpi_size - 2
 
-RECEIVER_RANKS = [0, 1, 2, 3]
-SENDERS_RANKS = [4, ]
+GEOMETRY = [1, 1]
+c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y
+module_size = [512, 1024]
 
-print(rank, size)
-#supported_mpi_sizes = [3, ]
-#if mpi_size not in supported_mpi_sizes:
-#    raise ValueError("mpi size (number of mpi processes) must be in %s" % supported_mpi_sizes)
+#c.ModuleReceiver.bit_depth = 16
+#c.ZMQSender.bit_depth = 16
+c.ZMQSender.detector_size = [module_size[0] * GEOMETRY[0], module_size[1] * GEOMETRY[1]]
 
-c.BulletinBoardClient.prefix = u'backend'
-c.BulletinBoardClient.postfix = str(rank)
-#c.DataFlow.maxelements = 42
-c.DataFlow.log_level = 'INFO'
 
-c.ModuleReceiver.geometry = (1, 1)  # number of modules, x and y 
-c.ModuleReceiver.bit_depth = 16
-c.ZMQSender.bit_depth = 16
+RECEIVER_RANKS = [x for x in range(4 * c.ModuleReceiver.geometry[0] * c.ModuleReceiver.geometry[1])]  # [0, 1, 2, 3]
+SENDERS_RANKS = [RECEIVER_RANKS[-1] +  1, ]
+
 
 n_modules = c.ModuleReceiver.geometry[0] * c.ModuleReceiver.geometry[1]
-receiver_ips = 2 * ["10.0.30.200"] + 2 * ["10.0.40.200"]
-receiver_ports = [50001, 50002, 50004, 50003] #[50001 + i for i in range(4 * n_modules)]
+receiver_ips = 2 * ["10.0.30.210"] + 2 * ["10.0.30.210"]
+receiver_ips = n_modules * receiver_ips
+# submodule numeration differs from the one in the setup file
+receiver_ports = [50001 + i for i in range(4)]
+# receiver_ports[2:] = receiver_ports[:1:-1]
+for m in range(1, n_modules):
+    receiver_ports += [i + m*4 for i in receiver_ports[:4]]
 submodule_index = n_modules * [0, 1, 2, 3]
 
 # Ring Buffers settings
 rb_writers_id = range(len(RECEIVER_RANKS))
-rb_followers_id = SENDERS_RANKS
 #rb_followers_id = []
 rb_fdir = "/dev/shm/eiger/"
 rb_head_file = rb_fdir + "rb_header.dat"
@@ -68,32 +77,39 @@ if rank in RECEIVER_RANKS:
     c.ModuleReceiver.ip = receiver_ips[rank]
     c.ModuleReceiver.port = receiver_ports[rank]
     c.ModuleReceiver.submodule_index = submodule_index[rank]
+    c.ModuleReceiver.module_index = int(rank / 4)
     c.ModuleReceiver.rb_id = rb_writers_id[rank]
-    c.ModuleReceiver.rb_followers = rb_followers_id
+    c.ModuleReceiver.rb_followers = SENDERS_RANKS
     c.ModuleReceiver.rb_head_file = rb_head_file
     c.ModuleReceiver.rb_imghead_file = rb_imghead_file
-    c.ModuleReceiver.rb_imgdata_file = rb_imgdata_file    
+    c.ModuleReceiver.rb_imgdata_file = rb_imgdata_file
 
+    
 elif rank in SENDERS_RANKS:
     c.DataFlow.nodelist = [
         ('ZMQ', 'module_zmq.ZMQSender'),
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
-    c.ZMQSender.uri = "tcp://10.0.30.200:9999"
+    #c.ZMQSender.uri = "tcp://10.0.30.210:9999"
+    c.ZMQSender.uri = "tcp://127.0.0.1:40000"
     c.ZMQSender.socket_type = "PUB"
     c.ZMQSender.rb_id = rank
-    c.ZMQSender.ModuleReceiver.rb_followers = rb_writers_id
+    c.ZMQSender.rb_followers = rb_writers_id
     c.ZMQSender.rb_head_file = rb_head_file
     c.ZMQSender.rb_imghead_file = rb_imghead_file
     c.ZMQSender.rb_imgdata_file = rb_imgdata_file
 
     
+c.BulletinBoardClient.prefix = u'backend'
+c.BulletinBoardClient.postfix = str(rank)
+#c.DataFlow.maxelements = 42
+c.DataFlow.log_level = 'INFO'
 
 c.RestGWApplication.rest_port = 8080
 c.RestGWApplication.rest_host = u'0.0.0.0'   # pass u'0.0.0.0' to listen on all interfaces
 c.RestGWApplication.trace_rest = True
 c.RPCBulletinBoardApplication.trace_metrics = True
-c.RPCDataflowApplication.initialize_dataflow_on_startup = False
+c.RPCDataflowApplication.initialize_dataflow_on_startup = True
 # =============================================================================================
 debug = dict(level='DEBUG')
 info  = dict(level='INFO')
@@ -103,13 +119,9 @@ log_config = dict( loggers =
                    {
                        'RestGWApplication' :           undef,
                        'RPCDataflowApplication' :      undef,
-                       #'RPCBulletinBoardApplication' : info,
-                       #'MPIReceivingConnection' :      debug,
-                       #'MPISendingConnection' :        debug,
-                       #'MPIRPCConnection' :            debug,
                        'DataFlow' :                    undef,
                        'ZMQSender':                    info,
-                       'ModuleReceiver':                 info,
+                       'ModuleReceiver':                 debug,
                    }
 )
 
