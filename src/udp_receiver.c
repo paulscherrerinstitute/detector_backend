@@ -414,6 +414,7 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   int data_len = 0;
   int line_number;
   bool commit_flag = false;
+  int packet_length = 8246;
 
   // can pass a void pointer, and dereference in the memory copy - useful?
   uint16_t * data;
@@ -427,7 +428,7 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   data = (uint16_t *)packet_jungfrau.data;
 
   // ignoring the special eiger initial packet
-  if(data_len <= HEADER_PACKET_SIZE){
+  if(data_len <= packet_lenght){
     return bpacket;
   }
 
