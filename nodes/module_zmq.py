@@ -58,8 +58,6 @@ def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
     metadata["type"] = str(A.dtype)
     metadata["shape"] = A.shape
 
-    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", metadata)
-
     socket.send_json(metadata, flags | zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
@@ -228,6 +226,7 @@ class ZMQSender(DataFlowNode):
 
         self.recv_frames = 0
 
+        print(self.detector_size)
         self.gain_corrections = np.ones((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_mask = np.zeros((self.detector_size[0], self.detector_size[1]), dtype=np.int16)

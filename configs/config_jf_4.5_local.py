@@ -52,6 +52,24 @@ size = mpi_size - 2
 geometry = [1, 9]
 module_size = [512, 1024]
 
+#gap_chips = [2, 2]
+#gap_modules = [36, 8]
+gap_chips = [0, 0]
+gap_modules = [0, 0]
+#module_size_wgaps = [module_size[0] + gap_chips[0], module_size[1] + gap_chips[1] + 4]
+module_size_wgaps = [module_size[0], module_size[1]]
+detector_size = [(geometry[0] - 1) * gap_modules[0] + module_size_wgaps[0] * geometry[0], 
+                (geometry[1] - 1) * gap_modules[1] + module_size_wgaps[1] * geometry[1]]
+#detector_size = [(GEOMETRY[0] - 1) * gap_modules[0] + detector_size[0],
+#                 (GEOMETRY[1] - 1) * gap_modules[1] + detector_size[1]]
+
+c.ModuleReceiver.geometry = geometry  # number of modules, x and y
+c.ModuleReceiver.module_size = module_size
+c.ModuleReceiver.detector_size = detector_size
+c.ZMQSender.module_size = module_size
+c.ZMQSender.detector_size = detector_size
+
+
 RECEIVER_RANKS = [i for i in range(9)]
 SENDERS_RANKS = [RECEIVER_RANKS[-1] + 1]
 #ip = 3 * ["10.30.10.3", ]
