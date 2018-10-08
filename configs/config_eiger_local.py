@@ -9,7 +9,7 @@ mpirun -n 15 mpi-dafld --config-file config_eiger.py
 
 import sys
 #new_path = '/home/l_det/Work/dafl.psieiger/nodes'
-new_path = '/home/sala/Work/GIT/psi/HPDI/dafl.psieiger/nodes'
+new_path = '../nodes'
 new_path
 if new_path not in sys.path:
     sys.path.append(new_path)
@@ -33,7 +33,7 @@ mpi_size = comm.Get_size()
 rank = mpi_rank
 size = mpi_size - 2
 
-GEOMETRY = [1, 1]
+GEOMETRY = [6, 3]
 #c.ModuleReceiver.geometry = GEOMETRY  # number of modules, x and y
 module_size = [512, 1024]
 gap_chips = [2, 2]
@@ -107,7 +107,7 @@ elif rank in SENDERS_RANKS:
         ('ZMQ', 'module_zmq.ZMQSender'),
     ]
     c.DataFlow.targets_per_node = { 'ZMQ' : []}
-    c.ZMQSender.uri = "tcp://127.0.0.1:9999"
+    c.ZMQSender.uri = "tcp://127.0.0.1:40000"
     c.ZMQSender.socket_type = "PUSH"
     c.ZMQSender.rb_id = rank
     c.ZMQSender.rb_followers = rb_writers_id

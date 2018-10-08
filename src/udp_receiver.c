@@ -180,7 +180,7 @@ int get_message8(int sd, eiger_packet8 * packet){
   
 #ifdef DEBUG
   if(nbytes > HEADER_PACKET_SIZE){
-    printf("[UDPRECEIVER][%d] framenum: %llu packetnum: %i\n", getpid(), packet->framenum, packet->packetnum);
+    printf("[UDPRECEIVER][%d] framenum: %lu packetnum: %i\n", getpid(), packet->framenum, packet->packetnum);
   }
 #endif
   return nbytes;
@@ -213,7 +213,7 @@ int get_message32(int sd, eiger_packet32 * packet){
     
 #ifdef DEBUG
   if(nbytes > HEADER_PACKET_SIZE){
-    printf("[UDPRECEIVER][%d] framenum: %llu packetnum: %i\n", getpid(), packet->framenum, packet->packetnum);
+    printf("[UDPRECEIVER][%d] framenum: %lu packetnum: %i\n", getpid(), packet->framenum, packet->packetnum);
   }
 #endif
   return nbytes;
@@ -274,7 +274,7 @@ bool act_on_new_frame(counter *counters, int packets_frame, barebone_packet *bpa
     commit_flag = true; // for committing the slot later
     counters->lost_frames = 0;
   }
-  // this means we are in a new frame
+  // this means we are in a new frame (first one included)
   else if (counters->current_frame != bpacket->framenum){        
     if(counters->recv_packets != packets_frame && counters->recv_packets != 1){
       // this means we lost some packets before, and we have a dangling slot. Current frame is set to 0 when a complete frame is committed
@@ -317,6 +317,8 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int packets_frame,
 
 barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
+  // if less than this, drop the packet
+  int packet_length = 4144;
   /*!
     gets the packet data and put it in the correct memory place in the RingBuffer
    */
@@ -339,9 +341,17 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   data = (uint16_t *)packet_eiger.data;
 
   // ignoring the special eiger initial packet
-  if(data_len <= HEADER_PACKET_SIZE){
+  if(data_len != packet_length){
     return bpacket;
   }
+
+  // claim a slot the first packet received
+  //printf("Got new slot %d\n", *rb_current_slot);
+  //while(*rb_current_slot == -1){
+   //   *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+   // printf("Got new slot %d\n", *rb_current_slot);
+  //}
+  //printf("Got new slot %d\n", *rb_current_slot);
 
   counters->recv_packets++;
   commit_flag = act_on_new_frame(counters, packets_frame, &bpacket, rb_current_slot, rb_writer_id);
@@ -480,7 +490,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   double tdif=-1;
 
   int buffer_length = BUFFER_LENGTH;
-  
+
   if(strcmp(det.detector_name, "EIGER") == 0){
     buffer_length = BUFFER_LENGTH / 2;
   }
@@ -524,7 +534,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   gettimeofday(&tv_start, NULL);
 
-  printf("[UDPRECEIVER][%d] entered at %.3f s\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec));
+  printf("[UDPRECEIVER][%d] entered at %.3f s slot %d\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec), rb_current_slot);
   // infinite loop, with timeout
 
   
@@ -571,8 +581,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
       if (timeout_i > (double)timeout){
         // flushes the last message, in case the last frame lost packets
-        printf("breaking timeout after %f ms\n", timeout_i);
-        printf("[UDPRECEIVER][%d] left at %.3f s\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec));
+        //printf("breaking timeout after %f ms\n", timeout_i);
+        printf("[UDPRECEIVER][%d] left at %.3f s slot %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), 
+                                                            rb_current_slot);
 
         if(rb_current_slot != -1){
           rb_commit_slot(rb_writer_id, rb_current_slot);
