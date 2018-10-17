@@ -58,8 +58,6 @@ def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
     metadata["type"] = str(A.dtype)
     metadata["shape"] = A.shape
 
-    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", metadata)
-
     socket.send_json(metadata, flags | zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
@@ -119,7 +117,11 @@ class ZMQSender(DataFlowNode):
     name = Unicode("ZMQSender", config=True)
     uri = Unicode('tcp://192.168.10.1:9999', config=True, help="URI which binds for ZMQ")
     socket_type = Unicode('PUB', config=True, help="ZMQ socket type")
+
     send_every_s = Float(0, config=True, help="send every n second")
+    send_modulo = Int(0, config=True, help="Send on modulo. 0 for turning off.")
+    send_modulo_offset = Int(0, config=True, help="Offset to add to the modulo calculation. Default: 0.")
+
     module_size = List((512, 1024), config=True)
     exp_module_size = List((0, 0), config=True) 
     expand_gaps = Bool(True, config=True)
@@ -228,6 +230,7 @@ class ZMQSender(DataFlowNode):
 
         self.recv_frames = 0
 
+        print(self.detector_size)
         self.gain_corrections = np.ones((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
         self.pede_mask = np.zeros((self.detector_size[0], self.detector_size[1]), dtype=np.int16)
@@ -440,15 +443,26 @@ class ZMQSender(DataFlowNode):
             if self.reset_framenum:
                 framenum -= self.first_frame
 
+            self.recv_frames += 1
+
             # TODO: use milliseconds
             if self.send_every_s != 0:
                 if framenum != 0 and (time() - self.send_time) < self.send_every_s:
-                    self.recv_frames += 1
+
                     if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
-                        self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
+                        self.log.error("RINGBUFFER: CANNOT COMMIT SLOT on send_every_s.")
+
                     continue
 
-            self.recv_frames += 1
+            # TODO: Modulo currently works on the consequtive received frame - pulse_id for JF?
+            elif self.send_modulo != 0:
+                if (self.recv_frames + self.send_modulo_offset) % self.send_modulo:
+
+                    if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
+                        self.log.error("RINGBUFFER: CANNOT COMMIT SLOT on send_modulo.")
+
+                    continue
+
             self.send_time = time()
 
             # check if packets are missing
