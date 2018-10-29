@@ -540,7 +540,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   gettimeofday(&tv_start, NULL);
 
-  printf("[UDPRECEIVER][%d] entered at %.3f s slot %d\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec), rb_current_slot);
+  //printf("[UDPRECEIVER][%d] entered at %.3f s slot %d\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec), rb_current_slot);
   // infinite loop, with timeout
 
   
@@ -588,8 +588,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       if (timeout_i > (double)timeout){
         // flushes the last message, in case the last frame lost packets
         //printf("breaking timeout after %f ms\n", timeout_i);
-        printf("[UDPRECEIVER][%d] left at %.3f s slot %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), 
-                                                            rb_current_slot);
+        //printf("[UDPRECEIVER][%d] left at %.3f s slot %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), 
+        //                                                    rb_current_slot);
 
         if(rb_current_slot != -1){
           rb_commit_slot(rb_writer_id, rb_current_slot);

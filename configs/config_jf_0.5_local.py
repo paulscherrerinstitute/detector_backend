@@ -13,7 +13,7 @@ import logging
 c = get_config()  # @UndefinedVariable
 
 
-
+detector_name = "JUNGFRAU"
 rb_fdir = "/dev/shm/rb/"
 #rb_fdir = "/mnt/north/"
 rb_head_file = rb_fdir + "rb_header.dat"
@@ -31,8 +31,8 @@ info  = dict(level='INFO')
 undef = dict(level=0)
 
 log_config = dict(loggers = {
-    'ModuleReceiver': debug,
-    'ZMQSender': debug}
+    'ModuleReceiver': info,
+    'ZMQSender': info}
 )
 
 c.XblBaseApplication.log_config = log_config
@@ -52,11 +52,29 @@ size = mpi_size - 2
 geometry = [1, 1]
 module_size = [512, 1024]
 
-RECEIVER_RANKS = [i for i in range(1)]
+#gap_chips = [2, 2]
+#gap_modules = [36, 8]
+gap_chips = [0, 0]
+gap_modules = [0, 0]
+#module_size_wgaps = [module_size[0] + gap_chips[0], module_size[1] + gap_chips[1] + 4]
+module_size_wgaps = [module_size[0], module_size[1]]
+detector_size = [(geometry[0] - 1) * gap_modules[0] + module_size_wgaps[0] * geometry[0], 
+                (geometry[1] - 1) * gap_modules[1] + module_size_wgaps[1] * geometry[1]]
+#detector_size = [(GEOMETRY[0] - 1) * gap_modules[0] + detector_size[0],
+#                 (GEOMETRY[1] - 1) * gap_modules[1] + detector_size[1]]
+
+c.ModuleReceiver.geometry = geometry  # number of modules, x and y
+c.ModuleReceiver.module_size = module_size
+c.ModuleReceiver.detector_size = detector_size
+c.ZMQSender.module_size = module_size
+c.ZMQSender.detector_size = detector_size
+
+n_modules = geometry[0] * geometry[0]
+RECEIVER_RANKS = [i for i in range(n_modules)]
 SENDERS_RANKS = [RECEIVER_RANKS[-1] + 1]
 #ip = 3 * ["10.30.10.3", ]
-ip = 1 * ["127.0.0.1", ]
-port = [10001 + i for i in range(9)]
+ip = geometry[0] * geometry[0] * ["127.0.0.1", ]
+port = [10001 + i for i in range(geometry[0] * geometry[0])]
 
 # print ip, port, RECEIVER_RANKS
 
@@ -74,7 +92,7 @@ if rank in RECEIVER_RANKS:
     ]
     c.DataFlow.targets_per_node = { 'RECV' : []}
 
-    #c.ModuleReceiver.ip = "192.168.10.10"
+    c.ModuleReceiver.detector_name = detector_name
     c.ModuleReceiver.ip = ip[rank]
     c.ModuleReceiver.port = port[rank]
 
@@ -102,12 +120,3 @@ elif rank in SENDERS_RANKS:
     c.ZMQSender.rb_imgdata_file = rb_imgdata_file
     c.ZMQSender.geometry = geometry
     c.ZMQSender.module_size = module_size
-
-
-#c.DataFlow.maxitterations = 20
-
-#c.aliases = dict(maxitterations='DataFlow.maxitterations',
-#                 start='NumberGenerator.start',
-#                 stop='NumberGenerator.stop')
-
-
