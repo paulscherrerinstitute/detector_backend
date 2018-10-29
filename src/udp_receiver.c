@@ -128,6 +128,8 @@ typedef struct _barebone_packet{
   uint32_t packetnum;
 #endif
   uint64_t framenum;
+  double bunchid;
+  uint32_t debug;
 } barebone_packet;
 
 
@@ -300,7 +302,8 @@ bool act_on_new_frame(counter *counters, int packets_frame, barebone_packet *bpa
   return commit_flag;
 }
 
-void update_counters(rb_header * ph, barebone_packet bpacket, int packets_frame, counter *counters){
+
+void update_counters(rb_header * ph, barebone_packet bpacket, int packets_frame, counter *counters, int mod_number){
   // updating counters
   ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
   ph->framemetadata[1] = packets_frame - counters->recv_packets;
@@ -312,6 +315,11 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int packets_frame,
   else{
     ph->framemetadata[3] &= ~(mask << (bpacket.packetnum - 64));
   }
+  ph->framemetadata[4] = (uint64_t) bpacket.bunchid;
+  ph->framemetadata[5] = (uint64_t) bpacket.debug;
+  ph->framemetadata[6] = (uint64_t) mod_number;
+  ph->framemetadata[7] = (uint64_t) 1;
+
 }
 
 
@@ -338,20 +346,15 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   bpacket.data_len = data_len;
   bpacket.framenum = packet_eiger.framenum;
   bpacket.packetnum = packet_eiger.packetnum;
+  // the following two are not needed for Eiger
+  //bpacket.bunchid = packet_eiger.bunchid;
+  //bpacket.debug = packet_eiger.debug;  
   data = (uint16_t *)packet_eiger.data;
 
   // ignoring the special eiger initial packet
   if(data_len != packet_length){
     return bpacket;
   }
-
-  // claim a slot the first packet received
-  //printf("Got new slot %d\n", *rb_current_slot);
-  //while(*rb_current_slot == -1){
-   //   *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-   // printf("Got new slot %d\n", *rb_current_slot);
-  //}
-  //printf("Got new slot %d\n", *rb_current_slot);
 
   counters->recv_packets++;
   commit_flag = act_on_new_frame(counters, packets_frame, &bpacket, rb_current_slot, rb_writer_id);
@@ -387,7 +390,7 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   }
 
   // updating counters
-  update_counters(ph, bpacket, packets_frame, counters);
+  update_counters(ph, bpacket, packets_frame, counters, mod_number);
 
   // commit the slot if this is the last packet of the frame
   if(commit_flag){
@@ -414,7 +417,7 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   int data_len = 0;
   int line_number;
   bool commit_flag = false;
-  int packet_length = 8246;
+  //int packet_length = 8246;
 
   // can pass a void pointer, and dereference in the memory copy - useful?
   uint16_t * data;
@@ -425,6 +428,8 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   bpacket.data_len = data_len;
   bpacket.framenum = packet_jungfrau.framenum;
   bpacket.packetnum = packet_jungfrau.packetnum;
+  bpacket.bunchid = packet_jungfrau.bunchid;
+  bpacket.debug = packet_jungfrau.debug;
   data = (uint16_t *)packet_jungfrau.data;
 
   // ignoring the special eiger initial packet
@@ -456,7 +461,7 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   copy_data(det, line_number, lines_per_packet, p1, data, 16, -1);
   
   // updating counters
-  update_counters(ph, bpacket, packets_frame, counters);
+  update_counters(ph, bpacket, packets_frame, counters, mod_number);
 
   // commit the slot if this is the last packet of the frame
   if(commit_flag){

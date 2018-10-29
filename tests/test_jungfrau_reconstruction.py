@@ -105,8 +105,11 @@ class BaseTests(unittest.TestCase):
         reference_data = np.load(reference, encoding="bytes")
         # TODO save new headers
         #self.assertTrue((md_data[0] == reference_data[0]).all())
-        #for i in range(self.n_frames):
-        self.assertTrue((np.array([x for  x in md_data[1]]) == np.array([x for  x in reference_data[1]])).all())
+        for i in range(self.n_frames):
+            for k, v in reference_data[0][i].items():
+                self.assertEqual(v, md_data[0][i][k])
+     
+        self.assertTrue((np.array([x for x in md_data[1]]) == np.array([x for  x in reference_data[1]])).all())
 
     def test_reco4p5M(self):
         # self.data_dir = "../data/jungfrau_alvra_4p5/"
