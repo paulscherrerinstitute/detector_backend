@@ -200,7 +200,7 @@ class ModuleReceiver(DataFlowNode):
 
         if self.create_and_delete_ringbuffer_header:
             self.log.info("RB %d %d slots: %d" % (self.rb_header_id, self.rb_writer_id, nslots))
-            self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+            self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
             self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
 
         self.rb_current_slot = ctypes.c_int(-1)
