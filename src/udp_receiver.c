@@ -146,7 +146,7 @@ typedef struct Counter{
 
 void initialize_counters(counter *counters, rb_header *ph, int packets_frame){
   uint64_t ones = ~((uint64_t)0);
-
+  
   if (counters->recv_packets == 1){
     for(int i=0; i < 8; i++) ph->framemetadata[i] = 0;
 
@@ -373,8 +373,9 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
 #endif
 
   // initializing - recv_packets already increased above
-  initialize_counters(counters, ph, packets_frame);
-  
+  if (counters->recv_packets == 1) {
+    initialize_counters(counters, ph, packets_frame);
+  }
   // First half (up)
   // notice this is reversed wrt jungfrau
   if((det.submodule_idx[0] == 0 && det.submodule_idx[1] == 0) ||
@@ -452,7 +453,10 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
 #endif
 
   // initializing - recv_packets already increased above
-  initialize_counters(counters, ph, packets_frame);
+  if (counters->recv_packets == 1) {
+    initialize_counters(counters, ph, packets_frame);
+  }
+    
   copy_data(det, line_number, lines_per_packet, p1, data, 16, -1);
   
   // updating counters
@@ -583,8 +587,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       if (timeout_i > (double)timeout){
         // flushes the last message, in case the last frame lost packets
         //printf("breaking timeout after %f ms\n", timeout_i);
-        printf("[UDPRECEIVER][%d] left at %.3f s slot %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), 
-                                                            rb_current_slot);
+        printf("[UDPRECEIVER][%d] left at %.3f s slot %d for mod_number %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), rb_current_slot, mod_number);
 
         if(rb_current_slot != -1){
           rb_commit_slot(rb_writer_id, rb_current_slot);
