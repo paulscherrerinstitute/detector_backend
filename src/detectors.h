@@ -21,6 +21,9 @@ typedef struct _rb_header{
   // Field 3: packets counter 64-127
   // Field 4: pulse id
   // Field 5: debug (daq_rec) - gain flag
+  // Field 6: module number
+  // Field 7: module enabled
+
   uint64_t framemetadata[8];
 } rb_header;
 
