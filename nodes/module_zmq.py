@@ -127,6 +127,7 @@ class ZMQSender(DataFlowNode):
     expand_gaps = Bool(True, config=True)
     geometry = List((1, 1), config=True)
     detector_size = List((-1, -1), config=True)
+    submodule_n = Int(1, config=True)
 
     gap_px_chip = List((2, 2), config=True, reconfig=False)  # possibly not used
     gap_px_module = List((0, 0), config=True, reconfig=False)
@@ -197,11 +198,18 @@ class ZMQSender(DataFlowNode):
         self.worker_communicator = app.worker_communicator
         self.worker_communicator.barrier()
         
+        self.n_modules = self.geometry[0] * self.geometry[1]
+        self.n_submodules = self.geometry[0] * self.geometry[1] * self.submodule_n
+        self.log.debug("Using n_modules %d and n_submodules %d", self.n_modules, self.n_submodules)
+
+        self.HEADER = Mystruct * self.n_submodules
+
         self.rb_header_id = rb.open_header_file(self.rb_head_file)
         self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
+
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.n_submodules)
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
                                      int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
@@ -214,10 +222,6 @@ class ZMQSender(DataFlowNode):
 
         self.n_frames = -1
         self.period = 1
-
-        self.n_modules = self.geometry[0] * self.geometry[1]
-        self.HEADER = Mystruct * self.n_modules
-
 
         self.counter = 0
         self.sent_frames = 0
@@ -409,20 +413,21 @@ class ZMQSender(DataFlowNode):
                 #self.log.debug("No RB slot")
                 continue
 
-            pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
-                                   ctypes.POINTER(self.HEADER))
+            rb_header_slot = rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot)
+            pointerh = ctypes.cast(rb_header_slot, ctypes.POINTER(self.HEADER))
 
             # check that all frame numbers are the same
             try:
                 framenum = copy(pointerh.contents[0].framemetadata[0])
-                daq_recs = [pointerh.contents[i].framemetadata[5] for i in range(self.n_modules)]
-                framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
-                pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_modules)]
+                self.log.debug("Preparing to send rb_current_slot %d, framenum %d", self.rb_current_slot, framenum)
+                daq_recs = [pointerh.contents[i].framemetadata[5] for i in range(self.n_submodules)]
+                framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_submodules)]
+                pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_submodules)]
                 framenum = copy(pointerh.contents[0].framemetadata[0])
                 pulseid = pointerh.contents[0].framemetadata[4]
                 daq_rec = pointerh.contents[0].framemetadata[5]
-                mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_modules)]
-                mod_enabled = [pointerh.contents[i].framemetadata[7] for i in range(self.n_modules)]
+                mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_submodules)]
+                mod_enabled = [pointerh.contents[i].framemetadata[7] for i in range(self.n_submodules)]
                 if self.check_framenum:
                     is_good_frame = int(len(set(framenums)) == 1)
             except:
@@ -466,7 +471,7 @@ class ZMQSender(DataFlowNode):
             self.send_time = time()
 
             # check if packets are missing
-            missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
+            missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_submodules)])
             #missing_packets = 0
             is_good_frame = missing_packets == 0
             if missing_packets != 0:
@@ -519,8 +524,8 @@ class ZMQSender(DataFlowNode):
                                                      "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, 
                                                      "pulse_id_diff": [pulseids[0] - i for i in pulseids], 
                                                      "framenum_diff": [framenums[0] - i for i in framenums], 
-                                                     "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], 
-                                                     "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)],
+                                                     "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_submodules)], 
+                                                     "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_submodules)],
                                                      "module_number": mod_numbers,
                                                     "module_enabled": mod_enabled
                                                  }, copy=True
