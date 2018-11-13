@@ -80,13 +80,15 @@ detector_config, per_module_config = process_detector_config_file(sys.argv[1])
 ignore_module_index = [30, 31]
 
 for module_index in per_module_config.keys():
-    if module_index in ignore_module_index:
-        continue
 
     ip = per_module_config[module_index]["rx_udpip"]
     udp_port_1 = int(per_module_config[module_index]["rx_udpport"])
     udp_port_2 = int(per_module_config[module_index]["rx_udpport2"])
     
+    if module_index in ignore_module_index:
+        print("Ignoring ip %s, ports %d, %d" % (ip, udp_port_1, udp_port_2))
+        continue
+
     print ("----- module index %d -----" % module_index)
     test_module(ip, udp_port_1)
     test_module(ip, udp_port_2)
