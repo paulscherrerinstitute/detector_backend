@@ -272,14 +272,14 @@ class ModuleReceiver(DataFlowNode):
 
         # header data is 64b times n_modules. Each entry is a cache line owned by the receiving process
         # TODO add asserts / exceptions
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * 64)
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.geometry[0] * self.geometry[1] * self.submodule_n * 64)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
         nslots = rb.adjust_nslots(self.rb_header_id)
       
         if self.create_and_delete_ringbuffer_header:
             self.log.info("[%s] RB HeaderID: %d buffers: Header %d Data %d" % (self.name, self.rb_header_id, self.rb_hbuffer_id, self.rb_dbuffer_id))
             self.log.info("RB slots: %d" % nslots)
-            self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+            self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
             self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
 
         self.rb_current_slot = ctypes.c_int(-1)
