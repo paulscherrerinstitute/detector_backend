@@ -213,7 +213,11 @@ class ZMQSender(DataFlowNode):
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
                                      int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
-        rb.adjust_nslots(self.rb_header_id)
+        n_slots = rb.adjust_nslots(self.rb_header_id)
+
+        self.log.info("RB %d slots: %d" % (self.rb_header_id, n_slots))
+        self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
+        self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
 
         self.context = zmq.Context(io_threads=4)
         self.open_sockets()
