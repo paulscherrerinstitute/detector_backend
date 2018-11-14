@@ -294,7 +294,7 @@ class ZMQSender(DataFlowNode):
 
         self.log.info("[%s] RB buffers: Header %d Data %d" % (self.name, self.rb_hbuffer_id, self.rb_dbuffer_id))
         
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.n_submodules)
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
                                      int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
@@ -424,6 +424,7 @@ class ZMQSender(DataFlowNode):
             try:
                 framenum = copy(pointerh.contents[0].framemetadata[0])
                 self.log.debug("Preparing to send rb_current_slot %d, framenum %d", self.rb_current_slot, framenum)
+
                 daq_recs = [pointerh.contents[i].framemetadata[5] for i in range(self.n_submodules)]
                 framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_submodules)]
                 pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_submodules)]
