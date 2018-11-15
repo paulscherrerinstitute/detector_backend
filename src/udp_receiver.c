@@ -592,8 +592,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       if (timeout_i > (double)timeout){
         // flushes the last message, in case the last frame lost packets
         //printf("breaking timeout after %f ms\n", timeout_i);
-        printf("[UDPRECEIVER][%d] left at %.3f s slot %d for mod_number %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), rb_current_slot, mod_number);
-
+        #ifdef DEBUG
+          printf("[UDPRECEIVER][%d] left at %.3f s slot %d for mod_number %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), rb_current_slot, mod_number);
+        #endif
         if(rb_current_slot != -1){
           rb_commit_slot(rb_writer_id, rb_current_slot);
           printf("Committed slot %d after timeout\n", rb_current_slot);
