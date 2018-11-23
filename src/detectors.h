@@ -53,8 +53,6 @@ typedef struct _eiger_packet {
   char data[4096];
 } eiger_packet;
 
-
-
 // 6 bytes + 48 bytes + 8192 bytes = 8246 bytes
 #pragma pack(push)
 #pragma pack(2)
