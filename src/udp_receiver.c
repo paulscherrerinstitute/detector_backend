@@ -298,8 +298,7 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   }
   // First half (up)
   // notice this is reversed wrt jungfrau
-  if((det.submodule_idx[0] == 0 && det.submodule_idx[1] == 0) ||
-      (det.submodule_idx[0] == 0 && det.submodule_idx[1] == 1)){
+  if (det.submodule_idx[0] == 0) {
       copy_data(det, line_number, lines_per_packet, p1, data, bit_depth, 1);
   }
   // the other half
