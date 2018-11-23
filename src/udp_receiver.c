@@ -255,6 +255,7 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int packets_frame,
 barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
   
+  int bit_depth = 16;
   eiger_packet packet;
   size_t expected_packet_length = sizeof(packet);
 
@@ -299,11 +300,11 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   // notice this is reversed wrt jungfrau
   if((det.submodule_idx[0] == 0 && det.submodule_idx[1] == 0) ||
       (det.submodule_idx[0] == 0 && det.submodule_idx[1] == 1)){
-      copy_data(det, line_number, lines_per_packet, p1, data, 16, 1);
+      copy_data(det, line_number, lines_per_packet, p1, data, bit_depth, 1);
   }
   // the other half
   else{
-      copy_data(det, line_number, lines_per_packet, p1, data, 16, -1);
+      copy_data(det, line_number, lines_per_packet, p1, data, bit_depth, -1);
   }
 
   // updating counters
@@ -326,6 +327,7 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
 barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det) {
 
+  int bit_depth = 32;
   eiger_packet packet;
   size_t expected_packet_length = sizeof(packet);
   int data_len = get_udp_packet(sock, &packet, expected_packet_length);
@@ -335,8 +337,6 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
       printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), data_len, packet->framenum, packet->packetnum);
     }
   #endif
-  
-  uint16_t* data = (uint16_t *)packet.data;
   
   barebone_packet bpacket;
   bpacket.data_len = data_len;
@@ -360,7 +360,6 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
   ph += mod_number;
   p1 += mod_origin;
 
-
   // assuming packetnum sequence is 0..N-1
   int line_number = lines_per_packet * (packets_frame - bpacket.packetnum - 1);
 
@@ -374,11 +373,11 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
   // notice this is reversed wrt jungfrau
   if((det.submodule_idx[0] == 0 && det.submodule_idx[1] == 0) ||
       (det.submodule_idx[0] == 0 && det.submodule_idx[1] == 1)){
-      copy_data(det, line_number, lines_per_packet, p1, data, 32, 1);
+      copy_data(det, line_number, lines_per_packet, p1, packet.data, bit_depth, 1);
   }
   // the other half
   else{
-      copy_data(det, line_number, lines_per_packet, p1, data, 32, -1);
+      copy_data(det, line_number, lines_per_packet, p1, packet.data, bit_depth, -1);
   }
 
   // updating counters
@@ -400,6 +399,7 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
 barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
   
+  int bit_depth = 16;
   jungfrau_packet packet;
   size_t expected_packet_length = sizeof(packet);
   int data_len = get_udp_packet(sock, &packet, expected_packet_length);
@@ -409,8 +409,6 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
     printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), data_len, packet.framenum, packet.packetnum);
   }
 #endif
-
-  uint16_t* data = (uint16_t*) packet.data;
 
   barebone_packet bpacket;
   bpacket.data_len = data_len;
@@ -443,7 +441,7 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
     initialize_counters(counters, ph, packets_frame);
   }
     
-  copy_data(det, line_number, lines_per_packet, p1, data, 16, -1);
+  copy_data(det, line_number, lines_per_packet, p1, packet.data, bit_depth, -1);
   
   // updating counters
   update_counters(ph, bpacket, packets_frame, counters, mod_number);
