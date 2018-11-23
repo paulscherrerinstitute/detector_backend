@@ -79,11 +79,8 @@ commit_flag
 //#define SOCKET_BUFFER_SIZE 4096
 
 
-#define HEADER_PACKET_SIZE 40
-#define PACKET_LENGTH 4144
-
-// size of the data buffer, in bytes
-#define BUFFER_LENGTH    8192
+// Size of data bytes received in each UDP packet.
+#define DATA_BYTES_PER_PACKET    8192
 
 // gap pixels between chips and modules. move this to a struct and pass it as argument
 
@@ -300,9 +297,8 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   // notice this is reversed wrt jungfrau
   if (det.submodule_idx[0] == 0) {
       copy_data(det, line_number, lines_per_packet, p1, data, bit_depth, 1);
-  }
   // the other half
-  else{
+  } else {
       copy_data(det, line_number, lines_per_packet, p1, data, bit_depth, -1);
   }
 
@@ -477,15 +473,14 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   struct  timeval ti, te; //for timing
   double tdif=-1;
 
-  int buffer_length = BUFFER_LENGTH;
+  int buffer_length = DATA_BYTES_PER_PACKET;
 
   if(strcmp(det.detector_name, "EIGER") == 0){
-    buffer_length = BUFFER_LENGTH / 2;
+    buffer_length = DATA_BYTES_PER_PACKET / 2;
   }
 
 
   int lines_per_packet = 8 * buffer_length / (bit_depth * det.submodule_size[1]);
-  //int lines_per_packet = BUFFER_LENGTH / det.module_size[1];
 
   counter counters;
 
@@ -579,7 +574,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     gettimeofday(&tv_start, NULL);
 
     //this means a new frame, but only for Eiger. Possibly it will be removed
-    if(counters.current_frame == 0 && bpacket.data_len != HEADER_PACKET_SIZE){
+    if(counters.current_frame == 0 && bpacket.data_len > 0){
       tot_lost_packets += counters.lost_frames;
       // prints out statistics every stats_frames
       int stats_frames = 120;
