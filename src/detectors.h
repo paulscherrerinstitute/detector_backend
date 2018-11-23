@@ -71,17 +71,6 @@ typedef struct _eiger_packet8{
 } eiger_packet8;
 
 typedef struct _eiger_packet16{
-#ifdef OLD_HEADER
-  uint32_t subframenum;
-  uint16_t internal1;
-  uint8_t memaddress;
-  uint8_t internal2;
-  uint16_t data[2048];
-  uint48 framenum2;
-  uint16_t packetnum;
-  uint64_t framenum;
-#endif
-#ifndef OLD_HEADER
   uint64_t framenum;
   uint32_t exptime;
   uint32_t packetnum;
@@ -96,7 +85,6 @@ typedef struct _eiger_packet16{
   uint8_t detectortype;
   uint8_t headerVersion;
   uint16_t data[2048];
-#endif
 } eiger_packet16;
 
 
