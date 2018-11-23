@@ -45,11 +45,11 @@ typedef struct _detector_common_packet{
   uint16_t roundRobin;
   uint8_t detectortype;
   uint8_t headerVersion;
-} detector_common_packet
+} detector_common_packet;
 
 // 48 bytes + 4096 bytes = 4144 bytes.
 typedef struct _eiger_packet {
-  struct detector_common_packet metadata;
+  detector_common_packet metadata;
   char data[4096];
 } eiger_packet;
 
@@ -58,7 +58,7 @@ typedef struct _eiger_packet {
 #pragma pack(2)
 typedef struct _jungfrau_packet{
   char emptyheader[6];
-  struct detector_common_packet metadata;
+  detector_common_packet metadata;
   char data[8192];
 } jungfrau_packet;
 #pragma pack(pop)

@@ -255,10 +255,10 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int packets_frame,
 barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
   
-  eiger_packet packet_eiger;
-  size_t expected_packet_length = sizeof(packet_eiger);
+  eiger_packet packet;
+  size_t expected_packet_length = sizeof(packet);
 
-  int data_len = get_udp_packet(sock, &packet_eiger, expected_packet_length);
+  int data_len = get_udp_packet(sock, &packet, expected_packet_length);
 
   #ifdef DEBUG
     if(data_len > 0){
@@ -268,10 +268,10 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
 
   barebone_packet bpacket;
   bpacket.data_len = data_len;
-  bpacket.framenum = packet_eiger.metadata.framenum;
-  bpacket.packetnum = packet_eiger.metadata.packetnum;
+  bpacket.framenum = packet.metadata.framenum;
+  bpacket.packetnum = packet.metadata.packetnum;
 
-  uint16_t* data = (uint16_t *)packet_eiger.data;
+  uint16_t* data = (uint16_t *)packet.data;
 
   // ignoring the special eiger initial packet
   if(data_len != expected_packet_length){
@@ -326,9 +326,9 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
 barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det) {
 
-  eiger_packet packet_eiger;
-  size_t expected_packet_length = sizeof(packet_eiger);
-  int data_len = get_udp_packet(sock, &packet_eiger, expected_packet_length);
+  eiger_packet packet;
+  size_t expected_packet_length = sizeof(packet);
+  int data_len = get_udp_packet(sock, &packet, expected_packet_length);
 
   #ifdef DEBUG
     if(data_len > 0){
@@ -336,12 +336,12 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
     }
   #endif
   
-  uint16_t* data = (uint16_t *)packet_eiger.data;
+  uint16_t* data = (uint16_t *)packet.data;
   
   barebone_packet bpacket;
   bpacket.data_len = data_len;
-  bpacket.framenum = packet_eiger.metadata.framenum;
-  bpacket.packetnum = packet_eiger.metadata.packetnum;
+  bpacket.framenum = packet.metadata.framenum;
+  bpacket.packetnum = packet.metadata.packetnum;
 
   // ignoring the special eiger initial packet
   if (bpacket.data_len != expected_packet_length) {
