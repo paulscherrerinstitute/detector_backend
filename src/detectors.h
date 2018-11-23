@@ -27,80 +27,41 @@ typedef struct _rb_header{
   uint64_t framemetadata[8];
 } rb_header;
 
-#pragma pack(push)
-#pragma pack(2)
-typedef struct _jungfrau_packet16{
-//Jungfrau
-  char emptyheader[6];
+// 48 bytes.
+typedef struct _detector_common_packet{
   uint64_t framenum;
   uint32_t exptime;
   uint32_t packetnum;
-  //uint64_t bunchid;
+
   double bunchid;
   uint64_t timestamp;
+
   uint16_t moduleID;
   uint16_t xCoord;
   uint16_t yCoord;
   uint16_t zCoord;
+
   uint32_t debug;
   uint16_t roundRobin;
   uint8_t detectortype;
   uint8_t headerVersion;
-  uint16_t data[4096];
-} jungfrau_packet16;
+} detector_common_packet
+
+// 48 bytes + 4096 bytes = 4144 bytes.
+typedef struct _eiger_packet {
+  struct detector_common_packet metadata;
+  char data[4096];
+} eiger_packet;
+
+
+
+// 6 bytes + 48 bytes + 8192 bytes = 8246 bytes
+#pragma pack(push)
+#pragma pack(2)
+typedef struct _jungfrau_packet{
+  char emptyheader[6];
+  struct detector_common_packet metadata;
+  char data[8192];
+} jungfrau_packet;
 #pragma pack(pop)
 
-
-// various structs for eiger packets, one per bit dept
-// 4bits still unsupported!
-typedef struct _eiger_packet8{
-  uint64_t framenum;
-  uint32_t exptime;
-  uint32_t packetnum;
-  uint64_t bunchid;
-  uint64_t timestamp;
-  uint16_t moduleID;
-  uint16_t xCoord;
-  uint16_t yCoord;
-  uint16_t zCoord;
-  uint32_t debug;
-  uint16_t roundRobin;
-  uint8_t detectortype;
-  uint8_t headerVersion;
-  uint8_t data[4096];
-} eiger_packet8;
-
-typedef struct _eiger_packet16{
-  uint64_t framenum;
-  uint32_t exptime;
-  uint32_t packetnum;
-  uint64_t bunchid;
-  uint64_t timestamp;
-  uint16_t moduleID;
-  uint16_t xCoord;
-  uint16_t yCoord;
-  uint16_t zCoord;
-  uint32_t debug;
-  uint16_t roundRobin;
-  uint8_t detectortype;
-  uint8_t headerVersion;
-  uint16_t data[2048];
-} eiger_packet16;
-
-
-typedef struct _eiger_packet32{
-  uint64_t framenum;
-  uint32_t exptime;
-  uint32_t packetnum;
-  uint64_t bunchid;
-  uint64_t timestamp;
-  uint16_t moduleID;
-  uint16_t xCoord;
-  uint16_t yCoord;
-  uint16_t zCoord;
-  uint32_t debug;
-  uint16_t roundRobin;
-  uint8_t detectortype;
-  uint8_t headerVersion;
-  uint32_t data[1024];
-} eiger_packet32;
