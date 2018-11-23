@@ -73,23 +73,14 @@ commit_flag
   */
 
 
-// uncomment if you want to acquire data with the old UDP header
-//#define OLD_HEADER 1
-
 // unused atm
 //#define SERVER_PORT 50001
 //#define SERVER_IP "127.0.0.1"
 //#define SOCKET_BUFFER_SIZE 4096
 
-// Foreseen packet sizes
-#ifdef OLD_HEADER
-#define HEADER_PACKET_SIZE 48
-#define PACKET_LENGTH 4112
-#endif
-#ifndef OLD_HEADER
+
 #define HEADER_PACKET_SIZE 40
 #define PACKET_LENGTH 4144
-#endif
 
 // size of the data buffer, in bytes
 #define BUFFER_LENGTH    8192
@@ -111,23 +102,12 @@ commit_flag
 #define GAP_PX_MODULES_X 0
 #define GAP_PX_MODULES_Y 0
 */
-// only needed for the old UDP eader
-#ifdef OLD_HEADER
-typedef struct uint48 {
-	unsigned long long v:48;
-} __attribute__((packed)) uint48;
-#endif
 
 
 // the essential info needed for a packet
 typedef struct _barebone_packet{
   int data_len;
-#ifdef OLD_HEADER
-  uint16_t packetnum;
-#endif
-#ifndef OLD_HEADER
   uint32_t packetnum;
-#endif
   uint64_t framenum;
   double bunchid;
   uint32_t debug;
@@ -160,68 +140,15 @@ void initialize_counters(counter *counters, rb_header *ph, int packets_frame){
   }
 }
 
-int jungfrau_get_message16(int sd, jungfrau_packet16 * packet){
-  //jungfrau_packet16 * tp = (jungfrau_packet16*) packet;
-  ssize_t nbytes = recv(sd, packet, sizeof(*packet), 0); //MSG_DONTWAIT);
+int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) {
+  size_t n_bytes = recv(socket_fd, buffer, buffer_len, 0);
 
-  //printf("%ld %ld\n", nbytes, sizeof(*(jungfrau_packet16*)packet));
- #ifdef DEBUG
-  if(nbytes > 0){
-    printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), nbytes, ((jungfrau_packet16*)packet)->framenum, ((jungfrau_packet16*)packet)->packetnum);
-  }
-  #endif
-
-  return nbytes;
-}
-
-
-//simple routines to get data from UDP socket
-int get_message8(int sd, eiger_packet8 * packet){
-  ssize_t nbytes = recv(sd, packet, sizeof(*packet), 0);
-  if(nbytes != PACKET_LENGTH && nbytes != HEADER_PACKET_SIZE)
+  // Did not receive a valid frame packet.
+  if (n_bytes != buffer_len) {
     return 0;
-  
-#ifdef DEBUG
-  if(nbytes > HEADER_PACKET_SIZE){
-    printf("[UDPRECEIVER][%d] framenum: %lu packetnum: %i\n", getpid(), packet->framenum, packet->packetnum);
   }
-#endif
-  return nbytes;
-}
 
-int get_message16(int sd, eiger_packet16 * packet){
-  ssize_t nbytes = recv(sd, packet, sizeof(*packet), 0); //MSG_DONTWAIT);
-
-  //discard incomplete data
-  //if(nbytes != PACKET_LENGTH && nbytes != HEADER_PACKET_SIZE)
-  //  return 0;
-
-#ifdef OLD_HEADER
-  packet->framenum = (unsigned long long) packet->framenum2.v;
-#endif
-
- #ifdef DEBUG
-  if(nbytes > 0){
-    printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), nbytes, packet->framenum, packet->packetnum);
-  }
- #endif
-
-  return nbytes;
-}
-
-int get_message32(int sd, eiger_packet32 * packet){
-  ssize_t nbytes = recv(sd, packet, sizeof(*packet), 0);
-  if(nbytes != PACKET_LENGTH && nbytes != HEADER_PACKET_SIZE)
-    return 0;
-    
-#ifdef DEBUG
-  if(nbytes > HEADER_PACKET_SIZE){
-    printf("[UDPRECEIVER][%d] framenum: %lu packetnum: %i\n", getpid(), packet->framenum, packet->packetnum);
-  }
-#endif
-  return nbytes;
-}
-
+  return n_bytes;
 
 void copy_data(detector det, int line_number, int lines_per_packet, void * p1, void * data, int bit_depth, int reverse){
   int int_line = 0;
@@ -326,55 +253,44 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int packets_frame,
 
 barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
-  // if less than this, drop the packet
-  int packet_length = 4144;
-  /*!
-    gets the packet data and put it in the correct memory place in the RingBuffer
-   */
-  rb_header * ph;
-
-  uint16_t * p1;
-  int data_len = 0;
-  int line_number;
-  bool commit_flag = false;
-
-  // can pass a void pointer, and dereference in the memory copy - useful?
-  uint16_t * data;
-  barebone_packet bpacket;
+  
   eiger_packet16 packet_eiger;
+  size_t expected_packet_length = sizeof(packet_eiger);
 
-  data_len = get_message16(sock, &packet_eiger);
+  int data_len = get_udp_packet(sock, &packet_eiger, expected_packet_length);
+
+  #ifdef DEBUG
+    if(data_len > 0){
+      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), nbytes, packet->framenum, packet->packetnum);
+    }
+  #endif
+
+  barebone_packet bpacket;
   bpacket.data_len = data_len;
   bpacket.framenum = packet_eiger.framenum;
   bpacket.packetnum = packet_eiger.packetnum;
   // the following two are not needed for Eiger
   //bpacket.bunchid = packet_eiger.bunchid;
   //bpacket.debug = packet_eiger.debug;  
-  data = (uint16_t *)packet_eiger.data;
+  uint16_t* data = (uint16_t *)packet_eiger.data;
 
   // ignoring the special eiger initial packet
-  if(data_len != packet_length){
+  if(data_len != expected_packet_length){
     return bpacket;
   }
 
   counters->recv_packets++;
-  commit_flag = act_on_new_frame(counters, packets_frame, &bpacket, rb_current_slot, rb_writer_id);
+  bool commit_flag = act_on_new_frame(counters, packets_frame, &bpacket, rb_current_slot, rb_writer_id);
   // Data copy
   // getting the pointers in RB for header and data - must be done after slots are committed / assigned
-  ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
-  p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
+  uint16_t p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
   p1 += mod_origin;
 
-    // assuming packetnum sequence is 1..N
-#ifdef OLD_HEADER
-  line_number = lines_per_packet * (packets_frame - packet.packetnum);
-#endif
-#ifndef OLD_HEADER
   // assuming packetnum sequence is 0..N-1
-  line_number = lines_per_packet * (packets_frame - bpacket.packetnum - 1);
-#endif
+  int line_number = lines_per_packet * (packets_frame - bpacket.packetnum - 1);
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
@@ -409,14 +325,19 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
 }
 
 barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
+  int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det) {
 
-  int data_len = 0;
   eiger_packet32 packet_eiger;
-  data_len = get_message32(sock, &packet_eiger);
+  size_t expected_packet_length = sizeof(packet_eiger);
+  int data_len = get_udp_packet(sock, &packet_eiger, expected_packet_length);
+
+  #ifdef DEBUG
+    if(data_len > 0){
+      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), data_len, packet->framenum, packet->packetnum);
+    }
+  #endif
   
-  uint16_t * data;
-  data = (uint16_t *)packet_eiger.data;
+  uint16_t* data = (uint16_t *)packet_eiger.data;
   
   barebone_packet bpacket;
   bpacket.data_len = data_len;
@@ -424,8 +345,7 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
   bpacket.packetnum = packet_eiger.packetnum;
 
   // ignoring the special eiger initial packet
-  int expected_packet_length = 4144;
-  if (data_len != expected_packet_length) {
+  if (bpacket.data_len != expected_packet_length) {
     return bpacket;
   }
 
@@ -441,13 +361,9 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
   ph += mod_number;
   p1 += mod_origin;
 
-#ifdef OLD_HEADER
-  // assuming packetnum sequence is 1..N
-  int line_number = lines_per_packet * (packets_frame - packet.packetnum);
-#else
+
   // assuming packetnum sequence is 0..N-1
   int line_number = lines_per_packet * (packets_frame - bpacket.packetnum - 1);
-#endif
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
@@ -484,29 +400,24 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
 
 barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
-  /*!
-    gets the packet data and put it in the correct memory place in the RingBuffer
-   */
-  rb_header * ph;
-
-  uint16_t * p1;
-  int data_len = 0;
-  int line_number;
-  bool commit_flag = false;
-  //int packet_length = 8246;
-
-  // can pass a void pointer, and dereference in the memory copy - useful?
-  uint16_t * data;
-  barebone_packet bpacket;
+  
   jungfrau_packet16 packet_jungfrau;
+  size_t expected_packet_length = sizeof(packet_jungfrau)
+  int data_len = get_udp_packet(sock, &packet_jungfrau, expected_packet_length);
 
-  data_len = jungfrau_get_message16(sock, &packet_jungfrau);
+#ifdef DEBUG
+  if(data_len > 0){
+    printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), data_len, packet.framenum, packet.packetnum);
+  }
+#endif
+
+  barebone_packet bpacket;
   bpacket.data_len = data_len;
   bpacket.framenum = packet_jungfrau.framenum;
   bpacket.packetnum = packet_jungfrau.packetnum;
   bpacket.bunchid = packet_jungfrau.bunchid;
   bpacket.debug = packet_jungfrau.debug;
-  data = (uint16_t *)packet_jungfrau.data;
+  uint16_t data = (uint16_t*) packet_jungfrau.data;
 
   // ignoring the special eiger initial packet
   if(data_len <= 0){
@@ -514,23 +425,18 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   }
 
   counters->recv_packets++;
-  commit_flag = act_on_new_frame(counters, packets_frame, &bpacket, rb_current_slot, rb_writer_id);
+  bool commit_flag = act_on_new_frame(counters, packets_frame, &bpacket, rb_current_slot, rb_writer_id);
+  
   // Data copy
   // getting the pointers in RB for header and data - must be done after slots are committed / assigned
-  ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
-  p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
+  uint16_t* p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
   p1 += mod_origin;
 
-    // assuming packetnum sequence is 1..N
-#ifdef OLD_HEADER
-  line_number = lines_per_packet * (packets_frame - packet.packetnum);
-#endif
-#ifndef OLD_HEADER
   // assuming packetnum sequence is 0..N-1
-  line_number = lines_per_packet * (packets_frame - bpacket.packetnum - 1);
-#endif
+  int line_number = lines_per_packet * (packets_frame - bpacket.packetnum - 1);
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
