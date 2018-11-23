@@ -148,7 +148,7 @@ int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) {
   return n_bytes;
 }
 
-void copy_data(detector det, int line_number, int lines_per_packet, void * p1, void * data, int bit_depth, int reverse){
+void copy_data(detector det, int line_number, int n_submodule_lines_per_packet, void * p1, void * data, int bit_depth, int reverse){
   int int_line = 0;
   int data_len = 0;
   int reverse_factor = 0;
@@ -160,7 +160,7 @@ void copy_data(detector det, int line_number, int lines_per_packet, void * p1, v
     data_len = det.submodule_size[1] * sizeof(int16_t);
 
     if(det.submodule_n == 4){
-      for(int i=line_number + lines_per_packet - 1; i >= line_number; i--){
+      for(int i=line_number + n_submodule_lines_per_packet - 1; i >= line_number; i--){
 
         memcpy((uint16_t *) p1 + (reverse_factor + reverse * i) * det.detector_size[1],
           (uint16_t *) data + int_line * det.submodule_size[1], data_len / 2);
@@ -170,7 +170,7 @@ void copy_data(detector det, int line_number, int lines_per_packet, void * p1, v
         }
     }
     else{
-      for(int i=line_number + lines_per_packet - 1; i >= line_number; i--){
+      for(int i=line_number + n_submodule_lines_per_packet - 1; i >= line_number; i--){
         memcpy(
               ((uint16_t *)p1) + (reverse_factor + reverse * i) * det.detector_size[1],
           //FIXME: would it make sense to do this? Performances issues?
@@ -250,7 +250,7 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
 
 
 barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int lines_per_packet, int n_packets_per_frame, counter * counters, detector det){
+  int mod_number, int n_submodule_lines_per_packet, int n_packets_per_frame, counter * counters, detector det){
   
   int bit_depth = 16;
   eiger_packet packet;
@@ -287,7 +287,7 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   p1 += mod_origin;
 
   // assuming packetnum sequence is 0..N-1
-  int line_number = lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
+  int line_number = n_submodule_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
@@ -296,10 +296,10 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   // First half (up)
   // notice this is reversed wrt jungfrau
   if (det.submodule_idx[0] == 0) {
-      copy_data(det, line_number, lines_per_packet, p1, data, bit_depth, 1);
+      copy_data(det, line_number, n_submodule_lines_per_packet, p1, data, bit_depth, 1);
   // the other half
   } else {
-      copy_data(det, line_number, lines_per_packet, p1, data, bit_depth, -1);
+      copy_data(det, line_number, n_submodule_lines_per_packet, p1, data, bit_depth, -1);
   }
 
   // updating counters
@@ -320,7 +320,7 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
 }
 
 barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int lines_per_packet, int n_packets_per_frame, counter * counters, detector det) {
+  int mod_number, int n_submodule_lines_per_packet, int n_packets_per_frame, counter * counters, detector det) {
 
   int bit_depth = 32;
   eiger_packet packet;
@@ -356,7 +356,7 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
   p1 += mod_origin;
 
   // assuming packetnum sequence is 0..N-1
-  int line_number = lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
+  int line_number = n_submodule_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
@@ -368,11 +368,11 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
   // notice this is reversed wrt jungfrau
   if((det.submodule_idx[0] == 0 && det.submodule_idx[1] == 0) ||
       (det.submodule_idx[0] == 0 && det.submodule_idx[1] == 1)){
-      copy_data(det, line_number, lines_per_packet, p1, packet.data, bit_depth, 1);
+      copy_data(det, line_number, n_submodule_lines_per_packet, p1, packet.data, bit_depth, 1);
   }
   // the other half
   else{
-      copy_data(det, line_number, lines_per_packet, p1, packet.data, bit_depth, -1);
+      copy_data(det, line_number, n_submodule_lines_per_packet, p1, packet.data, bit_depth, -1);
   }
 
   // updating counters
@@ -392,7 +392,7 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
 }
 
 barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int lines_per_packet, int n_packets_per_frame, counter * counters, detector det){
+  int mod_number, int n_submodule_lines_per_packet, int n_packets_per_frame, counter * counters, detector det){
   
   int bit_depth = 16;
   jungfrau_packet packet;
@@ -429,14 +429,14 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   p1 += mod_origin;
 
   // assuming packetnum sequence is 0..N-1
-  int line_number = lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
+  int line_number = n_submodule_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
     initialize_counters(counters, ph, n_packets_per_frame);
   }
     
-  copy_data(det, line_number, lines_per_packet, p1, packet.data, bit_depth, -1);
+  copy_data(det, line_number, n_submodule_lines_per_packet, p1, packet.data, bit_depth, -1);
   
   // updating counters
   update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
@@ -478,8 +478,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     data_bytes_per_packet = DATA_BYTES_PER_PACKET / 2;
   }
 
-  // TODO: Where does this 8 come from?
-  int lines_per_packet = 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
+  // (Bytes in packet) / (Bytes in submodule line)
+  int n_submodule_lines_per_packet = 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
 
   counter counters;
 
@@ -538,14 +538,14 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     if (bit_depth == 16) {
       if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
         bpacket = get_put_data_jf16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       lines_per_packet, n_packets_per_frame, &counters, det);
+			       n_submodule_lines_per_packet, n_packets_per_frame, &counters, det);
       } else if (strcmp(det.detector_name, "EIGER") == 0) {
         bpacket = get_put_data_eiger16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       lines_per_packet, n_packets_per_frame, &counters, det);
+			       n_submodule_lines_per_packet, n_packets_per_frame, &counters, det);
       } 
     } else if (bit_depth == 32 && strcmp(det.detector_name, "EIGER") == 0) {
         bpacket = get_put_data_eiger32(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       lines_per_packet, n_packets_per_frame, &counters, det);
+			       n_submodule_lines_per_packet, n_packets_per_frame, &counters, det);
     } else {
       printf("[UDP_RECEIVER][%d] please set up a bit_depth", getpid());
       return counters.recv_frames;
