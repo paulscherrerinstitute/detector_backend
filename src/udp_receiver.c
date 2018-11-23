@@ -149,6 +149,7 @@ int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) {
   }
 
   return n_bytes;
+}
 
 void copy_data(detector det, int line_number, int lines_per_packet, void * p1, void * data, int bit_depth, int reverse){
   int int_line = 0;
@@ -284,7 +285,7 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   // Data copy
   // getting the pointers in RB for header and data - must be done after slots are committed / assigned
   rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
-  uint16_t p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  uint16_t* p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
   p1 += mod_origin;
@@ -402,7 +403,7 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   int mod_number, int lines_per_packet, int packets_frame, counter * counters, detector det){
   
   jungfrau_packet16 packet_jungfrau;
-  size_t expected_packet_length = sizeof(packet_jungfrau)
+  size_t expected_packet_length = sizeof(packet_jungfrau);
   int data_len = get_udp_packet(sock, &packet_jungfrau, expected_packet_length);
 
 #ifdef DEBUG
@@ -417,7 +418,7 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   bpacket.packetnum = packet_jungfrau.packetnum;
   bpacket.bunchid = packet_jungfrau.bunchid;
   bpacket.debug = packet_jungfrau.debug;
-  uint16_t data = (uint16_t*) packet_jungfrau.data;
+  uint16_t* data = (uint16_t*) packet_jungfrau.data;
 
   // ignoring the special eiger initial packet
   if(data_len <= 0){
