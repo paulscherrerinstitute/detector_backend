@@ -255,10 +255,9 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
 }
 
 
-barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det){
+barebone_packet get_put_data_eiger(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth){
   
-  int bit_depth = 16;
   eiger_packet packet;
   size_t expected_packet_length = sizeof(packet);
 
@@ -324,82 +323,9 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   return bpacket;
 }
 
-barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det) {
+barebone_packet get_put_data_jungfrau(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth){
 
-  int bit_depth = 32;
-  eiger_packet packet;
-  size_t expected_packet_length = sizeof(packet);
-
-  int data_len = get_udp_packet(sock, &packet, expected_packet_length);
-
-  #ifdef DEBUG
-    if(data_len > 0){
-      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), data_len, packet->framenum, packet->packetnum);
-    }
-  #endif
-  
-  barebone_packet bpacket;
-  bpacket.data_len = data_len;
-  bpacket.framenum = packet.metadata.framenum;
-  bpacket.packetnum = packet.metadata.packetnum;
-
-  // ignoring the special eiger initial packet
-  if (bpacket.data_len != expected_packet_length) {
-    return bpacket;
-  }
-
-  counters->recv_packets++;
-  
-  bool commit_flag = act_on_new_frame(counters, n_packets_per_frame, &bpacket, rb_current_slot, rb_writer_id);
-  
-  // getting the pointers in RB for header and data - must be done after slots are committed / assigned
-  rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
-  uint16_t* p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
-  
-  // computing the origin and stride of memory locations
-  ph += mod_number;
-  p1 += mod_origin;
-
-  // initializing - recv_packets already increased above
-  if (counters->recv_packets == 1) {
-    initialize_counters(counters, ph, n_packets_per_frame);
-  }
-
-  // assuming packetnum sequence is 0..N-1
-  int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
-
-  // Data copy
-  // First half (up)
-  // notice this is reversed wrt jungfrau
-  if (det.submodule_idx[0] == 0) {
-      copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth, 1);
-  }
-  // the other half
-  else{
-      copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth, -1);
-  }
-
-  // updating counters
-  update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
-
-  // commit the slot if this is the last packet of the frame
-  if(commit_flag){
-    if(*rb_current_slot != -1){
-    // add some checks here
-      rb_commit_slot(rb_writer_id, *rb_current_slot);
-    }
-    else
-      printf("[ERROR] I should have been committing a slot, but it is -1\n");
-    commit_flag = false;
-  }
-  return bpacket;
-}
-
-barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det){
-  
-  int bit_depth = 16;
   jungfrau_packet packet;
   size_t expected_packet_length = sizeof(packet);
   int data_len = get_udp_packet(sock, &packet, expected_packet_length);
@@ -538,21 +464,23 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
         }
       return counters.recv_frames;
       }
+
+    if (bit_depth != 16 && bit_depth != 32) {
+      printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
+      return counters.recv_frames;
+    }
    
     // get data and copy to RB
-    if (bit_depth == 16) {
-      if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
-        bpacket = get_put_data_jf16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       n_lines_per_packet, n_packets_per_frame, &counters, det);
-      } else if (strcmp(det.detector_name, "EIGER") == 0) {
-        bpacket = get_put_data_eiger16(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       n_lines_per_packet, n_packets_per_frame, &counters, det);
-      } 
-    } else if (bit_depth == 32 && strcmp(det.detector_name, "EIGER") == 0) {
-        bpacket = get_put_data_eiger32(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			       n_lines_per_packet, n_packets_per_frame, &counters, det);
+    if (strcmp(det.detector_name, "EIGER") == 0) {
+      bpacket = get_put_data_eiger(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
+			  n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth);
+
+    } else if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
+      bpacket = get_put_data_jungfrau(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
+        n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth);
+
     } else {
-      printf("[UDP_RECEIVER][%d] please set up a bit_depth", getpid());
+      printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
       return counters.recv_frames;
     }
     
