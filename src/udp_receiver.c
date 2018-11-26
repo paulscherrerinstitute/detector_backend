@@ -162,20 +162,26 @@ void copy_data(detector det, int line_number, int n_lines_per_packet, void * p1,
     if(det.submodule_n == 4){
       for(int i=line_number + n_lines_per_packet - 1; i >= line_number; i--){
 
-        memcpy((uint16_t *) p1 + (reverse_factor + reverse * i) * det.detector_size[1],
-          (uint16_t *) data + int_line * det.submodule_size[1], data_len / 2);
-        memcpy((uint16_t *)p1 + (reverse_factor + reverse * i) * det.detector_size[1] + det.gap_px_chips[1] + det.submodule_size[1] / 2,
-          (uint16_t *)data + int_line * det.submodule_size[1] + det.submodule_size[1] / 2, data_len / 2);
+        long destination_offset = (reverse_factor + reverse * i) * det.detector_size[1];
+        long source_offset = int_line * det.submodule_size[1];
+
+        memcpy((uint16_t *) p1 + destination_slot_offset, (uint16_t *) data + source_offset, data_len / 2);
+
+        memcpy((uint16_t *)p1 + destination_offset + det.gap_px_chips[1] + det.submodule_size[1] / 2,
+          (uint16_t *)data + source_offset + det.submodule_size[1] / 2, data_len / 2);
+
         int_line ++;
         }
     }
     else{
       for(int i=line_number + n_lines_per_packet - 1; i >= line_number; i--){
-        memcpy(
-              ((uint16_t *)p1) + (reverse_factor + reverse * i) * det.detector_size[1],
-          //FIXME: would it make sense to do this? Performances issues?
-              /*p1 + i * det.detector_size[1],*/
-              ((uint16_t *)data) + int_line * det.submodule_size[1], data_len);
+        long destination_offset = (reverse_factor + reverse * i) * det.detector_size[1];
+        long source_offset = int_line * det.submodule_size[1];
+        
+        //FIXME: would it make sense to do this? Performances issues?
+        /*p1 + i * det.detector_size[1],*/
+        memcpy(((uint16_t *)p1) + destination_offset, ((uint16_t *)data) + source_offset, data_len);
+                    
         int_line ++;
       }
     } // end submodule
@@ -286,13 +292,14 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   ph += mod_number;
   p1 += mod_origin;
 
-  // assuming packetnum sequence is 0..N-1
-  int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
-
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
     initialize_counters(counters, ph, n_packets_per_frame);
   }
+
+  // assuming packetnum sequence is 0..N-1
+  int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
+
   // First half (up)
   // notice this is reversed wrt jungfrau
   if (det.submodule_idx[0] == 0) {
@@ -356,13 +363,13 @@ barebone_packet get_put_data_eiger32(int sock, int rb_hbuffer_id, int *rb_curren
   ph += mod_number;
   p1 += mod_origin;
 
-  // assuming packetnum sequence is 0..N-1
-  int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
-
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
     initialize_counters(counters, ph, n_packets_per_frame);
   }
+
+  // assuming packetnum sequence is 0..N-1
+  int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
   // Data copy
   // First half (up)
@@ -428,13 +435,13 @@ barebone_packet get_put_data_jf16(int sock, int rb_hbuffer_id, int *rb_current_s
   ph += mod_number;
   p1 += mod_origin;
 
-  // assuming packetnum sequence is 0..N-1
-  int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
-
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
     initialize_counters(counters, ph, n_packets_per_frame);
   }
+
+  // assuming packetnum sequence is 0..N-1
+  int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
     
   copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth, -1);
   
