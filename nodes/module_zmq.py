@@ -567,8 +567,8 @@ class ZMQSender(DataFlowNode):
         metadata["type"] = str(A.dtype)
         metadata["shape"] = A.shape
 
-        self.log.debug("[%s] Sending frame %d", self.name, metadata["frame"])
-        self.log.log(0, "[%s] Frame %d metadata %s", self.name, metadata["frame"], metadata)
+        self.log.info("[%s] Sending frame %d", self.name, metadata["frame"])
+        self.log.debug("[%s] Frame %d metadata %s", self.name, metadata["frame"], metadata)
 
         socket.send_json(metadata, flags | zmq.SNDMORE)
         return socket.send(A, flags, copy=copy, track=track)
