@@ -275,8 +275,6 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   bpacket.framenum = packet.metadata.framenum;
   bpacket.packetnum = packet.metadata.packetnum;
 
-  uint16_t* data = (uint16_t *)packet.data;
-
   // ignoring the special eiger initial packet
   if(data_len != expected_packet_length){
     return bpacket;
@@ -303,10 +301,10 @@ barebone_packet get_put_data_eiger16(int sock, int rb_hbuffer_id, int *rb_curren
   // First half (up)
   // notice this is reversed wrt jungfrau
   if (det.submodule_idx[0] == 0) {
-      copy_data(det, line_number, n_lines_per_packet, p1, data, bit_depth, 1);
+      copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth, 1);
   // the other half
   } else {
-      copy_data(det, line_number, n_lines_per_packet, p1, data, bit_depth, -1);
+      copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth, -1);
   }
 
   // updating counters
