@@ -165,7 +165,7 @@ void copy_data(detector det, int line_number, int n_lines_per_packet, void * p1,
         long destination_offset = (reverse_factor + reverse * i) * det.detector_size[1];
         long source_offset = int_line * det.submodule_size[1];
 
-        memcpy((uint16_t *) p1 + destination_slot_offset, (uint16_t *) data + source_offset, data_len / 2);
+        memcpy((uint16_t *) p1 + destination_offset, (uint16_t *) data + source_offset, data_len / 2);
 
         memcpy((uint16_t *)p1 + destination_offset + det.gap_px_chips[1] + det.submodule_size[1] / 2,
           (uint16_t *)data + source_offset + det.submodule_size[1] / 2, data_len / 2);
@@ -284,10 +284,12 @@ barebone_packet get_put_data_eiger(int sock, int rb_hbuffer_id, int *rb_current_
   // Data copy
   // getting the pointers in RB for header and data - must be done after slots are committed / assigned
   rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
-  uint16_t* p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  char* p1 = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
-  p1 += mod_origin;
+
+  // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
+  p1 += (mod_origin * bit_depth) / 8;
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
@@ -354,10 +356,12 @@ barebone_packet get_put_data_jungfrau(int sock, int rb_hbuffer_id, int *rb_curre
   // Data copy
   // getting the pointers in RB for header and data - must be done after slots are committed / assigned
   rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
-  uint16_t* p1 = (uint16_t *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  char* p1 = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
-  p1 += mod_origin;
+
+  // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
+  p1 += (mod_origin * bit_depth) / 8;
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
