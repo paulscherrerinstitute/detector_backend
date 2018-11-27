@@ -271,9 +271,9 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
 }
 
 
-barebone_packet get_put_data_eiger(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth){
-  
+
   eiger_packet packet;
   size_t expected_packet_length = sizeof(packet);
 
@@ -297,6 +297,7 @@ barebone_packet get_put_data_eiger(int sock, int rb_hbuffer_id, int *rb_current_
 
   counters->recv_packets++;
   bool commit_flag = act_on_new_frame(counters, n_packets_per_frame, &bpacket, rb_current_slot, rb_writer_id);
+  
   // Data copy
   // getting the pointers in RB for header and data - must be done after slots are committed / assigned
   rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
@@ -315,7 +316,15 @@ barebone_packet get_put_data_eiger(int sock, int rb_hbuffer_id, int *rb_current_
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
-  copy_data_eiger(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth);
+  if (strcmp(det.detector_name, "EIGER") == 0) {
+      copy_data_eiger(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth);
+
+  } else if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
+      copy_data_jungfrau(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth);
+
+  } else {
+    printf("[UDP_RECEIVER:get_put_data][%d] Invalid detector_name.\n", getpid());
+  }
 
   // updating counters
   update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
@@ -355,7 +364,7 @@ barebone_packet get_put_data_jungfrau(int sock, int rb_hbuffer_id, int *rb_curre
   bpacket.debug = packet.metadata.debug;
 
   // ignoring the special eiger initial packet
-  if(data_len <= 0){
+  if(data_len != expected_packet_length){
     return bpacket;
   }
 
@@ -379,7 +388,7 @@ barebone_packet get_put_data_jungfrau(int sock, int rb_hbuffer_id, int *rb_curre
 
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
-    
+  
   copy_data_jungfrau(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth);
   
   // updating counters
@@ -485,7 +494,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
    
     // get data and copy to RB
     if (strcmp(det.detector_name, "EIGER") == 0) {
-      bpacket = get_put_data_eiger(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
+      bpacket = get_put_data(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
 			  n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth);
 
     } else if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
