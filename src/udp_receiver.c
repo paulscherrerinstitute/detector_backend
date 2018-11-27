@@ -148,44 +148,60 @@ int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) {
   return n_bytes;
 }
 
-void copy_data(detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth, int reverse){
+void copy_data_eiger(detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth){
+  
+  int reverse;
+  int reverse_factor;
+
+  // Top submodule row.
+  if (det.submodule_idx[0] == 0) {
+      reverse = 1;
+      reverse_factor = 0;
+  // Bottom submodule row.
+  } else {
+      reverse = -1;
+      reverse_factor = det.submodule_size[0] - 1;
+  }
+
+  int submodule_line_data_len = (8 * det.submodule_size[1]) / bit_depth;
+
   int int_line = 0;
-  int data_len = 0;
-  int reverse_factor = 0;
+  for(int i=line_number + n_lines_per_packet - 1; i >= line_number; i--){
 
-  if(reverse == -1)
-    reverse_factor = det.submodule_size[0] - 1;
+    long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
+    long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
 
-  if (bit_depth == 16) {
-    data_len = det.submodule_size[1] * sizeof(int16_t);
+    memcpy((char*) p1 + destination_offset, (char*) data + source_offset, submodule_line_data_len/2);
 
-    if(det.submodule_n == 4){
-      for(int i=line_number + n_lines_per_packet - 1; i >= line_number; i--){
+    long destination_gap_offset = 8 * (det.gap_px_chips[1] + det.submodule_size[1] / 2) / bit_depth;
+    long source_gap_offset = 8 * (det.submodule_size[1] / 2) / bit_depth;
 
-        long destination_offset = (reverse_factor + reverse * i) * det.detector_size[1];
-        long source_offset = int_line * det.submodule_size[1];
+    memcpy((char*)p1 + destination_offset + destination_gap_offset,
+      (char *)data + source_offset + source_gap_offset, submodule_line_data_len/2);
 
-        memcpy((uint16_t *) p1 + destination_offset, (uint16_t *) data + source_offset, data_len / 2);
+    int_line ++;
+  }
+}
 
-        memcpy((uint16_t *)p1 + destination_offset + det.gap_px_chips[1] + det.submodule_size[1] / 2,
-          (uint16_t *)data + source_offset + det.submodule_size[1] / 2, data_len / 2);
+void copy_data_jungfrau(detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth){
+  
+  int reverse = -1;
+  int reverse_factor = det.submodule_size[0] - 1;
 
-        int_line ++;
-        }
-    }
-    else{
-      for(int i=line_number + n_lines_per_packet - 1; i >= line_number; i--){
-        long destination_offset = (reverse_factor + reverse * i) * det.detector_size[1];
-        long source_offset = int_line * det.submodule_size[1];
-        
-        //FIXME: would it make sense to do this? Performances issues?
-        /*p1 + i * det.detector_size[1],*/
-        memcpy(((uint16_t *)p1) + destination_offset, ((uint16_t *)data) + source_offset, data_len);
-                    
-        int_line ++;
-      }
-    } // end submodule
-  }// end bit_length
+  int submodule_line_data_len = (8 * det.submodule_size[1]) / bit_depth;
+
+  int int_line = 0;
+  for (int i=line_number + n_lines_per_packet - 1; i >= line_number; i--) {
+
+    long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
+    long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
+    
+    //FIXME: would it make sense to do this? Performances issues?
+    /*p1 + i * det.detector_size[1],*/
+    memcpy((char*)p1 + destination_offset, (char*)data + source_offset, submodule_line_data_len);
+                
+    int_line++;
+  }
 }
 
 
@@ -299,14 +315,7 @@ barebone_packet get_put_data_eiger(int sock, int rb_hbuffer_id, int *rb_current_
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
-  // First half (up)
-  // notice this is reversed wrt jungfrau
-  if (det.submodule_idx[0] == 0) {
-      copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth, 1);
-  // the other half
-  } else {
-      copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth, -1);
-  }
+  copy_data_eiger(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth);
 
   // updating counters
   update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
@@ -371,7 +380,7 @@ barebone_packet get_put_data_jungfrau(int sock, int rb_hbuffer_id, int *rb_curre
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
     
-  copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth, -1);
+  copy_data_jungfrau(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth);
   
   // updating counters
   update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
