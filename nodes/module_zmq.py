@@ -369,7 +369,7 @@ class ZMQSender(DataFlowNode):
         ref_time = time()
         # frame_comp_time = time()
         frame_comp_counter = 0
-        is_good_frame = int(True)
+        is_good_frame = True
 
         # need to stay here because of numba
         # for gain plus data masking
@@ -425,7 +425,7 @@ class ZMQSender(DataFlowNode):
                 mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_submodules)]
                 mod_enabled = [pointerh.contents[i].framemetadata[7] for i in range(self.n_submodules)]
                 if self.check_framenum:
-                    is_good_frame = int(len(set(framenums)) == 1)
+                    is_good_frame = len(set(framenums)) == 1
             except:
                 # FIXME: not clear why I get here
                 print(rb.gf_perror())
@@ -473,7 +473,7 @@ class ZMQSender(DataFlowNode):
             # check if packets are missing
             missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_submodules)])
             #missing_packets = 0
-            is_good_frame = missing_packets == 0
+            is_good_frame &= missing_packets == 0
             if missing_packets != 0:
                 self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
                 self.frames_with_missing_packets += 1
