@@ -143,41 +143,6 @@ int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) {
   return n_bytes;
 }
 
-void copy_data_eiger(detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth){
-  
-  int reverse;
-  int reverse_factor;
-
-  // Top submodule row.
-  if (det.submodule_idx[0] == 0) {
-      reverse = 1;
-      reverse_factor = 0;
-  // Bottom submodule row.
-  } else {
-      reverse = -1;
-      reverse_factor = det.submodule_size[0] - 1;
-  }
-
-  int submodule_line_data_len = (8 * det.submodule_size[1]) / bit_depth;
-
-  int int_line = 0;
-  for(int i=line_number + n_lines_per_packet - 1; i >= line_number; i--){
-
-    long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
-    long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
-
-    memcpy((char*) p1 + destination_offset, (char*) data + source_offset, submodule_line_data_len/2);
-
-    long destination_gap_offset = 8 * (det.gap_px_chips[1] + det.submodule_size[1] / 2) / bit_depth;
-    long source_gap_offset = 8 * (det.submodule_size[1] / 2) / bit_depth;
-
-    memcpy((char*)p1 + destination_offset + destination_gap_offset,
-      (char *)data + source_offset + source_gap_offset, submodule_line_data_len/2);
-
-    int_line ++;
-  }
-}
-
 void copy_data_jungfrau(detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth){
   
   int reverse = -1;
@@ -263,18 +228,6 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
   ph->framemetadata[6] = (uint64_t) mod_number;
   ph->framemetadata[7] = (uint64_t) 1;
 
-}
-
-
-barebone_packet interpret_udp_packet_eiger(const char* udp_packet, const int received_packet_len) {
-  const jungfrau_packet* packet = (const jungfrau_packet*) udp_packet;
-
-  barebone_packet bpacket;
-  bpacket.data_len = received_packet_len;
-  bpacket.framenum = packet.metadata.framenum;
-  bpacket.packetnum = packet.metadata.packetnum;
-
-  return bpacket;
 }
 
 
