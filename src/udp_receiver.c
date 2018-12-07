@@ -18,6 +18,8 @@
 #include <sched.h>
 
 #include "detectors.h"
+#include "jungfrau.h"
+#include "eiger.h"
 
   /*
   Logic:
@@ -273,27 +275,37 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
 }
 
 
+barebone_packet interpret_udp_packet_eiger(const char* udp_packet, const int received_packet_len) {
+  const jungfrau_packet* packet = (const jungfrau_packet*) udp_packet;
+
+  barebone_packet bpacket;
+  bpacket.data_len = received_packet_len;
+  bpacket.framenum = packet.metadata.framenum;
+  bpacket.packetnum = packet.metadata.packetnum;
+
+  return bpacket;
+}
+
+
 barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, copy_data_function copy_data){
 
   eiger_packet packet;
   size_t expected_packet_length = sizeof(packet);
 
-  int data_len = get_udp_packet(sock, &packet, expected_packet_length);
+  char[expected_packet_length] udp_packet;
+  int received_data_len = get_udp_packet(sock, &packet, expected_packet_length);
 
   #ifdef DEBUG
-    if(data_len > 0){
+    if(received_data_len > 0){
       printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), nbytes, packet->framenum, packet->packetnum);
     }
   #endif
 
-  barebone_packet bpacket;
-  bpacket.data_len = data_len;
-  bpacket.framenum = packet.metadata.framenum;
-  bpacket.packetnum = packet.metadata.packetnum;
+  barebone_packet bpacket = interpret_udp_packet_eiger(&udp_packet, received_data_len)
 
   // ignoring the special eiger initial packet
-  if(data_len != expected_packet_length){
+  if(received_data_len != expected_packet_length){
     return bpacket;
   }
 
