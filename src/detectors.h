@@ -65,4 +65,9 @@ typedef void (*interpret_udp_packet_function)(detector, int, int, void*, void*, 
 // Signature: const char* udp_packet, const int received_packet_le
 typedef void (*copy_data_function)(const char*, const int);
 
+typedef struct _detector_definition{
+  interpret_udp_packet_function* interpret_udp_packet;
+  copy_data_function* copy_data;
+} detector_definition;
+
 #endif

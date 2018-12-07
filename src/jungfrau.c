@@ -43,3 +43,8 @@ void copy_data_jungfrau(detector det, int line_number, int n_lines_per_packet, v
     int_line++;
   }
 }
+
+detector_definition jungfrau_definition = {
+  .interpret_udp_packet = interpret_udp_packet_jungfrau,
+  .copy_data = copy_data_jungfrau
+};
