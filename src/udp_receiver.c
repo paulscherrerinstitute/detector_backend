@@ -277,15 +277,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   struct  timeval ti, te; //for timing
   double tdif=-1;
 
-  int data_bytes_per_packet = DATA_BYTES_PER_PACKET;
-
-  if(strcmp(det.detector_name, "EIGER") == 0){
-    data_bytes_per_packet = DATA_BYTES_PER_PACKET / 2;
-  }
-
-  // (Bytes in packet) / (Bytes in submodule line)
-  int n_lines_per_packet = 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
-
   counter counters;
 
   counters.current_frame = 0;
@@ -339,6 +330,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
     return -1;
   }
+
+  // (Bytes in packet) / (Bytes in submodule line)
+  int n_lines_per_packet = 8 * det_definition.data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
   
   while(true){
 
