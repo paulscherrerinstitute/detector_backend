@@ -1,6 +1,3 @@
-#ifndef EIGER_H
-#define EIGER_H
-
 #include <string.h>
 
 #include "detectors.h"
@@ -56,5 +53,3 @@ void copy_data_eiger(detector det, int line_number, int n_lines_per_packet, void
     int_line ++;
   }
 }
-
-#endif

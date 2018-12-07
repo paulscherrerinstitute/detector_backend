@@ -19,7 +19,7 @@
 
 #include "detectors.h"
 #include "jungfrau.h"
-#include "eiger.h"
+#include "eiger.c"
 
   /*
   Logic:
