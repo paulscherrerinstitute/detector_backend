@@ -1,4 +1,7 @@
+#include <string.h>
 #include "detectors.h"
+
+#define JUNGFRAU_DATA_BYTES_PER_PACKET 8192
 
 // 6 bytes + 48 bytes + 8192 bytes = 8246 bytes
 #pragma pack(push)
@@ -6,7 +9,7 @@
 typedef struct _jungfrau_packet{
   char emptyheader[6];
   detector_common_packet metadata;
-  char data[8192];
+  char data[JUNGFRAU_DATA_BYTES_PER_PACKET];
 } jungfrau_packet;
 #pragma pack(pop)
 
@@ -46,5 +49,7 @@ void copy_data_jungfrau(detector det, int line_number, int n_lines_per_packet, v
 
 detector_definition jungfrau_definition = {
   .interpret_udp_packet = interpret_udp_packet_jungfrau,
-  .copy_data = copy_data_jungfrau
+  .copy_data = copy_data_jungfrau,
+  .udp_packet_bytes = sizeof(jungfrau_packet),
+  .data_bytes_per_packet = JUNGFRAU_DATA_BYTES_PER_PACKET
 };

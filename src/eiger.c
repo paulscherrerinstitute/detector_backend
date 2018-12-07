@@ -1,11 +1,12 @@
 #include <string.h>
-
 #include "detectors.h"
+
+#define EIGER_DATA_BYTES_PER_PACKET 4096
 
 // 48 bytes + 4096 bytes = 4144 bytes.
 typedef struct _eiger_packet {
   detector_common_packet metadata;
-  char data[4096];
+  char data[EIGER_DATA_BYTES_PER_PACKET];
 } eiger_packet;
 
 barebone_packet interpret_udp_packet_eiger(const char* udp_packet, const int received_packet_len) {
@@ -56,5 +57,7 @@ void copy_data_eiger(detector det, int line_number, int n_lines_per_packet, void
 
 detector_definition eiger_definition = {
   .interpret_udp_packet = interpret_udp_packet_eiger,
-  .copy_data = copy_data_eiger
+  .copy_data = copy_data_eiger,
+  .udp_packet_bytes = sizeof(eiger_packet),
+  .data_bytes_per_packet = EIGER_DATA_BYTES_PER_PACKET
 };

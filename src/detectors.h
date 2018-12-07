@@ -68,6 +68,8 @@ typedef void (*copy_data_function)(const char*, const int);
 typedef struct _detector_definition{
   interpret_udp_packet_function* interpret_udp_packet;
   copy_data_function* copy_data;
+  size_t udp_packet_bytes;
+  size_t data_bytes_per_packet;
 } detector_definition;
 
 #endif
