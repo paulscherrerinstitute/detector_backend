@@ -59,4 +59,10 @@ typedef struct _barebone_packet{
   uint32_t debug;
 } barebone_packet;
 
+// Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
+typedef void (*interpret_udp_packet_function)(detector, int, int, void*, void*, int);
+
+// Signature: const char* udp_packet, const int received_packet_le
+typedef void (*copy_data_function)(const char*, const int);
+
 #endif

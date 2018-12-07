@@ -102,10 +102,6 @@ commit_flag
 #define GAP_PX_MODULES_Y 0
 */
 
-
-// Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
-typedef void (*copy_data_function)(detector, int, int, void*, void*, int);
-
 typedef struct Counter{
   /*
   int total_packets;
@@ -211,7 +207,8 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
 
 
 barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, copy_data_function copy_data){
+  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, copy_data_function copy_data, 
+  interpret_udp_packet_function interpred_udp_packet){
 
   eiger_packet packet;
   size_t expected_packet_length = sizeof(packet);
@@ -219,7 +216,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   char[expected_packet_length] udp_packet;
   int received_data_len = get_udp_packet(sock, &udp_packet, expected_packet_length);
 
-  barebone_packet bpacket = interpret_udp_packet_eiger(&udp_packet, received_data_len)
+  barebone_packet bpacket = interpret_udp_packet(&udp_packet, received_data_len)
 
   #ifdef DEBUG
     if(received_data_len > 0){
@@ -420,7 +417,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     if (strcmp(det.detector_name, "EIGER") == 0) {
 
       bpacket = get_put_data(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			  n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth, copy_data_eiger);
+			  n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth, copy_data_eiger, interpret_udp_packet_eiger);
 
     } else if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
       bpacket = get_put_data_jungfrau(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
