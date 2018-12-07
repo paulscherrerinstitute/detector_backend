@@ -18,7 +18,7 @@
 #include <sched.h>
 
 #include "detectors.h"
-#include "jungfrau.h"
+#include "jungfrau.c"
 #include "eiger.c"
 
   /*
