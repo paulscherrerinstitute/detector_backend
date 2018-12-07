@@ -208,10 +208,7 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
 
 barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, copy_data_function copy_data, 
-  interpret_udp_packet_function interpred_udp_packet){
-
-  eiger_packet packet;
-  size_t expected_packet_length = sizeof(packet);
+  interpret_udp_packet_function interpred_udp_packet, size_t expected_packet_length){
 
   char[expected_packet_length] udp_packet;
   int received_data_len = get_udp_packet(sock, &udp_packet, expected_packet_length);
@@ -394,39 +391,36 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   //printf("[UDPRECEIVER][%d] entered at %.3f s slot %d\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec), rb_current_slot);
   // infinite loop, with timeout
 
+  detector_definition detector;
+  if (strcmp(det.detector_name, "EIGER") == 0) {
+    detector = eiger_definition;
+  else if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
+    detector = jungfrau_definition;
+  } else {
+    printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
+    return -1;
+  }
+
+  if (bit_depth != 16 && bit_depth != 32) {
+    printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
+    return -1;
+  }
   
   while(true){
 
-    if(nframes != -1)
-      if(counters.recv_frames >= nframes){
-        // not clear if this is needed
-        // flushes the last message, in case the last frame lost packets
-        if(rb_current_slot != -1){
-          rb_commit_slot(rb_writer_id, rb_current_slot);
-          printf("Committed slot %d in mod_number %d after having received %d frames\n", rb_current_slot, mod_number, counters.recv_frames);
-        }
-      return counters.recv_frames;
+    if (nframes != -1 && counters.recv_frames >= nframes) {
+      // not clear if this is needed
+      // flushes the last message, in case the last frame lost packets
+      if(rb_current_slot != -1){
+        rb_commit_slot(rb_writer_id, rb_current_slot);
+        printf("Committed slot %d in mod_number %d after having received %d frames\n", rb_current_slot, mod_number, counters.recv_frames);
       }
 
-    if (bit_depth != 16 && bit_depth != 32) {
-      printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
       return counters.recv_frames;
     }
-   
-    // get data and copy to RB
-    if (strcmp(det.detector_name, "EIGER") == 0) {
 
       bpacket = get_put_data(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-			  n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth, copy_data_eiger, interpret_udp_packet_eiger);
-
-    } else if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
-      bpacket = get_put_data_jungfrau(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-        n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth);
-
-    } else {
-      printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
-      return counters.recv_frames;
-    }
+			  n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth, copy_data_eiger, interpret_udp_packet_eiger, sizeof(eiger_packet));
     
     // no data? Checks timeout
     if(bpacket.data_len <= 0){
