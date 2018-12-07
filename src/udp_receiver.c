@@ -143,27 +143,6 @@ int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) {
   return n_bytes;
 }
 
-void copy_data_jungfrau(detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth){
-  
-  int reverse = -1;
-  int reverse_factor = det.submodule_size[0] - 1;
-
-  int submodule_line_data_len = (8 * det.submodule_size[1]) / bit_depth;
-
-  int int_line = 0;
-  for (int i=line_number + n_lines_per_packet - 1; i >= line_number; i--) {
-
-    long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
-    long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
-    
-    //FIXME: would it make sense to do this? Performances issues?
-    /*p1 + i * det.detector_size[1],*/
-    memcpy((char*)p1 + destination_offset, (char*)data + source_offset, submodule_line_data_len);
-                
-    int_line++;
-  }
-}
-
 
 bool act_on_new_frame(counter *counters, int n_packets_per_frame, barebone_packet *bpacket, 
                       int *rb_current_slot, int rb_writer_id){
@@ -238,17 +217,16 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   size_t expected_packet_length = sizeof(packet);
 
   char[expected_packet_length] udp_packet;
-  int received_data_len = get_udp_packet(sock, &packet, expected_packet_length);
-
-  #ifdef DEBUG
-    if(received_data_len > 0){
-      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), nbytes, packet->framenum, packet->packetnum);
-    }
-  #endif
+  int received_data_len = get_udp_packet(sock, &udp_packet, expected_packet_length);
 
   barebone_packet bpacket = interpret_udp_packet_eiger(&udp_packet, received_data_len)
 
-  // ignoring the special eiger initial packet
+  #ifdef DEBUG
+    if(received_data_len > 0){
+      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), bpacket.data_len, bpacket.framenum, bpacket.packetnum);
+    }
+  #endif
+
   if(received_data_len != expected_packet_length){
     return bpacket;
   }
@@ -298,23 +276,19 @@ barebone_packet get_put_data_jungfrau(int sock, int rb_hbuffer_id, int *rb_curre
 
   jungfrau_packet packet;
   size_t expected_packet_length = sizeof(packet);
-  int data_len = get_udp_packet(sock, &packet, expected_packet_length);
 
-#ifdef DEBUG
-  if(data_len > 0){
-    printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), data_len, packet.framenum, packet.packetnum);
-  }
-#endif
+  char[expected_packet_length] udp_packet;
+  int received_data_len = get_udp_packet(sock, &udp_packet, expected_packet_length);
 
-  barebone_packet bpacket;
-  bpacket.data_len = data_len;
-  bpacket.framenum = packet.metadata.framenum;
-  bpacket.packetnum = packet.metadata.packetnum;
-  bpacket.bunchid = packet.metadata.bunchid;
-  bpacket.debug = packet.metadata.debug;
+  barebone_packet bpacket = interpret_udp_packet_jungfrau(&udp_packet, received_data_len)
 
-  // ignoring the special eiger initial packet
-  if(data_len != expected_packet_length){
+  #ifdef DEBUG
+    if(received_data_len > 0){
+      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), bpacket.data_len, bpacket.framenum, bpacket.packetnum);
+    }
+  #endif
+
+  if(received_data_len != expected_packet_length){
     return bpacket;
   }
 
