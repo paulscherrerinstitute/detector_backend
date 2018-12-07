@@ -103,15 +103,6 @@ commit_flag
 */
 
 
-// the essential info needed for a packet
-typedef struct _barebone_packet{
-  int data_len;
-  uint32_t packetnum;
-  uint64_t framenum;
-  double bunchid;
-  uint32_t debug;
-} barebone_packet;
-
 // Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
 typedef void (*copy_data_function)(detector, int, int, void*, void*, int);
 

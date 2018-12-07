@@ -50,4 +50,13 @@ typedef struct _detector_common_packet{
   uint8_t headerVersion;
 } detector_common_packet;
 
+// the essential info needed for a packet
+typedef struct _barebone_packet{
+  int data_len;
+  uint32_t packetnum;
+  uint64_t framenum;
+  double bunchid;
+  uint32_t debug;
+} barebone_packet;
+
 #endif
