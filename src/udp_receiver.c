@@ -205,10 +205,10 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
 barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, detector_definition det_definition){
 
-  char[det_definition.udp_packet_bytes] udp_packet;
-  int received_data_len = det_definition.get_udp_packet(sock, &udp_packet, det_definition.udp_packet_bytes);
+  const char udp_packet[det_definition.udp_packet_bytes];
+  const int received_data_len = get_udp_packet(sock, &udp_packet, det_definition.udp_packet_bytes);
 
-  barebone_packet bpacket = det_definition.interpret_udp_packet(&udp_packet, received_data_len)
+  barebone_packet bpacket = (*det_definition.interpret_udp_packet)(udp_packet, received_data_len);
 
   #ifdef DEBUG
     if(received_data_len > 0){
@@ -241,7 +241,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
-  copy_data(det, line_number, n_lines_per_packet, p1, packet.data, bit_depth);
+  copy_data(det, line_number, n_lines_per_packet, p1, bpacket.data, bit_depth);
 
   // updating counters
   update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
