@@ -60,10 +60,10 @@ typedef struct _barebone_packet{
 } barebone_packet;
 
 // Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
-typedef void (*interpret_udp_packet_function)(detector, int, int, void*, void*, int);
+typedef void (*interpret_udp_packet_function)(const char*, const int);
 
-// Signature: const char* udp_packet, const int received_packet_le
-typedef void (*copy_data_function)(const char*, const int);
+// Signature: const char* udp_packet, const int received_packet_len
+typedef void (*copy_data_function)(detector, int, int, void*, void*, int);
 
 typedef struct _detector_definition{
   interpret_udp_packet_function* interpret_udp_packet;
