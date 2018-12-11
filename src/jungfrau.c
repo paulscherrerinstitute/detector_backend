@@ -1,6 +1,7 @@
 #include <string.h>
 #include "detectors.h"
 
+#define JUNGFRAU_BYTES_PER_PACKET 8246
 #define JUNGFRAU_DATA_BYTES_PER_PACKET 8192
 
 // 6 bytes + 48 bytes + 8192 bytes = 8246 bytes
@@ -13,29 +14,38 @@ typedef struct _jungfrau_packet{
 } jungfrau_packet;
 #pragma pack(pop)
 
-barebone_packet interpret_udp_packet_jungfrau(const char* udp_packet, const int received_packet_len) {
+barebone_packet interpret_udp_packet_jungfrau (
+  const char* udp_packet, 
+  const int received_packet_len )
+{
   const jungfrau_packet* packet = (const jungfrau_packet*) udp_packet;
 
   barebone_packet bpacket;
-  bpacket.data_len = received_data_len;
-  bpacket.framenum = packet.metadata.framenum;
-  bpacket.packetnum = packet.metadata.packetnum;
-  bpacket.bunchid = packet.metadata.bunchid;
-  bpacket.debug = packet.metadata.debug;
+  bpacket.data_len = received_packet_len;
+  bpacket.framenum = packet->metadata.framenum;
+  bpacket.packetnum = packet->metadata.packetnum;
+  bpacket.bunchid = packet->metadata.bunchid;
+  bpacket.debug = packet->metadata.debug;
 
   return bpacket;
 }
 
-void copy_data_jungfrau(detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth){
-  
+void copy_data_jungfrau (
+  detector det, 
+  int line_number, 
+  int n_lines_per_packet, 
+  void * p1, 
+  void * data, 
+  int bit_depth )
+{
   int reverse = -1;
   int reverse_factor = det.submodule_size[0] - 1;
 
   int submodule_line_data_len = (8 * det.submodule_size[1]) / bit_depth;
 
   int int_line = 0;
-  for (int i=line_number + n_lines_per_packet - 1; i >= line_number; i--) {
-
+  for (int i=line_number + n_lines_per_packet - 1; i >= line_number; i--)
+  {
     long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
     long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
     
@@ -48,8 +58,9 @@ void copy_data_jungfrau(detector det, int line_number, int n_lines_per_packet, v
 }
 
 detector_definition jungfrau_definition = {
-  .interpret_udp_packet = interpret_udp_packet_jungfrau,
-  .copy_data = copy_data_jungfrau,
+  .interpret_udp_packet = (interpret_udp_packet_function*) interpret_udp_packet_jungfrau,
+  .copy_data = (copy_data_function*) copy_data_jungfrau,
   .udp_packet_bytes = sizeof(jungfrau_packet),
   .data_bytes_per_packet = JUNGFRAU_DATA_BYTES_PER_PACKET
 };
+
