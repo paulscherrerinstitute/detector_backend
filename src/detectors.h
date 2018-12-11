@@ -52,6 +52,7 @@ typedef struct _detector_common_packet{
 
 // the essential info needed for a packet
 typedef struct _barebone_packet{
+  char* data;
   int data_len;
   uint32_t packetnum;
   uint64_t framenum;

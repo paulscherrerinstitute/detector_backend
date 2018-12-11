@@ -17,6 +17,7 @@ barebone_packet interpret_udp_packet_eiger (
   eiger_packet* packet = (eiger_packet*) udp_packet;
 
   barebone_packet bpacket;
+  bpacket.data = packet->data;
   bpacket.data_len = received_packet_len;
   bpacket.framenum = packet->metadata.framenum;
   bpacket.packetnum = packet->metadata.packetnum;
