@@ -241,7 +241,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
-  copy_data(det, line_number, n_lines_per_packet, p1, bpacket.data, bit_depth);
+  (*det_definition.copy_data)(det, line_number, n_lines_per_packet, p1, bpacket.data, bit_depth);
 
   // updating counters
   update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
@@ -282,6 +282,21 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   counters.current_frame = 0;
   counters.recv_frames = 0;
 
+  detector_definition det_definition;
+  if (strcmp(det.detector_name, "EIGER") == 0)
+  {
+    det_definition = eiger_definition;
+  } 
+  else if (strcmp(det.detector_name, "JUNGFRAU") == 0) 
+  {
+    det_definition = jungfrau_definition;
+  } 
+  else 
+  {
+    printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
+    return -1;
+  }
+
   // Origin of the module within the detector, (0, 0) is bottom left
   uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
   mod_origin += det.module_idx[1] * ((det.submodule_n - 1) * det.gap_px_chips[1] + det.gap_px_modules[1]); // inter_chip gaps plus inter_module gap
@@ -298,7 +313,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); //numbering inside the detctor, growing over the x-axis
 
   // (Pixels in submodule) * (bytes per pixel) / (bytes per packet)
-  int n_packets_per_frame = det.submodule_size[0] * det.submodule_size[1] / (8 * data_bytes_per_packet / bit_depth);
+  int n_packets_per_frame = det.submodule_size[0] * det.submodule_size[1] / (8 * det_definition.data_bytes_per_packet / bit_depth);
   bpacket.data_len = 0;
 
   // Timeout for blocking sock recv
@@ -316,15 +331,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   //printf("[UDPRECEIVER][%d] entered at %.3f s slot %d\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec), rb_current_slot);
   // infinite loop, with timeout
 
-  detector_definition det_definition;
-  if (strcmp(det.detector_name, "EIGER") == 0) {
-    det_definition = eiger_definition;
-  else if (strcmp(det.detector_name, "JUNGFRAU") == 0) {
-    det_definition = jungfrau_definition;
-  } else {
-    printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
-    return -1;
-  }
 
   if (bit_depth != 16 && bit_depth != 32) {
     printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
