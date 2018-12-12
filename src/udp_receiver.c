@@ -260,6 +260,54 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   return bpacket;
 }
 
+inline uint32_t get_current_module_offset_in_pixels(detector& det)
+{
+  // Origin of the module within the detector, (0, 0) is bottom left
+  uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
+  mod_origin += det.module_idx[1] * ((det.submodule_n - 1) * det.gap_px_chips[1] + det.gap_px_modules[1]); // inter_chip gaps plus inter_module gap
+  mod_origin += det.module_idx[0] * (det.gap_px_chips[0] + det.gap_px_modules[0])* det.detector_size[1] ; // inter_chip gaps plus inter_module gap
+
+  // Origin of the submodule within the detector, relative to module origin
+  mod_origin += det.detector_size[1] * det.submodule_idx[0] * det.submodule_size[0] + det.submodule_idx[1] * det.submodule_size[1];
+  
+  if(det.submodule_idx[1] != 0)
+  {
+    // 2* because there is the inter-quartermodule chip gap
+    mod_origin += 2 * det.gap_px_chips[1];   
+  }
+
+  // the last takes into account extra space for chip gap within quarter module
+  if(det.submodule_idx[0] != 0)
+  {
+    mod_origin += det.submodule_idx[0] * det.detector_size[1] * det.gap_px_chips[0];
+  }
+
+  return mod_origin;
+}
+
+inline int get_current_module_index(detector det)
+{
+  //numbering inside the detctor, growing over the x-axiss
+  int mod_number = det.submodule_idx[0] * 2 + det.submodule_idx[1] + 
+    det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); 
+
+  return mod_number;
+}
+
+inline int get_n_packets_per_frame(detector det, size_t data_bytes_per_packet, int bit_depth)
+{
+  // (Pixels in submodule) * (bytes per pixel) / (bytes per packet)
+  return det.submodule_size[0] * det.submodule_size[1] / (8 * det_definition.data_bytes_per_packet / bit_depth);
+}
+
+inline int get_n_lines_per_packet(detector det, size_t data_bytes_per_packet, int bit_depth)
+{
+  // (Bytes in packet) / (Bytes in submodule line)
+  return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
+}
+
+
+
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
                     int16_t nframes, float timeout, detector det){
   /*!
@@ -267,12 +315,20 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     checking that all packets are acquired.
    */
   
-  //printf("%s %d\n", det.detector_name, det.detector_size[0]);
+  if (bit_depth != 16 && bit_depth != 32) 
+  {
+    printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
+    return -1;
+  }
+
+  if (strcmp(det.detector_name, "EIGER") != 0) && strcmp(det.detector_name, "JUNGFRAU") != 0))
+  {
+    printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
+    return -1;
+  }
 
   int stat_total_frames = 0;
   int tot_lost_packets = 0;
-  
-  barebone_packet bpacket;
   
   struct  timeval ti, te; //for timing
   double tdif=-1;
@@ -290,31 +346,12 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   else if (strcmp(det.detector_name, "JUNGFRAU") == 0) 
   {
     det_definition = jungfrau_definition;
-  } 
-  else 
-  {
-    printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
-    return -1;
   }
 
-  // Origin of the module within the detector, (0, 0) is bottom left
-  uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
-  mod_origin += det.module_idx[1] * ((det.submodule_n - 1) * det.gap_px_chips[1] + det.gap_px_modules[1]); // inter_chip gaps plus inter_module gap
-  mod_origin += det.module_idx[0] * (det.gap_px_chips[0] + det.gap_px_modules[0])* det.detector_size[1] ; // inter_chip gaps plus inter_module gap
-
-  // Origin of the submodule within the detector, relative to module origin
-  mod_origin += det.detector_size[1] * det.submodule_idx[0] * det.submodule_size[0] + det.submodule_idx[1] * det.submodule_size[1];
-  if(det.submodule_idx[1] != 0)
-    mod_origin += 2 * det.gap_px_chips[1];  // 2* because there is the inter-quartermodule chip gap //GAP_PX_CHIPS_Y * submod_idx[1]; // the last takes into account extra space for chip gap within quarter module
-  if(det.submodule_idx[0] != 0)
-    mod_origin += det.submodule_idx[0] * det.detector_size[1] * det.gap_px_chips[0];
-
-  int mod_number = det.submodule_idx[0] * 2 + det.submodule_idx[1] + 
-    det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); //numbering inside the detctor, growing over the x-axis
-
-  // (Pixels in submodule) * (bytes per pixel) / (bytes per packet)
-  int n_packets_per_frame = det.submodule_size[0] * det.submodule_size[1] / (8 * det_definition.data_bytes_per_packet / bit_depth);
-  bpacket.data_len = 0;
+  uint32_t mod_origin = get_current_module_offset_in_pixels(det);
+  int mod_number = get_current_module_index(det);
+  int n_packets_per_frame = get_n_packets_per_frame(det, det_definition.data_bytes_per_packet, bit_depth);
+  int n_lines_per_packet = get_n_lines_per_packet(det, det_definition.data_bytes_per_packet, bit_depth);
 
   // Timeout for blocking sock recv
   struct timeval tv;
@@ -330,16 +367,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   //printf("[UDPRECEIVER][%d] entered at %.3f s slot %d\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec), rb_current_slot);
   // infinite loop, with timeout
-
-
-  if (bit_depth != 16 && bit_depth != 32) {
-    printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
-    return -1;
-  }
-
-  // (Bytes in packet) / (Bytes in submodule line)
-  int n_lines_per_packet = 8 * det_definition.data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
   
+  barebone_packet bpacket;
+
   while(true){
 
     if (nframes != -1 && counters.recv_frames >= nframes) {
