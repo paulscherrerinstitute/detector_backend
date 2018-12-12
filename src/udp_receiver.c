@@ -244,7 +244,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   return bpacket;
 }
 
-inline uint32_t get_current_module_offset_in_pixels(detector& det)
+inline uint32_t get_current_module_offset_in_pixels(detector det)
 {
   // Origin of the module within the detector, (0, 0) is bottom left
   uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
@@ -281,7 +281,7 @@ inline int get_current_module_index(detector det)
 inline int get_n_packets_per_frame(detector det, size_t data_bytes_per_packet, int bit_depth)
 {
   // (Pixels in submodule) * (bytes per pixel) / (bytes per packet)
-  return det.submodule_size[0] * det.submodule_size[1] / (8 * det_definition.data_bytes_per_packet / bit_depth);
+  return det.submodule_size[0] * det.submodule_size[1] / (8 * data_bytes_per_packet / bit_depth);
 }
 
 inline int get_n_lines_per_packet(detector det, size_t data_bytes_per_packet, int bit_depth)
@@ -303,7 +303,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     return -1;
   }
 
-  if (strcmp(det.detector_name, "EIGER") != 0) && strcmp(det.detector_name, "JUNGFRAU") != 0))
+  if ((strcmp(det.detector_name, "EIGER") != 0) && (strcmp(det.detector_name, "JUNGFRAU") != 0))
   {
     printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
     return -1;
