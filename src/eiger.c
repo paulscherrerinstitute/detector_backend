@@ -69,9 +69,8 @@ void copy_data_eiger (
 }
 
 detector_definition eiger_definition = {
-  .interpret_udp_packet = (interpret_udp_packet_function*) interpret_udp_packet_eiger,
-  .copy_data = (copy_data_function*) copy_data_eiger,
+  .interpret_udp_packet = (interpret_udp_packet_function) interpret_udp_packet_eiger,
+  .copy_data = (copy_data_function) copy_data_eiger,
   .udp_packet_bytes = sizeof(eiger_packet),
   .data_bytes_per_packet = EIGER_DATA_BYTES_PER_PACKET
 };
-

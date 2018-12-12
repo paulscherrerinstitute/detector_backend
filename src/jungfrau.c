@@ -56,8 +56,8 @@ void copy_data_jungfrau (
 }
 
 detector_definition jungfrau_definition = {
-  .interpret_udp_packet = (interpret_udp_packet_function*) interpret_udp_packet_jungfrau,
-  .copy_data = (copy_data_function*) copy_data_jungfrau,
+  .interpret_udp_packet = (interpret_udp_packet_function) interpret_udp_packet_jungfrau,
+  .copy_data = (copy_data_function) copy_data_jungfrau,
   .udp_packet_bytes = sizeof(jungfrau_packet),
   .data_bytes_per_packet = JUNGFRAU_DATA_BYTES_PER_PACKET
 };
