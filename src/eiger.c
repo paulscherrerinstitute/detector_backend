@@ -11,8 +11,7 @@ typedef struct _eiger_packet {
 } eiger_packet;
 
 barebone_packet interpret_udp_packet_eiger (
-  const char* udp_packet, 
-  const int received_packet_len ) 
+  const char* udp_packet, const int received_packet_len ) 
 {
   eiger_packet* packet = (eiger_packet*) udp_packet;
 
@@ -26,12 +25,8 @@ barebone_packet interpret_udp_packet_eiger (
 }
 
 void copy_data_eiger (
-  detector det, 
-  int line_number, 
-  int n_lines_per_packet, 
-  void * p1, 
-  void * data, 
-  int bit_depth )
+  detector det, int line_number, int n_lines_per_packet, 
+  void* ringbuffer_slot_origin, void * data, int bit_depth )
 {  
   int reverse;
   int reverse_factor;
@@ -54,13 +49,20 @@ void copy_data_eiger (
     long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
     long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
 
-    memcpy((char*) p1 + destination_offset, (char*) data + source_offset, submodule_line_data_len/2);
+    memcpy (
+      (char*)ringbuffer_slot_origin + destination_offset, 
+      (char*) data + source_offset, 
+      submodule_line_data_len/2
+    );
 
     long destination_gap_offset = 8 * (det.gap_px_chips[1] + det.submodule_size[1] / 2) / bit_depth;
     long source_gap_offset = 8 * (det.submodule_size[1] / 2) / bit_depth;
 
-    memcpy((char*)p1 + destination_offset + destination_gap_offset,
-      (char *)data + source_offset + source_gap_offset, submodule_line_data_len/2);
+    memcpy(
+      (char*)ringbuffer_slot_origin + destination_offset + destination_gap_offset,
+      (char*)data + source_offset + source_gap_offset, 
+      submodule_line_data_len/2
+      );
 
     int_line ++;
   }

@@ -15,8 +15,7 @@ typedef struct _jungfrau_packet{
 #pragma pack(pop)
 
 barebone_packet interpret_udp_packet_jungfrau (
-  const char* udp_packet, 
-  const int received_packet_len )
+  const char* udp_packet, const int received_packet_len )
 {
   jungfrau_packet* packet = (jungfrau_packet*) udp_packet;
 
@@ -32,12 +31,8 @@ barebone_packet interpret_udp_packet_jungfrau (
 }
 
 void copy_data_jungfrau (
-  detector det, 
-  int line_number, 
-  int n_lines_per_packet, 
-  void * p1, 
-  void * data, 
-  int bit_depth )
+  detector det, int line_number, int n_lines_per_packet, 
+  void* ringbuffer_slot_origin, void* data, int bit_depth )
 {
   int reverse = -1;
   int reverse_factor = det.submodule_size[0] - 1;
@@ -50,9 +45,11 @@ void copy_data_jungfrau (
     long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
     long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
     
-    //FIXME: would it make sense to do this? Performances issues?
-    /*p1 + i * det.detector_size[1],*/
-    memcpy((char*)p1 + destination_offset, (char*)data + source_offset, submodule_line_data_len);
+    memcpy(
+      (char*)ringbuffer_slot_origin + destination_offset, 
+      (char*)data + source_offset, 
+      submodule_line_data_len
+    );
                 
     int_line++;
   }
@@ -64,4 +61,3 @@ detector_definition jungfrau_definition = {
   .udp_packet_bytes = sizeof(jungfrau_packet),
   .data_bytes_per_packet = JUNGFRAU_DATA_BYTES_PER_PACKET
 };
-

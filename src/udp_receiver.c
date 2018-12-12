@@ -74,30 +74,6 @@ commit_flag
       data is copied
   */
 
-
-// unused atm
-//#define SERVER_PORT 50001
-//#define SERVER_IP "127.0.0.1"
-//#define SOCKET_BUFFER_SIZE 4096
-
-// gap pixels between chips and modules. move this to a struct and pass it as argument
-
-/*
-#define GAP_PX_CHIPS_X 2
-#define GAP_PX_CHIPS_Y 2
-#define GAP_PX_MODULES_X 36
-#define GAP_PX_MODULES_Y 8
-//#define GAP_PX_MODULES_X 8
-//#define GAP_PX_MODULES_Y 36
-*/
-
-/*
-#define GAP_PX_CHIPS_X 0
-#define GAP_PX_CHIPS_Y 0
-#define GAP_PX_MODULES_X 0
-#define GAP_PX_MODULES_Y 0
-*/
-
 typedef struct Counter{
   /*
   int total_packets;
@@ -111,7 +87,8 @@ typedef struct Counter{
 } counter;
 
 
-void initialize_counters(counter *counters, rb_header *ph, int n_packets_per_frame){
+void initialize_counters(counter *counters, rb_header *ph, int n_packets_per_frame)
+{
   uint64_t ones = ~((uint64_t)0);
   
   if (counters->recv_packets == 1){
@@ -119,12 +96,16 @@ void initialize_counters(counter *counters, rb_header *ph, int n_packets_per_fra
 
     ph->framemetadata[2] = ones >> (64 - n_packets_per_frame);
     ph->framemetadata[3] = 0;
+
     if(n_packets_per_frame > 64)
+    {
       ph->framemetadata[3] = ones >> (128 - n_packets_per_frame);
+    }
   }
 }
 
-int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) {
+int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) 
+{
   size_t n_bytes = recv(socket_fd, buffer, buffer_len, 0);
 
   // Did not receive a valid frame packet.
@@ -136,18 +117,20 @@ int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) {
 }
 
 
-bool act_on_new_frame(counter *counters, int n_packets_per_frame, barebone_packet *bpacket, 
-                      int *rb_current_slot, int rb_writer_id){
+bool act_on_new_frame (
+  counter *counters, int n_packets_per_frame, barebone_packet *bpacket, 
+  int *rb_current_slot, int rb_writer_id )
+{
 
   bool commit_flag=false;
 
-    // this fails in case frame number is not updated by the detector (or its simulation)
+  // this fails in case frame number is not updated by the detector (or its simulation)
   if(counters->recv_packets == n_packets_per_frame && bpacket->framenum == counters->current_frame){
-    //this is the last packet of the frame
-#ifdef DEBUG
+  //this is the last packet of the frame
+  #ifdef DEBUG
     printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket->packetnum, counters->recv_packets, 
-                                                                    n_packets_per_frame, bpacket->framenum, counters->current_frame);
-#endif
+      n_packets_per_frame, bpacket->framenum, counters->current_frame);
+  #endif
 
     counters->recv_frames++;
     //counters->recv_packets = 0;
@@ -216,6 +199,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
     }
   #endif
 
+  // Invalid size/empty packet. received_data_len == 0 in this case.
   if(received_data_len != det_definition.udp_packet_bytes){
     return bpacket;
   }
@@ -226,12 +210,12 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   // Data copy
   // getting the pointers in RB for header and data - must be done after slots are committed / assigned
   rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
-  char* p1 = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  char* ringbuffer_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
 
   // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
-  p1 += (mod_origin * bit_depth) / 8;
+  ringbuffer_slot_origin += (mod_origin * bit_depth) / 8;
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
@@ -241,7 +225,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
-  (*det_definition.copy_data)(det, line_number, n_lines_per_packet, p1, bpacket.data, bit_depth);
+  (*det_definition.copy_data)(det, line_number, n_lines_per_packet, ringbuffer_slot_origin, bpacket.data, bit_depth);
 
   // updating counters
   update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
@@ -305,8 +289,6 @@ inline int get_n_lines_per_packet(detector det, size_t data_bytes_per_packet, in
   // (Bytes in packet) / (Bytes in submodule line)
   return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
 }
-
-
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
                     int16_t nframes, float timeout, detector det){
@@ -429,44 +411,3 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   } // end while
   return counters.recv_frames;
 }
-
-
-
-//test function
-/*
-int main(){
-	int ret;
-	struct sockaddr_in serveraddr;
-	int sd = socket(AF_INET, SOCK_DGRAM, 0);
-	printf("SD: %d\n", sd);
-
-	int   val=SOCKET_BUFFER_SIZE;
-	setsockopt(sd, SOL_SOCKET, SO_RCVBUF, &val, sizeof(int));
-	
-	if (sd < 0){
-	  perror("socket() failed");
-	  return -1;
-	}
-	
-	memset(&serveraddr, 0, sizeof(serveraddr));
-	serveraddr.sin_family      = AF_INET;
-	serveraddr.sin_port        = htons(SERVER_PORT);
-	serveraddr.sin_addr.s_addr = inet_addr(SERVER_IP);
-	
-	int rc = bind(sd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-	printf("RC bind: %d\n", rc);
-	//ret = setsockopt(socket, SOL_SOCKET, SO_RCVBUF, &val, sizeof(int));
-	//printf("%d\n", ret);
-
-	int32_t idx[256*256];
-	int i;
-	for(i=0; i<256*256; i++)
-	  idx[i] = i;
-	//eiger_packet16 packet;
-	void * packet;
-	while(1)
-	  put_udp_in_rb(sd, 16, 0, 0, 0, 0, 0, idx);
-			//get_message16(sd, &packet);
-}
-
-*/
