@@ -6,6 +6,7 @@ CC=gcc
 LIBNAME=libudpreceiver
 LIBDIR=$(RINGBUFFER)/ringbuffer/ringbuffer/lib/
 CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath=$(LIBDIR) -Wall
+CFLAGS+=-Wfatal-errors
 #CFLAGS+= -DDEBUG
 
 all: src/udp_receiver.c
