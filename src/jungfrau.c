@@ -18,7 +18,7 @@ barebone_packet interpret_udp_packet_jungfrau (
   const char* udp_packet, 
   const int received_packet_len )
 {
-  const jungfrau_packet* packet = (const jungfrau_packet*) udp_packet;
+  jungfrau_packet* packet = (jungfrau_packet*) udp_packet;
 
   barebone_packet bpacket;
   bpacket.data = packet->data;
