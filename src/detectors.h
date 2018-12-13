@@ -4,6 +4,17 @@
 // header struct for RB - to be updated to include the framenums of all modules
 #include <inttypes.h>
 
+typedef struct Counter{
+  /*
+  int total_packets;
+  uint64_t framenum_last;
+  int total_frames;
+  */
+  int recv_packets;
+  uint64_t current_frame;
+  int recv_frames;
+  int lost_frames;
+} counter;
 
 typedef struct _detector{
     char detector_name[10];

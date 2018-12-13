@@ -74,19 +74,6 @@ commit_flag
       data is copied
   */
 
-typedef struct Counter{
-  /*
-  int total_packets;
-  uint64_t framenum_last;
-  int total_frames;
-  */
-  int recv_packets;
-  uint64_t current_frame;
-  int recv_frames;
-  int lost_frames;
-} counter;
-
-
 void initialize_counters(counter *counters, rb_header *ph, int n_packets_per_frame)
 {
   uint64_t ones = ~((uint64_t)0);
@@ -123,6 +110,8 @@ bool act_on_new_frame (
 {
 
   bool commit_flag=false;
+
+  if ()
 
   // this fails in case frame number is not updated by the detector (or its simulation)
   if(counters->recv_packets == n_packets_per_frame && bpacket->framenum == counters->current_frame){
