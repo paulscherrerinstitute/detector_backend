@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +11,6 @@
 #include <sys/time.h>
 #include <ring_buffer.h>
 // for uint64 printing
-#include <inttypes.h>
 // for serveraddr
 #include <arpa/inet.h>
 #include <sched.h>
@@ -20,6 +18,7 @@
 #include "detectors.h"
 #include "jungfrau.c"
 #include "eiger.c"
+#include "geometry.c"
 
   /*
   Logic:
@@ -74,23 +73,6 @@ commit_flag
       data is copied
   */
 
-void initialize_counters(counter *counters, rb_header *ph, int n_packets_per_frame)
-{
-  uint64_t ones = ~((uint64_t)0);
-  
-  if (counters->recv_packets == 1){
-    for(int i=0; i < 8; i++) ph->framemetadata[i] = 0;
-
-    ph->framemetadata[2] = ones >> (64 - n_packets_per_frame);
-    ph->framemetadata[3] = 0;
-
-    if(n_packets_per_frame > 64)
-    {
-      ph->framemetadata[3] = ones >> (128 - n_packets_per_frame);
-    }
-  }
-}
-
 int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) 
 {
   size_t n_bytes = recv(socket_fd, buffer, buffer_len, 0);
@@ -110,8 +92,6 @@ bool act_on_new_frame (
 {
 
   bool commit_flag=false;
-
-  if ()
 
   // this fails in case frame number is not updated by the detector (or its simulation)
   if(counters->recv_packets == n_packets_per_frame && bpacket->framenum == counters->current_frame){
@@ -153,9 +133,29 @@ bool act_on_new_frame (
   return commit_flag;
 }
 
+void initialize_rb_header(counter *counters, rb_header *ph, int n_packets_per_frame)
+{
+  uint64_t ones = ~((uint64_t)0);
+  
+  if (counters->recv_packets == 1)
+  {
+    for(int i=0; i < 8; i++) 
+    {
+      ph->framemetadata[i] = 0;
+    } 
 
-void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_frame, counter *counters, int mod_number){
-  // updating counters
+    ph->framemetadata[2] = ones >> (64 - n_packets_per_frame);
+    
+    ph->framemetadata[3] = 0;
+    if(n_packets_per_frame > 64)
+    {
+      ph->framemetadata[3] = ones >> (128 - n_packets_per_frame);
+    }
+  }
+}
+
+void update_rb_header(rb_header * ph, barebone_packet bpacket, int n_packets_per_frame, counter *counters, int mod_number)
+{
   ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
   ph->framemetadata[1] = n_packets_per_frame - counters->recv_packets;
     
@@ -166,11 +166,11 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
   else{
     ph->framemetadata[3] &= ~(mask << (bpacket.packetnum - 64));
   }
+
   ph->framemetadata[4] = (uint64_t) bpacket.bunchid;
   ph->framemetadata[5] = (uint64_t) bpacket.debug;
   ph->framemetadata[6] = (uint64_t) mod_number;
   ph->framemetadata[7] = (uint64_t) 1;
-
 }
 
 
@@ -208,7 +208,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
-    initialize_counters(counters, ph, n_packets_per_frame);
+    initialize_rb_header(counters, ph, n_packets_per_frame);
   }
 
   // assuming packetnum sequence is 0..N-1
@@ -217,7 +217,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   det_definition.copy_data(det, line_number, n_lines_per_packet, ringbuffer_slot_origin, bpacket.data, bit_depth);
 
   // updating counters
-  update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
+  update_rb_header(ph, bpacket, n_packets_per_frame, counters, mod_number);
 
   // commit the slot if this is the last packet of the frame
   if(commit_flag){
@@ -231,52 +231,6 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   }
 
   return bpacket;
-}
-
-inline uint32_t get_current_module_offset_in_pixels(detector det)
-{
-  // Origin of the module within the detector, (0, 0) is bottom left
-  uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
-  mod_origin += det.module_idx[1] * ((det.submodule_n - 1) * det.gap_px_chips[1] + det.gap_px_modules[1]); // inter_chip gaps plus inter_module gap
-  mod_origin += det.module_idx[0] * (det.gap_px_chips[0] + det.gap_px_modules[0])* det.detector_size[1] ; // inter_chip gaps plus inter_module gap
-
-  // Origin of the submodule within the detector, relative to module origin
-  mod_origin += det.detector_size[1] * det.submodule_idx[0] * det.submodule_size[0] + det.submodule_idx[1] * det.submodule_size[1];
-  
-  if(det.submodule_idx[1] != 0)
-  {
-    // 2* because there is the inter-quartermodule chip gap
-    mod_origin += 2 * det.gap_px_chips[1];   
-  }
-
-  // the last takes into account extra space for chip gap within quarter module
-  if(det.submodule_idx[0] != 0)
-  {
-    mod_origin += det.submodule_idx[0] * det.detector_size[1] * det.gap_px_chips[0];
-  }
-
-  return mod_origin;
-}
-
-inline int get_current_module_index(detector det)
-{
-  //numbering inside the detctor, growing over the x-axiss
-  int mod_number = det.submodule_idx[0] * 2 + det.submodule_idx[1] + 
-    det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); 
-
-  return mod_number;
-}
-
-inline int get_n_packets_per_frame(detector det, size_t data_bytes_per_packet, int bit_depth)
-{
-  // (Pixels in submodule) * (bytes per pixel) / (bytes per packet)
-  return det.submodule_size[0] * det.submodule_size[1] / (8 * data_bytes_per_packet / bit_depth);
-}
-
-inline int get_n_lines_per_packet(detector det, size_t data_bytes_per_packet, int bit_depth)
-{
-  // (Bytes in packet) / (Bytes in submodule line)
-  return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
 }
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
