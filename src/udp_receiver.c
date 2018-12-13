@@ -16,7 +16,7 @@
 #include "detectors.h"
 #include "jungfrau.c"
 #include "eiger.c"
-#include "geometry.c"
+#include "utils.c"
 
 int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) 
 {
@@ -203,11 +203,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   struct  timeval ti, te; //for timing
   double tdif=-1;
 
-  counter counters;
-
-  counters.current_frame = 0;
-  counters.recv_frames = 0;
-
   detector_definition det_definition;
   if (strcmp(det.detector_name, "EIGER") == 0)
   {
@@ -230,16 +225,18 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
 
   // Timeout for receiving packets
-  struct timeval tv_start, tv_end;
+  struct timeval tv_start;
   double timeout_i = 0;
 
   gettimeofday(&tv_start, NULL);
 
-  //printf("[UDPRECEIVER][%d] entered at %.3f s slot %d\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec), rb_current_slot);
-  // infinite loop, with timeout
-  
   barebone_packet bpacket;
 
+  counter counters;
+  counters.current_frame = 0;
+  counters.recv_frames = 0;
+
+  // infinite loop, with timeout
   while(true){
 
     if (nframes != -1 && counters.recv_frames >= nframes) {
@@ -255,47 +252,43 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
     bpacket = get_put_data(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
       n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth, det_definition);
-    
-    // no data? Checks timeout
-    if(bpacket.data_len <= 0){
-      gettimeofday(&tv_end, NULL);
-      timeout_i = (double)(tv_end.tv_usec - tv_start.tv_usec) / 1e6 + (double)(tv_end.tv_sec - tv_start.tv_sec);
 
-      if (timeout_i > (double)timeout){
+    if (bpacket.data_len > 0) 
+    {
+      // Reset timeout timer. Only timeout when there are no packages coming for "timeout"
+      gettimeofday(&tv_start, NULL);
+
+      //this means a new frame, but only for Eiger. Possibly it will be removed
+      if(counters.current_frame == 0 && bpacket.data_len > 0){
+        tot_lost_packets += counters.lost_frames;
+        // prints out statistics every stats_frames
+        int stats_frames = 120;
+        stat_total_frames ++;
+
+        if (counters.recv_frames % stats_frames == 0 && counters.recv_frames != 0){
+          gettimeofday(&te, NULL);
+          tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
+          printf("| %d | %d | %lu | %.2f | %d | %.1f |\n", sched_getcpu(), getpid(), bpacket.framenum, (double) stats_frames / tdif, 
+                                                            tot_lost_packets, 100. * (float)tot_lost_packets / (float)(n_packets_per_frame * stat_total_frames));
+          //printf("| %d | %lu | %.2f | %d | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
+          gettimeofday(&ti,NULL);
+          stat_total_frames = 0;
+        } 
+      } // end new frame if
+    } 
+    else 
+    {
+      if (is_timeout_expired(timout, tv_start)) 
+      {
         // flushes the last message, in case the last frame lost packets
-        //printf("breaking timeout after %f ms\n", timeout_i);
-        #ifdef DEBUG
-          printf("[UDPRECEIVER][%d] left at %.3f s slot %d for mod_number %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), rb_current_slot, mod_number);
-        #endif
-        if(rb_current_slot != -1){
-          rb_commit_slot(rb_writer_id, rb_current_slot);
-          printf("Committed slot %d after timeout in mod_number %d, recv_packets %d\n", rb_current_slot, mod_number, counters.recv_packets);
-        }
-        return counters.recv_frames;
+        commit_slot(rb_current_slot, rb_writer_id);
+
+        printf("Committed slot %d after timeout in mod_number %d, recv_packets %d\n", rb_current_slot, mod_number, counters.recv_packets);
+
+        break;
       }
-      continue;
     }
-
-    gettimeofday(&tv_start, NULL);
-
-    //this means a new frame, but only for Eiger. Possibly it will be removed
-    if(counters.current_frame == 0 && bpacket.data_len > 0){
-      tot_lost_packets += counters.lost_frames;
-      // prints out statistics every stats_frames
-      int stats_frames = 120;
-      stat_total_frames ++;
-
-      if (counters.recv_frames % stats_frames == 0 && counters.recv_frames != 0){
-        gettimeofday(&te, NULL);
-        tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
-        printf("| %d | %d | %lu | %.2f | %d | %.1f |\n", sched_getcpu(), getpid(), bpacket.framenum, (double) stats_frames / tdif, 
-                                                          tot_lost_packets, 100. * (float)tot_lost_packets / (float)(n_packets_per_frame * stat_total_frames));
-        //printf("| %d | %lu | %.2f | %d | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
-        gettimeofday(&ti,NULL);
-        stat_total_frames = 0;
-      } 
-    } // end new frame if
-      
   } // end while
+  
   return counters.recv_frames;
 }

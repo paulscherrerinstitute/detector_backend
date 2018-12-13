@@ -1,5 +1,6 @@
 #include <inttypes.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "detectors.h"
 
@@ -47,4 +48,21 @@ inline int get_n_lines_per_packet(detector det, size_t data_bytes_per_packet, in
 {
   // (Bytes in packet) / (Bytes in submodule line)
   return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
+}
+
+inline bool is_timeout_expired(double timeout, struct timeval* tv_start)
+{
+  struct timeval tv_end;
+  gettimeofday(&tv_end, NULL);
+
+  double timeout_i = (double)(tv_end.tv_usec - tv_start->tv_usec) / 1e6 + (double)(tv_end.tv_sec - tv_start->tv_sec);
+  return timeout_i > timeout;
+}
+
+inline void commit_slot(int rb_current_slot, int rb_writer_id)
+{
+  if(rb_current_slot != -1)
+  {
+    rb_commit_slot(rb_writer_id, rb_current_slot);
+  }
 }
