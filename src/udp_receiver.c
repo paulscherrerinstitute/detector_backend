@@ -18,8 +18,6 @@
 #include "eiger.c"
 #include "utils.c"
 
-#define PRINT_STATS_N_FRAMES_MODULO 100
-
 int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) 
 {
   size_t n_bytes = recv(socket_fd, buffer, buffer_len, 0);
@@ -199,12 +197,6 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     return -1;
   }
 
-  int stat_total_frames = 0;
-  int tot_lost_packets = 0;
-  
-  struct  timeval ti, te; //for timing
-  double tdif=-1;
-
   detector_definition det_definition;
   if (strcmp(det.detector_name, "EIGER") == 0)
   {
@@ -220,23 +212,25 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int n_packets_per_frame = get_n_packets_per_frame(det, det_definition.data_bytes_per_packet, bit_depth);
   int n_lines_per_packet = get_n_lines_per_packet(det, det_definition.data_bytes_per_packet, bit_depth);
 
-  // Timeout for blocking sock recv
+  // Timeout for blocking sock recv.
   struct timeval tv;
   tv.tv_sec = 0;
   tv.tv_usec = 50;
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
 
-  // Timeout for receiving packets
-  struct timeval tv_start;
-  double timeout_i = 0;
+  // Timeout for receiving packets.
+  struct timeval timeout_start_time;
+  gettimeofday(&timeout_start_time, NULL);
 
-  gettimeofday(&tv_start, NULL);
-
-  barebone_packet bpacket;
+  // Timer for printing statistics.
+  struct timeval last_stats_print_time;
+  gettimeofday(&last_stats_print_time, NULL);
 
   counter counters;
   counters.current_frame = 0;
   counters.recv_frames = 0;
+
+  barebone_packet bpacket;
 
   while(true)
   {
@@ -246,7 +240,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       &counters, det, bit_depth, det_definition );
 
     // Not receiving data, and timeout expired.
-    if (bpacket.data_len <= 0 && is_timeout_expired(timout, tv_start)) 
+    if (bpacket.data_len <= 0 && is_timeout_expired(timout, timeout_start_time)) 
     {
       // Flushes the last message, in case the last frame lost packets
       if (commit_slot(rb_current_slot, rb_writer_id)) 
@@ -262,7 +256,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     // Acquisition finished.
     if (nframes != -1 && counters.recv_frames >= nframes) 
     {
-      // flushes the last message, in case the last frame lost packets
+      // Flushes the last message, in case the last frame lost packets.
       if (commit_slot(rb_current_slot, rb_writer_id))
       {
         printf (
@@ -273,30 +267,17 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       break;
     }
 
-    // Print statistics every n_frames
+    // Print statistics every PRINT_STATS_N_FRAMES_MODULO frames.
     if (counters.recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
       && counters.recv_frames != 0)
     {
+      print_statistics(&counters, &barebone_packet, &last_stat_print_time);
       
-      tot_lost_packets += counters.lost_frames;
-
-      // prints out statistics every stats_frames
-      int stats_frames = 120;
-      stat_total_frames ++;
-
-      if (counters.recv_frames % stats_frames == 0 && counters.recv_frames != 0){
-        gettimeofday(&te, NULL);
-        tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
-        printf("| %d | %d | %lu | %.2f | %d | %.1f |\n", sched_getcpu(), getpid(), bpacket.framenum, (double) stats_frames / tdif, 
-                                                          tot_lost_packets, 100. * (float)tot_lost_packets / (float)(n_packets_per_frame * stat_total_frames));
-        //printf("| %d | %lu | %.2f | %d | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
-        gettimeofday(&ti,NULL);
-        stat_total_frames = 0;
-      } 
+      gettimeofday(&last_stats_print_time, NULL);
     }
 
-    // Reset timeout counter.
-    gettimeofday(&tv_start, NULL);
+    // Reset timeout time.
+    gettimeofday(&timeout_start_time, NULL);
   }
 
   return counters.recv_frames;
