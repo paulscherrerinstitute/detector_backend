@@ -115,7 +115,7 @@ void update_rb_header (
   ph->framemetadata[7] = (uint64_t) 1;
 }
 
-bool get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, detector_definition det_definition){
 
   const char udp_packet[det_definition.udp_packet_bytes];
@@ -213,17 +213,14 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       getpid(), mod_origin, bit_depth, n_frames);
   #endif
 
-  // Timeout for blocking sock recv.
-  struct timeval tv;
-  tv.tv_sec = 0;
-  tv.tv_usec = 50;
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
+  struct timeval udp_socket_timeout;
+  udp_socket_timeout.tv_sec = 0;
+  udp_socket_timeout.tv_usec = 50;
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&udp_socket_timeout, sizeof(struct timeval));
 
-  // Timeout for receiving packets.
   struct timeval timeout_start_time;
   gettimeofday(&timeout_start_time, NULL);
 
-  // Timer for printing statistics.
   struct timeval last_stats_print_time;
   gettimeofday(&last_stats_print_time, NULL);
 
@@ -233,7 +230,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   while(true)
   {
-    bool is_packet_received = get_put_data (
+    bool is_packet_received = receive_save_packet (
       sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, 
       mod_origin, mod_number, n_lines_per_packet, n_packets_per_frame, 
       &counters, det, bit_depth, det_definition );
