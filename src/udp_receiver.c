@@ -162,7 +162,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
   #ifdef DEBUG
     printf("[put_data_in_rb][%d] mod_origin: %d mod_number: %d bit_depth: %d n_frames:%d\n",
-      getpid(), mod_origin, bit_depth, n_frames);
+      getpid(), mod_origin, mod_number, bit_depth, n_frames);
   #endif
 
   struct timeval udp_socket_timeout;
