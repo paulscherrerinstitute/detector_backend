@@ -67,55 +67,7 @@ bool act_on_new_frame (
   return commit_flag;
 }
 
-void initialize_rb_header (
-  counter *counters, 
-  rb_header *ph, 
-  int n_packets_per_frame )
-{
-  uint64_t ones = ~((uint64_t)0);
-  
-  if (counters->recv_packets == 1)
-  {
-    for(int i=0; i < 8; i++) 
-    {
-      ph->framemetadata[i] = 0;
-    } 
-
-    ph->framemetadata[2] = ones >> (64 - n_packets_per_frame);
-    
-    ph->framemetadata[3] = 0;
-    if(n_packets_per_frame > 64)
-    {
-      ph->framemetadata[3] = ones >> (128 - n_packets_per_frame);
-    }
-  }
-}
-
-void update_rb_header (
-  rb_header * ph, 
-  barebone_packet bpacket, 
-  int n_packets_per_frame, 
-  counter *counters, 
-  int mod_number )
-{
-  ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
-  ph->framemetadata[1] = n_packets_per_frame - counters->recv_packets;
-    
-  const uint64_t mask = 1;
-  if(bpacket.packetnum < 64){
-    ph->framemetadata[2] &= ~(mask << bpacket.packetnum);
-  }
-  else{
-    ph->framemetadata[3] &= ~(mask << (bpacket.packetnum - 64));
-  }
-
-  ph->framemetadata[4] = (uint64_t) bpacket.bunchid;
-  ph->framemetadata[5] = (uint64_t) bpacket.debug;
-  ph->framemetadata[6] = (uint64_t) mod_number;
-  ph->framemetadata[7] = (uint64_t) 1;
-}
-
-bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, detector_definition det_definition){
 
   const char udp_packet[det_definition.udp_packet_bytes];

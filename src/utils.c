@@ -84,6 +84,54 @@ inline bool commit_slot (int rb_current_slot, int rb_writer_id)
   return false;
 }
 
+inline void initialize_rb_header (
+  counter *counters, 
+  rb_header *ph, 
+  int n_packets_per_frame )
+{
+  uint64_t ones = ~((uint64_t)0);
+  
+  if (counters->recv_packets == 1)
+  {
+    for(int i=0; i < 8; i++) 
+    {
+      ph->framemetadata[i] = 0;
+    } 
+
+    ph->framemetadata[2] = ones >> (64 - n_packets_per_frame);
+    
+    ph->framemetadata[3] = 0;
+    if(n_packets_per_frame > 64)
+    {
+      ph->framemetadata[3] = ones >> (128 - n_packets_per_frame);
+    }
+  }
+}
+
+inline void update_rb_header (
+  rb_header * ph, 
+  barebone_packet bpacket, 
+  int n_packets_per_frame, 
+  counter *counters, 
+  int mod_number )
+{
+  ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
+  ph->framemetadata[1] = n_packets_per_frame - counters->recv_packets;
+    
+  const uint64_t mask = 1;
+  if(bpacket.packetnum < 64){
+    ph->framemetadata[2] &= ~(mask << bpacket.packetnum);
+  }
+  else{
+    ph->framemetadata[3] &= ~(mask << (bpacket.packetnum - 64));
+  }
+
+  ph->framemetadata[4] = (uint64_t) bpacket.bunchid;
+  ph->framemetadata[5] = (uint64_t) bpacket.debug;
+  ph->framemetadata[6] = (uint64_t) mod_number;
+  ph->framemetadata[7] = (uint64_t) 1;
+}
+
 inline void print_statistics (counter* counters, struct timeval last_stats_print_time)
 {
   struct timeval current_time;
