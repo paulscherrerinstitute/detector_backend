@@ -101,7 +101,7 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
-    initialize_rb_header(counters, ph, n_packets_per_frame);
+    initialize_rb_header(ph, n_packets_per_frame);
   }
 
   // assuming packetnum sequence is 0..N-1
