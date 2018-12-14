@@ -59,10 +59,13 @@ inline bool is_timeout_expired(double timeout, struct timeval* tv_start)
   return timeout_i > timeout;
 }
 
-inline void commit_slot(int rb_current_slot, int rb_writer_id)
+inline bool commit_slot(int rb_current_slot, int rb_writer_id)
 {
   if(rb_current_slot != -1)
   {
     rb_commit_slot(rb_writer_id, rb_current_slot);
+    return true;
   }
+
+  return false;
 }

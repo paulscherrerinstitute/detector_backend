@@ -121,7 +121,6 @@ void update_rb_header(rb_header * ph, barebone_packet bpacket, int n_packets_per
   ph->framemetadata[7] = (uint64_t) 1;
 }
 
-
 barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, detector_definition det_definition){
 
@@ -239,8 +238,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   counters.current_frame = 0;
   counters.recv_frames = 0;
 
-  while(true){
-
+  while(true)
+  {
     bpacket = get_put_data (
       sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, 
       mod_origin, mod_number, n_lines_per_packet, n_packets_per_frame, 
@@ -250,9 +249,12 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     if (bpacket.data_len <= 0 && is_timeout_expired(timout, tv_start)) 
     {
       // Flushes the last message, in case the last frame lost packets
-      commit_slot(rb_current_slot, rb_writer_id);
-
-      printf("Committed slot %d after timeout in mod_number %d, recv_packets %d\n", rb_current_slot, mod_number, counters.recv_packets);
+      if (commit_slot(rb_current_slot, rb_writer_id)) 
+      {
+        printf (
+        "[put_data_in_rb][mod_number %d] Timeout. Committed slot %d with %d packets.",
+        mod_number, rb_current_slot, counters.recv_packets );
+      }
 
       break;
     }
@@ -261,17 +263,21 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     if (nframes != -1 && counters.recv_frames >= nframes) 
     {
       // flushes the last message, in case the last frame lost packets
-      commit_slot(rb_current_slot, rb_writer_id);
-
-      printf("Committed slot %d in mod_number %d after having received %d frames\n", rb_current_slot, mod_number, counters.recv_frames);
+      if (commit_slot(rb_current_slot, rb_writer_id))
+      {
+        printf (
+        "[put_data_in_rb][mod_number %d] Finished. Committed slot %d with %d packets.",
+        mod_number, rb_current_slot, counters.recv_packets );
+      }
 
       break;
     }
 
     // Print statistics every n_frames
     if (counters.recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
-      && counters.recv_frames != 0 )
+      && counters.recv_frames != 0)
     {
+      
       tot_lost_packets += counters.lost_frames;
 
       // prints out statistics every stats_frames
@@ -289,9 +295,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       } 
     }
 
-    // Reset timeout timer.
+    // Reset timeout counter.
     gettimeofday(&tv_start, NULL);
-  } // end while
+  }
 
   return counters.recv_frames;
 }
