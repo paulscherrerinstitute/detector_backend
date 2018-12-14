@@ -50,13 +50,13 @@ inline int get_n_lines_per_packet (detector det, size_t data_bytes_per_packet, i
   return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
 }
 
-inline bool is_timeout_expired (double timeout, struct timeval* timeout_start_time)
+inline bool is_timeout_expired (double timeout, struct timeval timeout_start_time)
 {
   struct timeval current_time;
   gettimeofday(&current_time, NULL);
 
-  double timeout_i = (double)(current_time.tv_usec - timeout_start_time->tv_usec) / 1e6 
-    + (double)(current_time.tv_sec - timeout_start_time->tv_sec);
+  double timeout_i = (double)(current_time.tv_usec - timeout_start_time.tv_usec) / 1e6 
+    + (double)(current_time.tv_sec - timeout_start_time.tv_sec);
 
   return timeout_i > timeout;
 }
@@ -95,12 +95,12 @@ inline void print_statistics (counter* counters, struct timeval last_stats_print
   double frame_rate = (double) PRINT_STATS_N_FRAMES_MODULO / elapsed_seconds;
 
   float percentage_lost_packets = 100. * (float)counters->total_lost_packets / 
-    (float)(counters.total_recv_packets);
+    (float)(counters->total_recv_packets);
 
   // CPU | pid | framenum | frame_rate | tot_lost_packets | % lost packets |
   printf(
     "| %d | %d | %lu | %.2f | %lu | %.1f |\n", 
     sched_getcpu(), getpid(), counters->current_frame, frame_rate, 
-    counters.total_lost_packets, percentage_lost_packets) 
+    counters->total_lost_packets, percentage_lost_packets
   );
 }

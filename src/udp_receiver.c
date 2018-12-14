@@ -235,7 +235,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       mod_origin, mod_number, n_lines_per_packet, n_packets_per_frame, 
       &counters, det, bit_depth, det_definition );
 
-    if (!is_packet_received && is_timeout_expired(timout, timeout_start_time)) 
+    if (!is_packet_received && is_timeout_expired(timeout, timeout_start_time)) 
     {
       // Flushes the last message, in case the last frame lost packets
       if (commit_slot(rb_current_slot, rb_writer_id)) 
@@ -264,7 +264,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     if (counters.recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
       && counters.recv_frames != 0)
     {
-      print_statistics(&counters, &last_stat_print_time);
+      print_statistics(&counters, last_stats_print_time);
       
       gettimeofday(&last_stats_print_time, NULL);
     }
