@@ -18,18 +18,6 @@
 #include "eiger.c"
 #include "utils.c"
 
-int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) 
-{
-  size_t n_bytes = recv(socket_fd, buffer, buffer_len, 0);
-
-  // Did not receive a valid frame packet.
-  if (n_bytes != buffer_len) {
-    return 0;
-  }
-
-  return n_bytes;
-}
-
 
 bool act_on_new_frame (
   counter *counters, int n_packets_per_frame, barebone_packet *bpacket, 
@@ -79,7 +67,10 @@ bool act_on_new_frame (
   return commit_flag;
 }
 
-void initialize_rb_header(counter *counters, rb_header *ph, int n_packets_per_frame)
+void initialize_rb_header (
+  counter *counters, 
+  rb_header *ph, 
+  int n_packets_per_frame )
 {
   uint64_t ones = ~((uint64_t)0);
   
@@ -100,7 +91,12 @@ void initialize_rb_header(counter *counters, rb_header *ph, int n_packets_per_fr
   }
 }
 
-void update_rb_header(rb_header * ph, barebone_packet bpacket, int n_packets_per_frame, counter *counters, int mod_number)
+void update_rb_header (
+  rb_header * ph, 
+  barebone_packet bpacket, 
+  int n_packets_per_frame, 
+  counter *counters, 
+  int mod_number )
 {
   ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
   ph->framemetadata[1] = n_packets_per_frame - counters->recv_packets;
@@ -187,13 +183,13 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   
   if (bit_depth != 16 && bit_depth != 32) 
   {
-    printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
+    printf("[put_data_in_rb][%d] Please setup bit_depth to 16 or 32.\n", getpid());
     return -1;
   }
 
   if ((strcmp(det.detector_name, "EIGER") != 0) && (strcmp(det.detector_name, "JUNGFRAU") != 0))
   {
-    printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
+    printf("[put_data_in_rb][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
     return -1;
   }
 
@@ -211,6 +207,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int mod_number = get_current_module_index(det);
   int n_packets_per_frame = get_n_packets_per_frame(det, det_definition.data_bytes_per_packet, bit_depth);
   int n_lines_per_packet = get_n_lines_per_packet(det, det_definition.data_bytes_per_packet, bit_depth);
+
+  #ifdef DEBUG
+    printf("[put_data_in_rb][%d] mod_origin: %d mod_number: %d bit_depth: %d n_frames:%d\n",
+      getpid(), mod_origin, bit_depth, n_frames);
+  #endif
 
   // Timeout for blocking sock recv.
   struct timeval tv;
