@@ -84,10 +84,7 @@ inline bool commit_slot (int rb_current_slot, int rb_writer_id)
   return false;
 }
 
-inline void print_statistics (
-  counter* counters, 
-  barebone_packet* bpacket, 
-  struct timeval last_stats_print_time)
+inline void print_statistics (counter* counters, struct timeval last_stats_print_time)
 {
   struct timeval current_time;
   gettimeofday(&current_time, NULL);
@@ -103,7 +100,7 @@ inline void print_statistics (
   // CPU | pid | framenum | frame_rate | tot_lost_packets | % lost packets |
   printf(
     "| %d | %d | %lu | %.2f | %lu | %.1f |\n", 
-    sched_getcpu(), getpid(), bpacket->framenum, frame_rate, 
+    sched_getcpu(), getpid(), counters->current_frame, frame_rate, 
     counters.total_lost_packets, percentage_lost_packets) 
   );
 }

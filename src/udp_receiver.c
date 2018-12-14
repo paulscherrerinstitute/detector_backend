@@ -115,7 +115,7 @@ void update_rb_header (
   ph->framemetadata[7] = (uint64_t) 1;
 }
 
-barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+bool get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, detector_definition det_definition){
 
   const char udp_packet[det_definition.udp_packet_bytes];
@@ -131,7 +131,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
 
   // Invalid size/empty packet. received_data_len == 0 in this case.
   if(received_data_len != det_definition.udp_packet_bytes){
-    return bpacket;
+    return false;
   }
 
   counters->recv_packets++;
@@ -171,11 +171,11 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
     commit_flag = false;
   }
 
-  return bpacket;
+  return true;
 }
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
-                    int16_t nframes, float timeout, detector det){
+                    int16_t n_frames, float timeout, detector det){
   /*!
     Main routine to be called from python. Infinite loop with timeout calling for socket receive and putting data in memory, 
     checking that all packets are acquired.
@@ -231,22 +231,19 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   counters.current_frame = 0;
   counters.recv_frames = 0;
 
-  barebone_packet bpacket;
-
   while(true)
   {
-    bpacket = get_put_data (
+    bool is_packet_received = get_put_data (
       sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, 
       mod_origin, mod_number, n_lines_per_packet, n_packets_per_frame, 
       &counters, det, bit_depth, det_definition );
 
-    // Not receiving data, and timeout expired.
-    if (bpacket.data_len <= 0 && is_timeout_expired(timout, timeout_start_time)) 
+    if (!is_packet_received && is_timeout_expired(timout, timeout_start_time)) 
     {
       // Flushes the last message, in case the last frame lost packets
       if (commit_slot(rb_current_slot, rb_writer_id)) 
       {
-        printf (
+        printf(
         "[put_data_in_rb][mod_number %d] Timeout. Committed slot %d with %d packets.",
         mod_number, rb_current_slot, counters.recv_packets );
       }
@@ -254,13 +251,12 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       break;
     }
 
-    // Acquisition finished.
-    if (nframes != -1 && counters.recv_frames >= nframes) 
+    if (n_frames != -1 && counters.recv_frames >= n_frames) 
     {
       // Flushes the last message, in case the last frame lost packets.
       if (commit_slot(rb_current_slot, rb_writer_id))
       {
-        printf (
+        printf(
         "[put_data_in_rb][mod_number %d] Finished. Committed slot %d with %d packets.",
         mod_number, rb_current_slot, counters.recv_packets );
       }
@@ -268,11 +264,10 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       break;
     }
 
-    // Print statistics every PRINT_STATS_N_FRAMES_MODULO frames.
     if (counters.recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
       && counters.recv_frames != 0)
     {
-      print_statistics(&counters, &barebone_packet, &last_stat_print_time);
+      print_statistics(&counters, &last_stat_print_time);
       
       gettimeofday(&last_stats_print_time, NULL);
     }
