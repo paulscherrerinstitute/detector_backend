@@ -53,7 +53,7 @@ inline int get_n_lines_per_packet (detector det, size_t data_bytes_per_packet, i
 inline bool is_timeout_expired (double timeout, struct timeval* timeout_start_time)
 {
   struct timeval current_time;
-  gettimeofday(&tv_end, NULL);
+  gettimeofday(&current_time, NULL);
 
   double timeout_i = (double)(current_time.tv_usec - timeout_start_time->tv_usec) / 1e6 
     + (double)(current_time.tv_sec - timeout_start_time->tv_sec);
