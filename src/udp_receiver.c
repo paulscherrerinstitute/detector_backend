@@ -27,13 +27,13 @@ bool act_on_new_frame (
   bool commit_flag=false;
 
   // this fails in case frame number is not updated by the detector (or its simulation)
-  if(counters->recv_packets == n_packets_per_frame 
-    && bpacket->framenum == counters->current_frame){
-  //this is the last packet of the frame
-  #ifdef DEBUG
-    printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket->packetnum, counters->recv_packets, 
-      n_packets_per_frame, bpacket->framenum, counters->current_frame);
-  #endif
+  if(counters->recv_packets == n_packets_per_frame && bpacket->framenum == counters->current_frame)
+  {
+    //this is the last packet of the frame
+    #ifdef DEBUG
+      printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket->packetnum, counters->recv_packets, 
+        n_packets_per_frame, bpacket->framenum, counters->current_frame);
+    #endif
 
     counters->recv_frames++;
     //counters->recv_packets = 0;
@@ -42,28 +42,35 @@ bool act_on_new_frame (
     counters->lost_frames = 0;
   }
   // this means we are in a new frame (first one included)
-  else if (counters->current_frame != bpacket->framenum){        
-    if(counters->recv_packets != n_packets_per_frame && counters->recv_packets != 1){
+  else if (counters->current_frame != bpacket->framenum)
+  {        
+    if(counters->recv_packets != n_packets_per_frame && counters->recv_packets != 1)
+    {
       // this means we lost some packets before, and we have a dangling slot. Current frame is set to 0 when a complete frame is committed
-      if(counters->current_frame != 0){
-        if(*rb_current_slot != -1){
-          // add some checks here
-          rb_commit_slot(rb_writer_id, *rb_current_slot);
-        }
-        else
+      if(counters->current_frame != 0)
+      {
+        if (!commit_slot(rb_writer_id, *rb_current_slot))
+        {
           printf("[ERROR] I should have been committing a dangling slot, but it is -1\n");
+        } 
 
         //do_stats with recv_packets -1
         counters->lost_frames = n_packets_per_frame - (counters->recv_packets - 1);
       }
+
       counters->recv_packets = 1;
     }
+
     counters->current_frame = bpacket->framenum;
+
     *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-    while(*rb_current_slot == -1){
+    while(*rb_current_slot == -1)
+    {
       *rb_current_slot = rb_claim_next_slot(rb_writer_id);
     }
+
   }
+  
   return commit_flag;
 }
 
@@ -96,8 +103,6 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
-
-  
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
