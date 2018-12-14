@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,110 +10,13 @@
 #include <inttypes.h>
 #include <sys/time.h>
 #include <ring_buffer.h>
-// for uint64 printing
-#include <inttypes.h>
-// for serveraddr
 #include <arpa/inet.h>
 #include <sched.h>
 
 #include "detectors.h"
 #include "jungfrau.c"
 #include "eiger.c"
-
-  /*
-  Logic:
-    recv_packets ++
-    if got_pkg == pred_pkg && last_frame == packet.frame:
-      //this is the last packet of the frame
-      tot_frames++
-      recv_packets = 0
-      last_frame = 0 // this will cause getting a new slot afterwards
-      commit_flag = true // for committing the slot later
-
-    else if last_frame != packet frame:
-      // this means a new frame arrived
-      if last_frame == 0:
-        // this means prev frame was ok, and no dangling slot exists
-        
-      else:
-        // this means we lost some packets before
-        commit dangling slot
-        do_stats with recv_packets -1
-        recv_packets = 1
-
-      last_frame = packet_frame
-      get new slot
-    move p1, ph accordingly
-    copy to memory
-    update counters 
-
-    if commit_flag:
-      // this commits the slot when the frame has been succesfully received
-
-      commit slot
-      commit_flag = false
-commit_flag
-  Cases:
-    first packet arrives:
-      recv_packets ++
-      last_frame is 0, it is updated
-      new slot is allocated
-      data is copied
-    last packet arrives, no packets loss:
-      recv_packets ++
-      tot_frames++
-      counters resetted
-      last_frame to 0
-      data is copied
-      slot is committed
-    last packet arrives, packets lost:
-      case 2: previous slot is committed, stats updated
-      last frame updated
-      new slot allocated
-      data is copied
-  */
-
-typedef struct Counter{
-  /*
-  int total_packets;
-  uint64_t framenum_last;
-  int total_frames;
-  */
-  int recv_packets;
-  uint64_t current_frame;
-  int recv_frames;
-  int lost_frames;
-} counter;
-
-
-void initialize_counters(counter *counters, rb_header *ph, int n_packets_per_frame)
-{
-  uint64_t ones = ~((uint64_t)0);
-  
-  if (counters->recv_packets == 1){
-    for(int i=0; i < 8; i++) ph->framemetadata[i] = 0;
-
-    ph->framemetadata[2] = ones >> (64 - n_packets_per_frame);
-    ph->framemetadata[3] = 0;
-
-    if(n_packets_per_frame > 64)
-    {
-      ph->framemetadata[3] = ones >> (128 - n_packets_per_frame);
-    }
-  }
-}
-
-int get_udp_packet(int socket_fd, void* buffer, size_t buffer_len) 
-{
-  size_t n_bytes = recv(socket_fd, buffer, buffer_len, 0);
-
-  // Did not receive a valid frame packet.
-  if (n_bytes != buffer_len) {
-    return 0;
-  }
-
-  return n_bytes;
-}
+#include "utils.c"
 
 
 bool act_on_new_frame (
@@ -125,7 +27,8 @@ bool act_on_new_frame (
   bool commit_flag=false;
 
   // this fails in case frame number is not updated by the detector (or its simulation)
-  if(counters->recv_packets == n_packets_per_frame && bpacket->framenum == counters->current_frame){
+  if(counters->recv_packets == n_packets_per_frame 
+    && bpacket->framenum == counters->current_frame){
   //this is the last packet of the frame
   #ifdef DEBUG
     printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket->packetnum, counters->recv_packets, 
@@ -164,9 +67,37 @@ bool act_on_new_frame (
   return commit_flag;
 }
 
+void initialize_rb_header (
+  counter *counters, 
+  rb_header *ph, 
+  int n_packets_per_frame )
+{
+  uint64_t ones = ~((uint64_t)0);
+  
+  if (counters->recv_packets == 1)
+  {
+    for(int i=0; i < 8; i++) 
+    {
+      ph->framemetadata[i] = 0;
+    } 
 
-void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_frame, counter *counters, int mod_number){
-  // updating counters
+    ph->framemetadata[2] = ones >> (64 - n_packets_per_frame);
+    
+    ph->framemetadata[3] = 0;
+    if(n_packets_per_frame > 64)
+    {
+      ph->framemetadata[3] = ones >> (128 - n_packets_per_frame);
+    }
+  }
+}
+
+void update_rb_header (
+  rb_header * ph, 
+  barebone_packet bpacket, 
+  int n_packets_per_frame, 
+  counter *counters, 
+  int mod_number )
+{
   ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
   ph->framemetadata[1] = n_packets_per_frame - counters->recv_packets;
     
@@ -177,15 +108,14 @@ void update_counters(rb_header * ph, barebone_packet bpacket, int n_packets_per_
   else{
     ph->framemetadata[3] &= ~(mask << (bpacket.packetnum - 64));
   }
+
   ph->framemetadata[4] = (uint64_t) bpacket.bunchid;
   ph->framemetadata[5] = (uint64_t) bpacket.debug;
   ph->framemetadata[6] = (uint64_t) mod_number;
   ph->framemetadata[7] = (uint64_t) 1;
-
 }
 
-
-barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
+bool get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter * counters, detector det, int bit_depth, detector_definition det_definition){
 
   const char udp_packet[det_definition.udp_packet_bytes];
@@ -201,7 +131,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
 
   // Invalid size/empty packet. received_data_len == 0 in this case.
   if(received_data_len != det_definition.udp_packet_bytes){
-    return bpacket;
+    return false;
   }
 
   counters->recv_packets++;
@@ -219,7 +149,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
-    initialize_counters(counters, ph, n_packets_per_frame);
+    initialize_rb_header(counters, ph, n_packets_per_frame);
   }
 
   // assuming packetnum sequence is 0..N-1
@@ -228,7 +158,7 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
   det_definition.copy_data(det, line_number, n_lines_per_packet, ringbuffer_slot_origin, bpacket.data, bit_depth);
 
   // updating counters
-  update_counters(ph, bpacket, n_packets_per_frame, counters, mod_number);
+  update_rb_header(ph, bpacket, n_packets_per_frame, counters, mod_number);
 
   // commit the slot if this is the last packet of the frame
   if(commit_flag){
@@ -241,57 +171,11 @@ barebone_packet get_put_data(int sock, int rb_hbuffer_id, int *rb_current_slot, 
     commit_flag = false;
   }
 
-  return bpacket;
-}
-
-inline uint32_t get_current_module_offset_in_pixels(detector det)
-{
-  // Origin of the module within the detector, (0, 0) is bottom left
-  uint32_t mod_origin = det.detector_size[1] * det.module_idx[0] * det.module_size[0] + det.module_idx[1] * det.module_size[1];
-  mod_origin += det.module_idx[1] * ((det.submodule_n - 1) * det.gap_px_chips[1] + det.gap_px_modules[1]); // inter_chip gaps plus inter_module gap
-  mod_origin += det.module_idx[0] * (det.gap_px_chips[0] + det.gap_px_modules[0])* det.detector_size[1] ; // inter_chip gaps plus inter_module gap
-
-  // Origin of the submodule within the detector, relative to module origin
-  mod_origin += det.detector_size[1] * det.submodule_idx[0] * det.submodule_size[0] + det.submodule_idx[1] * det.submodule_size[1];
-  
-  if(det.submodule_idx[1] != 0)
-  {
-    // 2* because there is the inter-quartermodule chip gap
-    mod_origin += 2 * det.gap_px_chips[1];   
-  }
-
-  // the last takes into account extra space for chip gap within quarter module
-  if(det.submodule_idx[0] != 0)
-  {
-    mod_origin += det.submodule_idx[0] * det.detector_size[1] * det.gap_px_chips[0];
-  }
-
-  return mod_origin;
-}
-
-inline int get_current_module_index(detector det)
-{
-  //numbering inside the detctor, growing over the x-axiss
-  int mod_number = det.submodule_idx[0] * 2 + det.submodule_idx[1] + 
-    det.submodule_n * (det.module_idx[1] + det.module_idx[0] * det.detector_size[1] / det.module_size[1]); 
-
-  return mod_number;
-}
-
-inline int get_n_packets_per_frame(detector det, size_t data_bytes_per_packet, int bit_depth)
-{
-  // (Pixels in submodule) * (bytes per pixel) / (bytes per packet)
-  return det.submodule_size[0] * det.submodule_size[1] / (8 * data_bytes_per_packet / bit_depth);
-}
-
-inline int get_n_lines_per_packet(detector det, size_t data_bytes_per_packet, int bit_depth)
-{
-  // (Bytes in packet) / (Bytes in submodule line)
-  return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
+  return true;
 }
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
-                    int16_t nframes, float timeout, detector det){
+                    int16_t n_frames, float timeout, detector det){
   /*!
     Main routine to be called from python. Infinite loop with timeout calling for socket receive and putting data in memory, 
     checking that all packets are acquired.
@@ -299,26 +183,15 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   
   if (bit_depth != 16 && bit_depth != 32) 
   {
-    printf("[UDP_RECEIVER][%d] Please setup bit_depth to 16 or 32.\n", getpid());
+    printf("[put_data_in_rb][%d] Please setup bit_depth to 16 or 32.\n", getpid());
     return -1;
   }
 
   if ((strcmp(det.detector_name, "EIGER") != 0) && (strcmp(det.detector_name, "JUNGFRAU") != 0))
   {
-    printf("[UDP_RECEIVER][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
+    printf("[put_data_in_rb][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
     return -1;
   }
-
-  int stat_total_frames = 0;
-  int tot_lost_packets = 0;
-  
-  struct  timeval ti, te; //for timing
-  double tdif=-1;
-
-  counter counters;
-
-  counters.current_frame = 0;
-  counters.recv_frames = 0;
 
   detector_definition det_definition;
   if (strcmp(det.detector_name, "EIGER") == 0)
@@ -335,79 +208,73 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   int n_packets_per_frame = get_n_packets_per_frame(det, det_definition.data_bytes_per_packet, bit_depth);
   int n_lines_per_packet = get_n_lines_per_packet(det, det_definition.data_bytes_per_packet, bit_depth);
 
-  // Timeout for blocking sock recv
+  #ifdef DEBUG
+    printf("[put_data_in_rb][%d] mod_origin: %d mod_number: %d bit_depth: %d n_frames:%d\n",
+      getpid(), mod_origin, bit_depth, n_frames);
+  #endif
+
+  // Timeout for blocking sock recv.
   struct timeval tv;
   tv.tv_sec = 0;
   tv.tv_usec = 50;
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
 
-  // Timeout for receiving packets
-  struct timeval tv_start, tv_end;
-  double timeout_i = 0;
+  // Timeout for receiving packets.
+  struct timeval timeout_start_time;
+  gettimeofday(&timeout_start_time, NULL);
 
-  gettimeofday(&tv_start, NULL);
+  // Timer for printing statistics.
+  struct timeval last_stats_print_time;
+  gettimeofday(&last_stats_print_time, NULL);
 
-  //printf("[UDPRECEIVER][%d] entered at %.3f s slot %d\n", getpid(), (double)(tv_start.tv_usec) / 1e6 + (double)(tv_start.tv_sec), rb_current_slot);
-  // infinite loop, with timeout
-  
-  barebone_packet bpacket;
+  counter counters;
+  counters.current_frame = 0;
+  counters.recv_frames = 0;
 
-  while(true){
+  while(true)
+  {
+    bool is_packet_received = get_put_data (
+      sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, 
+      mod_origin, mod_number, n_lines_per_packet, n_packets_per_frame, 
+      &counters, det, bit_depth, det_definition );
 
-    if (nframes != -1 && counters.recv_frames >= nframes) {
-      // not clear if this is needed
-      // flushes the last message, in case the last frame lost packets
-      if(rb_current_slot != -1){
-        rb_commit_slot(rb_writer_id, rb_current_slot);
-        printf("Committed slot %d in mod_number %d after having received %d frames\n", rb_current_slot, mod_number, counters.recv_frames);
+    if (!is_packet_received && is_timeout_expired(timout, timeout_start_time)) 
+    {
+      // Flushes the last message, in case the last frame lost packets
+      if (commit_slot(rb_current_slot, rb_writer_id)) 
+      {
+        printf(
+        "[put_data_in_rb][mod_number %d] Timeout. Committed slot %d with %d packets.",
+        mod_number, rb_current_slot, counters.recv_packets );
       }
 
-      return counters.recv_frames;
+      break;
     }
 
-    bpacket = get_put_data(sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, mod_origin, mod_number,
-      n_lines_per_packet, n_packets_per_frame, &counters, det, bit_depth, det_definition);
-    
-    // no data? Checks timeout
-    if(bpacket.data_len <= 0){
-      gettimeofday(&tv_end, NULL);
-      timeout_i = (double)(tv_end.tv_usec - tv_start.tv_usec) / 1e6 + (double)(tv_end.tv_sec - tv_start.tv_sec);
-
-      if (timeout_i > (double)timeout){
-        // flushes the last message, in case the last frame lost packets
-        //printf("breaking timeout after %f ms\n", timeout_i);
-        #ifdef DEBUG
-          printf("[UDPRECEIVER][%d] left at %.3f s slot %d for mod_number %d\n", getpid(), (double)(tv_end.tv_usec) / 1e6 + (double)(tv_end.tv_sec), rb_current_slot, mod_number);
-        #endif
-        if(rb_current_slot != -1){
-          rb_commit_slot(rb_writer_id, rb_current_slot);
-          printf("Committed slot %d after timeout in mod_number %d, recv_packets %d\n", rb_current_slot, mod_number, counters.recv_packets);
-        }
-        return counters.recv_frames;
+    if (n_frames != -1 && counters.recv_frames >= n_frames) 
+    {
+      // Flushes the last message, in case the last frame lost packets.
+      if (commit_slot(rb_current_slot, rb_writer_id))
+      {
+        printf(
+        "[put_data_in_rb][mod_number %d] Finished. Committed slot %d with %d packets.",
+        mod_number, rb_current_slot, counters.recv_packets );
       }
-      continue;
+
+      break;
     }
 
-    gettimeofday(&tv_start, NULL);
-
-    //this means a new frame, but only for Eiger. Possibly it will be removed
-    if(counters.current_frame == 0 && bpacket.data_len > 0){
-      tot_lost_packets += counters.lost_frames;
-      // prints out statistics every stats_frames
-      int stats_frames = 120;
-      stat_total_frames ++;
-
-      if (counters.recv_frames % stats_frames == 0 && counters.recv_frames != 0){
-        gettimeofday(&te, NULL);
-        tdif = (te.tv_sec - ti.tv_sec) + ((long)(te.tv_usec) - (long)(ti.tv_usec)) / 1e6;
-        printf("| %d | %d | %lu | %.2f | %d | %.1f |\n", sched_getcpu(), getpid(), bpacket.framenum, (double) stats_frames / tdif, 
-                                                          tot_lost_packets, 100. * (float)tot_lost_packets / (float)(n_packets_per_frame * stat_total_frames));
-        //printf("| %d | %lu | %.2f | %d | %.1f |\n", getpid(), framenum_last, (double) stats_frames / tdif, lost_packets, 100. * (float)lost_packets / (float)(128 * stat_total_frames));
-        gettimeofday(&ti,NULL);
-        stat_total_frames = 0;
-      } 
-    } // end new frame if
+    if (counters.recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
+      && counters.recv_frames != 0)
+    {
+      print_statistics(&counters, &last_stat_print_time);
       
-  } // end while
+      gettimeofday(&last_stats_print_time, NULL);
+    }
+
+    // Reset timeout time.
+    gettimeofday(&timeout_start_time, NULL);
+  }
+
   return counters.recv_frames;
 }
