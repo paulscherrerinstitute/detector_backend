@@ -78,7 +78,7 @@ typedef struct _barebone_packet{
 typedef barebone_packet (*interpret_udp_packet_function)(const char*, const int);
 
 // Signature: const char* udp_packet, const int received_packet_len
-typedef barebone_packet (*copy_data_function)(detector, int, int, void*, void*, int);
+typedef void (*copy_data_function)(detector, int, int, void*, void*, int);
 
 typedef struct _detector_definition{
   interpret_udp_packet_function interpret_udp_packet;
