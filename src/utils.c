@@ -73,7 +73,7 @@ inline int get_udp_packet (int socket_fd, void* buffer, size_t buffer_len)
   return n_bytes;
 }
 
-inline bool commit_slot (int rb_current_slot, int rb_writer_id)
+inline bool commit_slot (int rb_writer_id, int rb_current_slot)
 {
   if(rb_current_slot != -1)
   {

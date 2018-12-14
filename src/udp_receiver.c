@@ -89,15 +89,15 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   counters->recv_packets++;
   bool commit_flag = act_on_new_frame(counters, n_packets_per_frame, &bpacket, rb_current_slot, rb_writer_id);
   
-  // Data copy
-  // getting the pointers in RB for header and data - must be done after slots are committed / assigned
-  rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
   char* ringbuffer_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
+  ringbuffer_slot_origin += (mod_origin * bit_depth) / 8;
+  
+  rb_header* ph = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   ph += mod_number;
 
-  // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
-  ringbuffer_slot_origin += (mod_origin * bit_depth) / 8;
+  
 
   // initializing - recv_packets already increased above
   if (counters->recv_packets == 1) {
@@ -113,13 +113,13 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   update_rb_header(ph, bpacket, n_packets_per_frame, counters, mod_number);
 
   // commit the slot if this is the last packet of the frame
-  if(commit_flag){
-    if(*rb_current_slot != -1){
-    // add some checks here
-      rb_commit_slot(rb_writer_id, *rb_current_slot);
-    }
-    else
+  if (commit_flag) 
+  {
+    if (!commit_slot(rb_writer_id, *rb_current_slot))
+    {
       printf("[ERROR] I should have been committing a slot, but it is -1\n");
+    }
+    
     commit_flag = false;
   }
 
@@ -190,7 +190,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     if (!is_packet_received && is_timeout_expired(timeout, timeout_start_time)) 
     {
       // Flushes the last message, in case the last frame lost packets
-      if (commit_slot(rb_current_slot, rb_writer_id)) 
+      if (commit_slot(rb_writer_id, rb_current_slot)) 
       {
         printf(
         "[put_data_in_rb][mod_number %d] Timeout. Committed slot %d with %d packets.",
@@ -203,7 +203,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     if (n_frames != -1 && counters.recv_frames >= n_frames) 
     {
       // Flushes the last message, in case the last frame lost packets.
-      if (commit_slot(rb_current_slot, rb_writer_id))
+      if (commit_slot(rb_writer_id, rb_current_slot))
       {
         printf(
         "[put_data_in_rb][mod_number %d] Finished. Committed slot %d with %d packets.",
