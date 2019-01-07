@@ -23,13 +23,14 @@ void act_on_new_frame (
   counter *counters, int n_packets_per_frame, barebone_packet *bpacket, 
   int *rb_current_slot, int rb_writer_id )
 {
+
   // this means we are in a new frame (first one included)
   if (counters->current_frame != bpacket->framenum)
   {        
     if(counters->recv_packets != n_packets_per_frame && counters->recv_packets != 1)
     {
       // this means we lost some packets before, and we have a dangling slot. Current frame is set to 0 when a complete frame is committed
-      if(counters->current_frame != 0)
+      if(counters->current_frame != NO_CURRENT_FRAME)
       {
         if (!commit_slot(rb_writer_id, *rb_current_slot))
         {
@@ -109,7 +110,7 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
     counters->recv_frames++;
     //counters->recv_packets = 0;
-    counters->current_frame = 0; // this will cause getting a new slot afterwards
+    counters->current_frame = NO_CURRENT_FRAME; // this will cause getting a new slot afterwards
     counters->lost_frames = 0;
 
     if (!commit_slot(rb_writer_id, *rb_current_slot))

@@ -5,6 +5,7 @@
 #include <inttypes.h>
 
 #define PRINT_STATS_N_FRAMES_MODULO 100
+#define NO_CURRENT_FRAME 0
 
 typedef struct Counter{
   int recv_packets;
