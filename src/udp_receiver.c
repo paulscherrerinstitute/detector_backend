@@ -28,31 +28,26 @@ void get_slot_for_frame (
   {
     return;
   }
-     
-  if(counters->recv_packets != n_packets_per_frame && counters->recv_packets != 1)
+  // We got a new frame before the last one was commited. Commit the dangling slot.
+  else if (counters->current_frame != NO_CURRENT_FRAME)
   {
-    // this means we lost some packets before, and we have a dangling slot. Current frame is set to 0 when a complete frame is committed
-    if(counters->current_frame != NO_CURRENT_FRAME)
+    if (!commit_slot(rb_writer_id, *rb_current_slot))
     {
-      if (!commit_slot(rb_writer_id, *rb_current_slot))
-      {
-        printf("[ERROR] I should have been committing a dangling slot, but it is -1\n");
-      } 
+      printf("[ERROR] I should have been committing a dangling slot, but it is -1\n");
+    } 
 
-      //do_stats with recv_packets -1
-      counters->lost_frames = n_packets_per_frame - (counters->recv_packets - 1);
-    }
+    //do_stats with recv_packets -1
+    counters->lost_frames = n_packets_per_frame - (counters->recv_packets - 1);
 
     counters->recv_packets = 1;
   }
-
-  counters->current_frame = frame_number;
 
   *rb_current_slot = rb_claim_next_slot(rb_writer_id);
   while(*rb_current_slot == -1)
   {
     *rb_current_slot = rb_claim_next_slot(rb_writer_id);
   }
+  counters->current_frame = frame_number;
   
 }
 
@@ -176,7 +171,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   gettimeofday(&last_stats_print_time, NULL);
 
   counter counters;
-  counters.current_frame = 0;
+  counters.current_frame = NO_CURRENT_FRAME;
   counters.recv_frames = 0;
 
   while(true)
