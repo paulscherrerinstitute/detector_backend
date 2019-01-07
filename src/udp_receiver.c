@@ -20,39 +20,40 @@
 
 
 void get_slot_for_frame (
-  counter *counters, int n_packets_per_frame, uint64_t frame_number, 
+  uint64_t frame_number, counter *counters, int n_packets_per_frame, 
   int *rb_current_slot, int rb_writer_id)
 {
-
-  // this means we are in a new frame (first one included)
-  if (counters->current_frame != frame_number)
-  {        
-    if(counters->recv_packets != n_packets_per_frame && counters->recv_packets != 1)
-    {
-      // this means we lost some packets before, and we have a dangling slot. Current frame is set to 0 when a complete frame is committed
-      if(counters->current_frame != NO_CURRENT_FRAME)
-      {
-        if (!commit_slot(rb_writer_id, *rb_current_slot))
-        {
-          printf("[ERROR] I should have been committing a dangling slot, but it is -1\n");
-        } 
-
-        //do_stats with recv_packets -1
-        counters->lost_frames = n_packets_per_frame - (counters->recv_packets - 1);
-      }
-
-      counters->recv_packets = 1;
-    }
-
-    counters->current_frame = frame_number;
-
-    *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-    while(*rb_current_slot == -1)
-    {
-      *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-    }
-
+  // We already have a slot for this frame.
+  if (counters->current_frame == frame_number) 
+  {
+    return;
   }
+     
+  if(counters->recv_packets != n_packets_per_frame && counters->recv_packets != 1)
+  {
+    // this means we lost some packets before, and we have a dangling slot. Current frame is set to 0 when a complete frame is committed
+    if(counters->current_frame != NO_CURRENT_FRAME)
+    {
+      if (!commit_slot(rb_writer_id, *rb_current_slot))
+      {
+        printf("[ERROR] I should have been committing a dangling slot, but it is -1\n");
+      } 
+
+      //do_stats with recv_packets -1
+      counters->lost_frames = n_packets_per_frame - (counters->recv_packets - 1);
+    }
+
+    counters->recv_packets = 1;
+  }
+
+  counters->current_frame = frame_number;
+
+  *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+  while(*rb_current_slot == -1)
+  {
+    *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+  }
+  
 }
 
 inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
@@ -70,13 +71,14 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   #endif
 
   // Invalid size/empty packet. received_data_len == 0 in this case.
-  if(received_data_len != det_definition.udp_packet_bytes){
+  if(received_data_len != det_definition.udp_packet_bytes)
+  {
     return false;
   }
 
   counters->recv_packets++;
 
-  get_slot_for_frame(counters, n_packets_per_frame, bpacket.framenum, rb_current_slot, rb_writer_id);
+  get_slot_for_frame(bpacket.framenum, counters, n_packets_per_frame, rb_current_slot, rb_writer_id);
   
   char* ringbuffer_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
