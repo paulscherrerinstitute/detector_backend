@@ -45,7 +45,6 @@ inline bool is_slot_ready_for_frame (
   uint64_t frame_number, counter *counters, int n_packets_per_frame, 
   int rb_current_slot, int rb_writer_id)
 {
-  // We already have a slot for this frame.
   if (counters->current_frame == frame_number) 
   {
     return true;
