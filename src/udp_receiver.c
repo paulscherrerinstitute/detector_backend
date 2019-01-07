@@ -20,12 +20,12 @@
 
 
 void get_slot_for_frame (
-  counter *counters, int n_packets_per_frame, barebone_packet *bpacket, 
-  int *rb_current_slot, int rb_writer_id )
+  counter *counters, int n_packets_per_frame, uint64_t frame_number, 
+  int *rb_current_slot, int rb_writer_id)
 {
 
   // this means we are in a new frame (first one included)
-  if (counters->current_frame != bpacket->framenum)
+  if (counters->current_frame != frame_number)
   {        
     if(counters->recv_packets != n_packets_per_frame && counters->recv_packets != 1)
     {
@@ -44,7 +44,7 @@ void get_slot_for_frame (
       counters->recv_packets = 1;
     }
 
-    counters->current_frame = bpacket->framenum;
+    counters->current_frame = frame_number;
 
     *rb_current_slot = rb_claim_next_slot(rb_writer_id);
     while(*rb_current_slot == -1)
@@ -76,7 +76,7 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
   counters->recv_packets++;
 
-  get_slot_for_frame(counters, n_packets_per_frame, &bpacket, rb_current_slot, rb_writer_id);
+  get_slot_for_frame(counters, n_packets_per_frame, bpacket.framenum, rb_current_slot, rb_writer_id);
   
   char* ringbuffer_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
