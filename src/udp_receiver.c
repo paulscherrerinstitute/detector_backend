@@ -19,7 +19,7 @@
 #include "utils.c"
 
 
-void act_on_new_frame (
+void get_slot_for_frame (
   counter *counters, int n_packets_per_frame, barebone_packet *bpacket, 
   int *rb_current_slot, int rb_writer_id )
 {
@@ -75,7 +75,8 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   }
 
   counters->recv_packets++;
-  act_on_new_frame(counters, n_packets_per_frame, &bpacket, rb_current_slot, rb_writer_id);
+
+  get_slot_for_frame(counters, n_packets_per_frame, &bpacket, rb_current_slot, rb_writer_id);
   
   char* ringbuffer_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
