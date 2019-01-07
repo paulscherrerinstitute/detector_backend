@@ -75,13 +75,16 @@ inline int get_udp_packet (int socket_fd, void* buffer, size_t buffer_len)
 
 inline bool commit_slot (int rb_writer_id, int rb_current_slot)
 {
-  if(rb_current_slot != -1)
+  if (rb_current_slot != -1)
   {
     rb_commit_slot(rb_writer_id, rb_current_slot);
     return true;
+  } 
+  else 
+  {
+    printf("[commit_slot][ERROR] I should have been committing a slot, but it is -1\n");
+    return false;
   }
-
-  return false;
 }
 
 inline void initialize_rb_header (rb_header *ph, int n_packets_per_frame)
