@@ -64,7 +64,9 @@ inline bool is_slot_ready_for_frame (
 }
 
 inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter* counters, detector det, int bit_depth, detector_definition det_definition){
+  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter* counters, detector det, int bit_depth, detector_definition det_definition,
+  char** data_slot_origin, rb_header** header_slot_origin)
+{
 
   const char udp_packet[det_definition.udp_packet_bytes];
   const int received_data_len = get_udp_packet(sock, &udp_packet, det_definition.udp_packet_bytes);
@@ -85,13 +87,10 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
   counters->recv_packets++;
 
-  char* data_slot_origin;
-  rb_header* header_slot_origin
-
   if (!is_slot_ready_for_frame(bpacket.framenum, counters, n_packets_per_frame, *rb_current_slot, rb_writer_id)
   {
  
-    claim_and_initialize_slot(rb_current_slot, &data_slot_origin, &header_slot_origin,
+    claim_and_initialize_slot(&rb_current_slot, data_slot_origin, header_slot_origin,
       rb_writer_id, rb_dbuffer_id, rb_hbuffer_id, mod_number, bit_depth, n_packets_per_frame);
 
     counters->current_frame = bpacket.framenum;
@@ -100,10 +99,10 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
 
-  det_definition.copy_data(det, line_number, n_lines_per_packet, ringbuffer_slot_origin, bpacket.data, bit_depth);
+  det_definition.copy_data(det, line_number, n_lines_per_packet, *data_slot_origin, bpacket.data, bit_depth);
 
   // updating counters
-  update_rb_header(ph, bpacket, n_packets_per_frame, counters, mod_number);
+  update_rb_header(*header_slot_origin, bpacket, n_packets_per_frame, counters, mod_number);
 
   // commit the slot if this is the last packet of the frame
   if(counters->recv_packets == n_packets_per_frame)
@@ -180,12 +179,15 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   counters.current_frame = NO_CURRENT_FRAME;
   counters.recv_frames = 0;
 
+  char* data_slot_origin = NULL;
+  rb_header* header_slot_origin = NULL;
+
   while(true)
   {
     bool is_packet_received = receive_save_packet (
       sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, 
       mod_origin, mod_number, n_lines_per_packet, n_packets_per_frame, 
-      &counters, det, bit_depth, det_definition );
+      &counters, det, bit_depth, det_definition, &data_slot_origin, &header_slot_origin );
 
     if (!is_packet_received && is_timeout_expired(timeout, timeout_start_time)) 
     {
