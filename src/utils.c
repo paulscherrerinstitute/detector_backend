@@ -87,21 +87,21 @@ inline bool commit_slot (int rb_writer_id, int rb_current_slot)
   }
 }
 
-inline void initialize_rb_header (rb_header *ph, int n_packets_per_frame)
+inline void initialize_rb_header (rb_header *header_slot_origin, int n_packets_per_frame)
 {
   uint64_t ones = ~((uint64_t)0);
   
   for(int i=0; i < 8; i++) 
   {
-    ph->framemetadata[i] = 0;
+    header_slot_origin->framemetadata[i] = 0;
   } 
 
-  ph->framemetadata[2] = ones >> (64 - n_packets_per_frame);
+  header_slot_origin->framemetadata[2] = ones >> (64 - n_packets_per_frame);
   
-  ph->framemetadata[3] = 0;
+  header_slot_origin->framemetadata[3] = 0;
   if(n_packets_per_frame > 64)
   {
-    ph->framemetadata[3] = ones >> (128 - n_packets_per_frame);
+    header_slot_origin->framemetadata[3] = ones >> (128 - n_packets_per_frame);
   }
 }
 
