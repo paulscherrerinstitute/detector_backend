@@ -19,30 +19,12 @@
 #include "utils.c"
 
 
-bool act_on_new_frame (
+void act_on_new_frame (
   counter *counters, int n_packets_per_frame, barebone_packet *bpacket, 
   int *rb_current_slot, int rb_writer_id )
 {
-
-  bool commit_flag=false;
-
-  // this fails in case frame number is not updated by the detector (or its simulation)
-  if(counters->recv_packets == n_packets_per_frame && bpacket->framenum == counters->current_frame)
-  {
-    //this is the last packet of the frame
-    #ifdef DEBUG
-      printf("[UDPRECV] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", bpacket->packetnum, counters->recv_packets, 
-        n_packets_per_frame, bpacket->framenum, counters->current_frame);
-    #endif
-
-    counters->recv_frames++;
-    //counters->recv_packets = 0;
-    counters->current_frame = 0; // this will cause getting a new slot afterwards
-    commit_flag = true; // for committing the slot later
-    counters->lost_frames = 0;
-  }
   // this means we are in a new frame (first one included)
-  else if (counters->current_frame != bpacket->framenum)
+  if (counters->current_frame != bpacket->framenum)
   {        
     if(counters->recv_packets != n_packets_per_frame && counters->recv_packets != 1)
     {
@@ -70,8 +52,6 @@ bool act_on_new_frame (
     }
 
   }
-  
-  return commit_flag;
 }
 
 inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
@@ -94,7 +74,7 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   }
 
   counters->recv_packets++;
-  bool commit_flag = act_on_new_frame(counters, n_packets_per_frame, &bpacket, rb_current_slot, rb_writer_id);
+  act_on_new_frame(counters, n_packets_per_frame, &bpacket, rb_current_slot, rb_writer_id);
   
   char* ringbuffer_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
@@ -118,14 +98,24 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   update_rb_header(ph, bpacket, n_packets_per_frame, counters, mod_number);
 
   // commit the slot if this is the last packet of the frame
-  if (commit_flag) 
+  if(counters->recv_packets == n_packets_per_frame && bpacket->framenum == counters->current_frame)
   {
+    //this is the last packet of the frame
+    #ifdef DEBUG
+      printf("[receive_save_packet][mod_number %d] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", 
+        mod_number, bpacket->packetnum, counters->recv_packets, n_packets_per_frame, 
+        bpacket->framenum, counters->current_frame);
+    #endif
+
+    counters->recv_frames++;
+    //counters->recv_packets = 0;
+    counters->current_frame = 0; // this will cause getting a new slot afterwards
+    counters->lost_frames = 0;
+
     if (!commit_slot(rb_writer_id, *rb_current_slot))
     {
       printf("[ERROR] I should have been committing a slot, but it is -1\n");
     }
-    
-    commit_flag = false;
   }
 
   return true;
@@ -205,6 +195,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       break;
     }
 
+    // TODO: Check if this condition is needed.
     if (n_frames != -1 && counters.recv_frames >= n_frames) 
     {
       // Flushes the last message, in case the last frame lost packets.
