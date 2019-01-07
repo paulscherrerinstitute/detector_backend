@@ -19,8 +19,10 @@
 #include "utils.c"
 
 
-void claim_and_initialize_slot (
-  int* rb_current_slot, int rb_writer_id, char* data_slot_origin, rb_header* header_slot_origin)
+inline void claim_and_initialize_slot (
+  int* rb_current_slot, char** data_slot_origin, rb_header** header_slot_origin, 
+  int rb_writer_id, int rb_dbuffer_id, int rb_hbuffer_id, int mod_number, 
+  int bit_depth, int n_packets_per_frame)
 {
   *rb_current_slot = rb_claim_next_slot(rb_writer_id);
   while(*rb_current_slot == -1)
@@ -28,18 +30,18 @@ void claim_and_initialize_slot (
     *rb_current_slot = rb_claim_next_slot(rb_writer_id);
   }
 
-  data_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  *data_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
   // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
-  data_slot_origin += (mod_origin * bit_depth) / 8;
+  *data_slot_origin += (mod_origin * bit_depth) / 8;
   
-  header_slot_origin = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
+  *header_slot_origin = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
-  header_slot_origin += mod_number;
+  *header_slot_origin += mod_number;
 
-  initialize_rb_header(header_slot_origin, n_packets_per_frame);
+  initialize_rb_header(*header_slot_origin, n_packets_per_frame);
 }
 
-bool is_slot_ready_for_frame (
+inline bool is_slot_ready_for_frame (
   uint64_t frame_number, counter *counters, int n_packets_per_frame, 
   int rb_current_slot, int rb_writer_id)
 {
@@ -84,9 +86,15 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
   counters->recv_packets++;
 
+  char* data_slot_origin;
+  rb_header* header_slot_origin
+
   if (!is_slot_ready_for_frame(bpacket.framenum, counters, n_packets_per_frame, *rb_current_slot, rb_writer_id)
   {
-    claim_and_initialize_slot();
+ 
+    claim_and_initialize_slot(rb_current_slot, &data_slot_origin, &header_slot_origin,
+      rb_writer_id, rb_dbuffer_id, rb_hbuffer_id, mod_number, bit_depth, n_packets_per_frame);
+
     counters->current_frame = bpacket.framenum;
   }
 
