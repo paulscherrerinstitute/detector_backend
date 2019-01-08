@@ -8,15 +8,14 @@
 #define NO_CURRENT_FRAME 0
 
 typedef struct Counter{
-  int recv_packets;
   uint64_t current_frame;
-  int recv_frames;
+  uint64_t current_frame_recv_packets;
 
   uint64_t total_recv_packets;
   uint64_t total_lost_packets;
+
   uint64_t total_recv_frames;
   uint64_t total_lost_frames;
-
 } counter;
 
 typedef struct _detector{

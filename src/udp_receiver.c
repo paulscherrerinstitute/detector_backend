@@ -71,10 +71,11 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
     // Initialize counters for new frame.
     counters->current_frame = bpacket.framenum;
-    counters->recv_packets = 0;
+    counters->current_frame_recv_packets = 0;
   }
 
-  counters->recv_packets++;
+  counters->current_frame_recv_packets++;
+  counters->total_recv_packets++;
 
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
@@ -90,7 +91,7 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
     //this is the last packet of the frame
     #ifdef DEBUG
       printf("[receive_save_packet][mod_number %d] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", 
-        mod_number, bpacket->packetnum, counters->recv_packets, n_packets_per_frame, 
+        mod_number, bpacket->packetnum, counters->current_frame_recv_packets, n_packets_per_frame, 
         bpacket->framenum, counters->current_frame);
     #endif
 
@@ -174,7 +175,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       {
         printf(
         "[put_data_in_rb][mod_number %d] Timeout. Committed slot %d with %d packets.",
-        mod_number, rb_current_slot, counters.recv_packets );
+        mod_number, rb_current_slot, counters.current_frame_recv_packets );
       }
 
       break;
@@ -188,7 +189,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       {
         printf(
         "[put_data_in_rb][mod_number %d] Finished. Committed slot %d with %d packets.",
-        mod_number, rb_current_slot, counters.recv_packets );
+        mod_number, rb_current_slot, counters.current_frame_recv_packets );
       }
 
       break;

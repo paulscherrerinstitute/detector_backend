@@ -94,7 +94,7 @@ inline bool is_slot_ready_for_frame (uint64_t frame_number, counter *counters)
 
 inline bool is_frame_complete (int n_packets_per_frame, counter *counters)
 {
-  return counters->recv_packets == n_packets_per_frame;
+  return counters->current_frame_recv_packets == n_packets_per_frame;
 }
 
 inline void commit_if_slot_dangling (
@@ -106,7 +106,7 @@ inline void commit_if_slot_dangling (
     commit_slot(rb_writer_id, rb_current_slot)
 
     // Update the ringbuffer header with the lost packages - do_stats with recv_packets -1.
-    uint64_t lost_frames = n_packets_per_frame - (counters->recv_packets - 1);
+    uint64_t lost_frames = n_packets_per_frame - (counters->current_frame_recv_packets - 1);
     header_slot_origin->framemetadata[1] = lost_frames;
   }
 }
@@ -137,7 +137,7 @@ inline void update_rb_header (
   int mod_number )
 {
   ph->framemetadata[0] = bpacket->framenum; // this could be avoided mayne
-  ph->framemetadata[1] = n_packets_per_frame - counters->recv_packets;
+  ph->framemetadata[1] = n_packets_per_frame - counters->current_frame_recv_packets;
     
   const uint64_t mask = 1;
   if(bpacket->packetnum < 64){
