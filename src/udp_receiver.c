@@ -69,7 +69,6 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
     initialize_rb_header(*header_slot_origin, n_packets_per_frame);
 
-    // Initialize counters for new frame.
     counters->current_frame = bpacket.framenum;
     counters->current_frame_recv_packets = 0;
   }
@@ -82,13 +81,10 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
   det_definition.copy_data(det, line_number, n_lines_per_packet, *data_slot_origin, bpacket.data, bit_depth);
 
-  // updating counters
   update_rb_header(*header_slot_origin, bpacket, n_packets_per_frame, counters, mod_number);
 
-  // commit the slot if this is the last packet of the frame
   if(is_frame_complete(n_packets_per_frame, counters)
   {
-    //this is the last packet of the frame
     #ifdef DEBUG
       printf("[receive_save_packet][mod_number %d] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", 
         mod_number, bpacket->packetnum, counters->current_frame_recv_packets, n_packets_per_frame, 
@@ -97,8 +93,8 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
     commit_slot(rb_writer_id, *rb_current_slot);
 
-    counters->total_recv_frames++;
     counters->current_frame = NO_CURRENT_FRAME;
+    counters->total_recv_frames++;
   }
 
   return true;
@@ -154,10 +150,15 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   struct timeval last_stats_print_time;
   gettimeofday(&last_stats_print_time, NULL);
 
-  counter counters;
-  counters.current_frame = NO_CURRENT_FRAME;
-  counters.recv_frames = 0;
-
+  counter counters = {
+    .current_frame = NO_CURRENT_FRAME
+    .current_frame_recv_packets = 0
+    .total_recv_packets = 0
+    .total_lost_packets = 0
+    .total_recv_frames = 0
+    .total_lost_frames = 0
+  };
+  
   char* data_slot_origin = NULL;
   rb_header* header_slot_origin = NULL;
 
@@ -181,16 +182,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       break;
     }
 
-    // TODO: Check if this condition is needed.
-    if (n_frames != -1 && counters.recv_frames >= n_frames) 
+    if (is_acquisition_completed(n_frames, &counters)) 
     {
-      // Flushes the last message, in case the last frame lost packets.
-      if (commit_slot(rb_writer_id, rb_current_slot))
-      {
-        printf(
-        "[put_data_in_rb][mod_number %d] Finished. Committed slot %d with %d packets.",
-        mod_number, rb_current_slot, counters.current_frame_recv_packets );
-      }
+      printf (
+        "[put_data_in_rb][mod_number %d] Acquisition finished.", 
+        mod_number, rb_current_slot );
 
       break;
     }

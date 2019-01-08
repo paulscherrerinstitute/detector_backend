@@ -105,9 +105,13 @@ inline void commit_if_slot_dangling (
   {
     commit_slot(rb_writer_id, rb_current_slot)
 
-    // Update the ringbuffer header with the lost packages - do_stats with recv_packets -1.
-    uint64_t lost_frames = n_packets_per_frame - (counters->current_frame_recv_packets - 1);
-    header_slot_origin->framemetadata[1] = lost_frames;
+    // Calculate and update lost packets - do_stats with recv_packets -1.
+    uint64_t lost_packets = n_packets_per_frame - (counters->current_frame_recv_packets - 1);
+    // Ringbuffer header field for number of lost packets in this frame.
+    header_slot_origin->framemetadata[1] = lost_packets;
+    
+    counters->total_lost_packets += lost_packets;
+    counters->total_lost_frames++;
   }
 }
 
@@ -172,4 +176,10 @@ inline void print_statistics (counter* counters, struct timeval last_stats_print
     sched_getcpu(), getpid(), counters->current_frame, frame_rate, 
     counters->total_lost_packets, percentage_lost_packets
   );
+}
+
+inline bool is_acquisition_completed(int16_t n_frames, counter* counters)
+{
+  uint64_t total_frames = counters->total_recv_frames + counters.total_lost_frames;
+  return (n_frames != -1) && total_frames >= n_frames;
 }
