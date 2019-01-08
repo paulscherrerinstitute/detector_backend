@@ -92,8 +92,11 @@ inline bool is_slot_ready_for_frame (uint64_t frame_number, counter *counters)
   return counters->current_frame == frame_number;
 }
 
-inline bool is_frame_complete (int n_packets_per_frame, counter *counters)
+inline bool is_frame_complete (int n_packets_per_frame, counter* counters)
 {
+  uint64_t total_frame_packets = 
+    counters->current_frame_recv_packets + counters->current_frame_lost_packets;
+    
   return counters->current_frame_recv_packets == n_packets_per_frame;
 }
 
@@ -182,4 +185,12 @@ inline bool is_acquisition_completed(int16_t n_frames, counter* counters)
 {
   uint64_t total_frames = counters->total_recv_frames + counters.total_lost_frames;
   return (n_frames != -1) && total_frames >= n_frames;
+}
+
+inline void initialize_counters_for_new_frame (
+  counter* counters, uint64_t frame_number )
+{
+  counters->current_frame = bpacket.framenum;
+  counters->current_frame_recv_packets = 0;
+  counters->current_frame_lost_packets = 0;
 }

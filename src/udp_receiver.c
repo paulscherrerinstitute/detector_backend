@@ -69,8 +69,7 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
     initialize_rb_header(*header_slot_origin, n_packets_per_frame);
 
-    counters->current_frame = bpacket.framenum;
-    counters->current_frame_recv_packets = 0;
+    initialize_counters_for_new_frame(counters, bpacket.framenum);
   }
 
   counters->current_frame_recv_packets++;
@@ -171,13 +170,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
     if (!is_packet_received && is_timeout_expired(timeout, timeout_start_time)) 
     {
-      // Flushes the last message, in case the last frame lost packets.
-      if (commit_slot(rb_writer_id, rb_current_slot)) 
-      {
-        printf(
-        "[put_data_in_rb][mod_number %d] Timeout. Committed slot %d with %d packets.",
-        mod_number, rb_current_slot, counters.current_frame_recv_packets );
-      }
+      // If images are lost in the last frame.
+      commit_if_slot_dangling(&counters, rb_writer_id, rb_current_slot, 
+        n_packets_per_frame, header_slot_origin);
 
       break;
     }
