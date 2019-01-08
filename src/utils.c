@@ -87,6 +87,30 @@ inline bool commit_slot (int rb_writer_id, int rb_current_slot)
   }
 }
 
+inline bool is_slot_ready_for_frame (uint64_t frame_number, counter *counters)
+{
+  return counters->current_frame == frame_number;
+}
+
+inline bool is_frame_complete (int n_packets_per_frame, counter *counters)
+{
+  return counters->recv_packets == n_packets_per_frame;
+}
+
+inline void commit_if_slot_dangling (
+  counter* counters, int rb_writer_id, int rb_current_slot, 
+  int n_packets_per_frame, rb_header* header_slot_origin )
+{
+  if (counters->current_frame != NO_CURRENT_FRAME)
+  {
+    commit_slot(rb_writer_id, rb_current_slot)
+
+    // Update the ringbuffer header with the lost packages - do_stats with recv_packets -1.
+    uint64_t lost_frames = n_packets_per_frame - (counters->recv_packets - 1);
+    header_slot_origin->framemetadata[1] = lost_frames;
+  }
+}
+
 inline void initialize_rb_header (rb_header *header_slot_origin, int n_packets_per_frame)
 {
   uint64_t ones = ~((uint64_t)0);
@@ -106,21 +130,21 @@ inline void initialize_rb_header (rb_header *header_slot_origin, int n_packets_p
 }
 
 inline void update_rb_header (
-  rb_header * ph, 
-  barebone_packet bpacket, 
+  rb_header* ph, 
+  barebone_packet* bpacket, 
   int n_packets_per_frame, 
   counter *counters, 
   int mod_number )
 {
-  ph->framemetadata[0] = bpacket.framenum; // this could be avoided mayne
+  ph->framemetadata[0] = bpacket->framenum; // this could be avoided mayne
   ph->framemetadata[1] = n_packets_per_frame - counters->recv_packets;
     
   const uint64_t mask = 1;
-  if(bpacket.packetnum < 64){
-    ph->framemetadata[2] &= ~(mask << bpacket.packetnum);
+  if(bpacket->packetnum < 64){
+    ph->framemetadata[2] &= ~(mask << bpacket->packetnum);
   }
   else{
-    ph->framemetadata[3] &= ~(mask << (bpacket.packetnum - 64));
+    ph->framemetadata[3] &= ~(mask << (bpacket->packetnum - 64));
   }
 
   ph->framemetadata[4] = (uint64_t) bpacket.bunchid;

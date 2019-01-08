@@ -11,7 +11,6 @@ typedef struct Counter{
   int recv_packets;
   uint64_t current_frame;
   int recv_frames;
-  int lost_frames;
 
   uint64_t total_recv_packets;
   uint64_t total_lost_packets;

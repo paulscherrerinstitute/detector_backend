@@ -19,7 +19,7 @@
 #include "utils.c"
 
 
-inline void claim_and_initialize_slot (
+inline void claim_next_slot (
   int* rb_current_slot, char** data_slot_origin, rb_header** header_slot_origin, 
   int rb_writer_id, int rb_dbuffer_id, int rb_hbuffer_id, int mod_number, 
   int bit_depth, int n_packets_per_frame)
@@ -37,37 +37,12 @@ inline void claim_and_initialize_slot (
   *header_slot_origin = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
   // computing the origin and stride of memory locations
   *header_slot_origin += mod_number;
-
-  initialize_rb_header(*header_slot_origin, n_packets_per_frame);
-}
-
-inline bool is_slot_ready_for_frame (
-  uint64_t frame_number, counter *counters, int n_packets_per_frame, 
-  int rb_current_slot, int rb_writer_id)
-{
-  if (counters->current_frame == frame_number) 
-  {
-    return true;
-  }
-  // We got a new frame before the last one was commited. Commit the dangling slot.
-  else if (counters->current_frame != NO_CURRENT_FRAME)
-  {
-    commit_slot(rb_writer_id, rb_current_slot)
-
-    //do_stats with recv_packets -1
-    counters->lost_frames = n_packets_per_frame - (counters->recv_packets - 1);
-
-    counters->recv_packets = 1;
-  }
-
-  return false;
 }
 
 inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter* counters, detector det, int bit_depth, detector_definition det_definition,
   char** data_slot_origin, rb_header** header_slot_origin)
 {
-
   const char udp_packet[det_definition.udp_packet_bytes];
   const int received_data_len = get_udp_packet(sock, &udp_packet, det_definition.udp_packet_bytes);
 
@@ -85,16 +60,21 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
     return false;
   }
 
-  counters->recv_packets++;
-
-  if (!is_slot_ready_for_frame(bpacket.framenum, counters, n_packets_per_frame, *rb_current_slot, rb_writer_id)
+  if (!is_slot_ready_for_frame(bpacket.framenum, counters))
   {
- 
-    claim_and_initialize_slot(&rb_current_slot, data_slot_origin, header_slot_origin,
+    commit_if_slot_dangling(counters, rb_writer_id, rb_current_slot, n_packets_per_frame, *header_slot_origin);
+    
+    claim_next_slot(&rb_current_slot, data_slot_origin, header_slot_origin,
       rb_writer_id, rb_dbuffer_id, rb_hbuffer_id, mod_number, bit_depth, n_packets_per_frame);
 
+    initialize_rb_header(*header_slot_origin, n_packets_per_frame);
+
+    // Initialize counters for new frame.
     counters->current_frame = bpacket.framenum;
+    counters->recv_packets = 0;
   }
+
+  counters->recv_packets++;
 
   // assuming packetnum sequence is 0..N-1
   int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
@@ -105,7 +85,7 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   update_rb_header(*header_slot_origin, bpacket, n_packets_per_frame, counters, mod_number);
 
   // commit the slot if this is the last packet of the frame
-  if(counters->recv_packets == n_packets_per_frame)
+  if(is_frame_complete(n_packets_per_frame, counters)
   {
     //this is the last packet of the frame
     #ifdef DEBUG
@@ -114,12 +94,10 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
         bpacket->framenum, counters->current_frame);
     #endif
 
-    counters->recv_frames++;
-    //counters->recv_packets = 0;
-    counters->current_frame = NO_CURRENT_FRAME; // this will cause getting a new slot afterwards
-    counters->lost_frames = 0;
+    commit_slot(rb_writer_id, *rb_current_slot);
 
-    commit_slot(rb_writer_id, *rb_current_slot)
+    counters->total_recv_frames++;
+    counters->current_frame = NO_CURRENT_FRAME;
   }
 
   return true;
