@@ -186,8 +186,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       break;
     }
 
-    if (counters.recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
-      && counters.recv_frames != 0)
+    if (counters.total_recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
+      && counters.total_recv_frames != 0)
     {
       print_statistics(&counters, last_stats_print_time);
       
