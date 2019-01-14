@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -14,10 +13,13 @@
 #include <sched.h>
 
 #include "detectors.h"
+
 #include "jungfrau.c"
 #include "eiger.c"
-#include "utils.c"
 
+#include "utils_metadata.c"
+#include "utils_ringbuffer.c"
+#include "utils_receiver.c"
 
 inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
   barebone_packet* bpacket, detector_definition* det_definition )
@@ -142,7 +144,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     {
       // If images are lost in the last frame.
       commit_if_slot_dangling(&counters, &rb_meta);
-      
+
       break;
     }
 

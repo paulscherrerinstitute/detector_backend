@@ -1,7 +1,6 @@
 #ifndef DETECTORS_H
 #define DETECTORS_H
 
-// header struct for RB - to be updated to include the framenums of all modules
 #include <inttypes.h>
 
 #define PRINT_STATS_N_FRAMES_MODULO 100
