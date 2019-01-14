@@ -19,27 +19,6 @@
 #include "utils.c"
 
 
-inline void claim_next_slot(ringbuffer* storage_metadata)
-{
-  storage_metadata->rb_current_slot = rb_claim_next_slot (
-    storage_metadata->rb_writer_id );
-  while(storage_metadata->rb_current_slot == -1)
-  {
-    storage_metadata->rb_current_slot = rb_claim_next_slot(
-      storage_metadata->rb_writer_id );
-  }
-
-  storage_metadata->data_slot_origin = (char *) rb_get_buffer_slot (
-    storage_metadata->rb_dbuffer_id, storage_metadata->rb_current_slot );
-
-  // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
-  storage_metadata->data_slot_origin += (storage_metadata->mod_origin * storage_metadata->bit_depth) / 8;
-  
-  storage_metadata->header_slot_origin = (rb_header *) rb_get_buffer_slot(storage_metadata->rb_hbuffer_id, storage_metadata->rb_current_slot);
-  // computing the origin and stride of memory locations
-  storage_metadata->header_slot_origin += storage_metadata->mod_number;
-}
-
 inline bool receive_packet (int sock, char* buffer, size_t udp_packet_bytes, 
   barebone_packet* bpacket, detector_definition* det_definition )
 {
