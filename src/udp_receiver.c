@@ -21,7 +21,7 @@
 
 inline void claim_next_slot (
   int* rb_current_slot, char** data_slot_origin, rb_header** header_slot_origin, 
-  int rb_writer_id, int rb_dbuffer_id, int rb_hbuffer_id, int mod_number, 
+  int rb_writer_id, int rb_dbuffer_id, int rb_hbuffer_id, int mod_number, int mod_origin,
   int bit_depth, int n_packets_per_frame)
 {
   *rb_current_slot = rb_claim_next_slot(rb_writer_id);
@@ -43,7 +43,7 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
   int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter* counters, detector det, int bit_depth, detector_definition det_definition,
   char** data_slot_origin, rb_header** header_slot_origin)
 {
-  const char udp_packet[det_definition.udp_packet_bytes];
+  char udp_packet[det_definition.udp_packet_bytes];
   const int received_data_len = get_udp_packet(sock, &udp_packet, det_definition.udp_packet_bytes);
 
   barebone_packet bpacket = det_definition.interpret_udp_packet(udp_packet, received_data_len);
@@ -62,10 +62,10 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
   if (!is_slot_ready_for_frame(bpacket.framenum, counters))
   {
-    commit_if_slot_dangling(counters, rb_writer_id, rb_current_slot, n_packets_per_frame, *header_slot_origin);
+    commit_if_slot_dangling(counters, rb_writer_id, *rb_current_slot, n_packets_per_frame, *header_slot_origin);
     
-    claim_next_slot(&rb_current_slot, data_slot_origin, header_slot_origin,
-      rb_writer_id, rb_dbuffer_id, rb_hbuffer_id, mod_number, bit_depth, n_packets_per_frame);
+    claim_next_slot(rb_current_slot, data_slot_origin, header_slot_origin,
+      rb_writer_id, rb_dbuffer_id, rb_hbuffer_id, mod_number, mod_origin, bit_depth, n_packets_per_frame);
 
     initialize_rb_header(*header_slot_origin, n_packets_per_frame);
 
@@ -80,9 +80,9 @@ inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slo
 
   det_definition.copy_data(det, line_number, n_lines_per_packet, *data_slot_origin, bpacket.data, bit_depth);
 
-  update_rb_header(*header_slot_origin, bpacket, n_packets_per_frame, counters, mod_number);
+  update_rb_header(*header_slot_origin, &bpacket, n_packets_per_frame, counters, mod_number);
 
-  if(is_frame_complete(n_packets_per_frame, counters)
+  if(is_frame_complete(n_packets_per_frame, counters))
   {
     #ifdef DEBUG
       printf("[receive_save_packet][mod_number %d] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", 
@@ -149,14 +149,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   struct timeval last_stats_print_time;
   gettimeofday(&last_stats_print_time, NULL);
 
-  counter counters = {
-    .current_frame = NO_CURRENT_FRAME
-    .current_frame_recv_packets = 0
-    .total_recv_packets = 0
-    .total_lost_packets = 0
-    .total_recv_frames = 0
-    .total_lost_frames = 0
-  };
+  counter counters = {NO_CURRENT_FRAME, 0, 0, 0, 0, 0};
   
   char* data_slot_origin = NULL;
   rb_header* header_slot_origin = NULL;
@@ -179,10 +172,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
 
     if (is_acquisition_completed(n_frames, &counters)) 
     {
-      printf (
-        "[put_data_in_rb][mod_number %d] Acquisition finished.", 
-        mod_number, rb_current_slot );
-
+      printf("[put_data_in_rb][mod_number %d] Acquisition finished.", mod_number);
       break;
     }
 
@@ -198,5 +188,5 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     gettimeofday(&timeout_start_time, NULL);
   }
 
-  return counters.recv_frames;
+  return counters.total_recv_frames + counters.total_lost_frames;
 }

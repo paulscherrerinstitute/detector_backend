@@ -103,7 +103,7 @@ inline void commit_if_slot_dangling (
 {
   if (counters->current_frame != NO_CURRENT_FRAME)
   {
-    commit_slot(rb_writer_id, rb_current_slot)
+    commit_slot(rb_writer_id, rb_current_slot);
 
     // Calculate and update lost packets - do_stats with recv_packets -1.
     uint64_t lost_packets = n_packets_per_frame - (counters->current_frame_recv_packets - 1);
@@ -151,8 +151,8 @@ inline void update_rb_header (
     ph->framemetadata[3] &= ~(mask << (bpacket->packetnum - 64));
   }
 
-  ph->framemetadata[4] = (uint64_t) bpacket.bunchid;
-  ph->framemetadata[5] = (uint64_t) bpacket.debug;
+  ph->framemetadata[4] = (uint64_t) bpacket->bunchid;
+  ph->framemetadata[5] = (uint64_t) bpacket->debug;
   ph->framemetadata[6] = (uint64_t) mod_number;
   ph->framemetadata[7] = (uint64_t) 1;
 }
@@ -172,7 +172,7 @@ inline void print_statistics (counter* counters, struct timeval last_stats_print
 
   // CPU | pid | framenum | frame_rate | tot_lost_packets | % lost packets |
   printf(
-    "| %d | %d | %lu | %.2f | %lu | %.1f |\n", 
+    "| %d | %d | %llu | %.2f | %llu | %.1f |\n", 
     sched_getcpu(), getpid(), counters->current_frame, frame_rate, 
     counters->total_lost_packets, percentage_lost_packets
   );
@@ -180,13 +180,13 @@ inline void print_statistics (counter* counters, struct timeval last_stats_print
 
 inline bool is_acquisition_completed(int16_t n_frames, counter* counters)
 {
-  uint64_t total_frames = counters->total_recv_frames + counters.total_lost_frames;
+  uint64_t total_frames = counters->total_recv_frames + counters->total_lost_frames;
   return (n_frames != -1) && total_frames >= n_frames;
 }
 
 inline void initialize_counters_for_new_frame (
   counter* counters, uint64_t frame_number )
 {
-  counters->current_frame = bpacket.framenum;
+  counters->current_frame = frame_number;
   counters->current_frame_recv_packets = 0;
 }
