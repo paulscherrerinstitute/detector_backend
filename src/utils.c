@@ -50,6 +50,38 @@ inline int get_n_lines_per_packet (detector det, size_t data_bytes_per_packet, i
   return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
 }
 
+inline ringbuffer get_ringbuffer_metadata (
+  int rb_writer_id, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_current_slot,  
+    detector det, size_t data_bytes_per_packet, int bit_depth )
+{
+  ringbuffer metadata;
+
+  metadata.rb_writer_id = rb_writer_id;
+  metadata.rb_header_id = rb_header_id;
+
+  metadata.rb_hbuffer_id = rb_hbuffer_id;
+  metadata.rb_dbuffer_id = rb_dbuffer_id;
+  
+  // Is this right? Should we calculate this?
+  metadata.rb_current_slot = rb_current_slot;
+  
+  metadata.mod_origin = get_current_module_offset_in_pixels(det);
+  metadata.mod_number = get_current_module_index(det);
+  metadata.n_lines_per_packet = get_n_lines_per_packet(det, data_bytes_per_packet, bit_depth);
+  metadata.n_packets_per_frame = get_n_packets_per_frame(det, data_bytes_per_packet, bit_depth);
+  metadata.bit_depth = bit_depth;
+
+  metadata.data_slot_origin = NULL;
+  metadata.header_slot_origin = NULL;
+
+  #ifdef DEBUG
+    printf("[get_ringbuffer_metadata][%d] mod_origin: %d mod_number: %d bit_depth: %d\n",
+      getpid(), metadata.mod_origin, metadata.mod_number, bit_depth);
+  #endif
+
+  return metadata;
+}
+
 inline bool is_timeout_expired (double timeout, struct timeval timeout_start_time)
 {
   struct timeval current_time;
@@ -61,7 +93,7 @@ inline bool is_timeout_expired (double timeout, struct timeval timeout_start_tim
   return timeout_i > timeout;
 }
 
-inline int get_udp_packet (int socket_fd, void* buffer, size_t buffer_len) 
+inline int get_udp_packet (int socket_fd, char* buffer, size_t buffer_len) 
 {
   size_t n_bytes = recv(socket_fd, buffer, buffer_len, 0);
 
@@ -98,50 +130,51 @@ inline bool is_frame_complete (int n_packets_per_frame, counter* counters)
 }
 
 inline void commit_if_slot_dangling (
-  counter* counters, int rb_writer_id, int rb_current_slot, 
-  int n_packets_per_frame, rb_header* header_slot_origin )
+  counter* counters, ringbuffer* storage_metadata)
 {
   if (counters->current_frame != NO_CURRENT_FRAME)
   {
-    commit_slot(rb_writer_id, rb_current_slot);
+    commit_slot(storage_metadata->rb_writer_id, storage_metadata->rb_current_slot);
 
     // Calculate and update lost packets - do_stats with recv_packets -1.
-    uint64_t lost_packets = n_packets_per_frame - (counters->current_frame_recv_packets - 1);
+    uint64_t lost_packets = 
+      storage_metadata->n_packets_per_frame - (counters->current_frame_recv_packets - 1);
     // Ringbuffer header field for number of lost packets in this frame.
-    header_slot_origin->framemetadata[1] = lost_packets;
+    storage_metadata->header_slot_origin->framemetadata[1] = lost_packets;
     
     counters->total_lost_packets += lost_packets;
     counters->total_lost_frames++;
   }
 }
 
-inline void initialize_rb_header (rb_header *header_slot_origin, int n_packets_per_frame)
+inline void initialize_rb_header (ringbuffer* storage_metadata)
 {
   uint64_t ones = ~((uint64_t)0);
   
   for(int i=0; i < 8; i++) 
   {
-    header_slot_origin->framemetadata[i] = 0;
+    storage_metadata->header_slot_origin->framemetadata[i] = 0;
   } 
 
-  header_slot_origin->framemetadata[2] = ones >> (64 - n_packets_per_frame);
+  storage_metadata->header_slot_origin->framemetadata[2] = 
+    ones >> (64 - storage_metadata->n_packets_per_frame);
   
-  header_slot_origin->framemetadata[3] = 0;
-  if(n_packets_per_frame > 64)
+  storage_metadata->header_slot_origin->framemetadata[3] = 0;
+  if(storage_metadata->n_packets_per_frame > 64)
   {
-    header_slot_origin->framemetadata[3] = ones >> (128 - n_packets_per_frame);
+    storage_metadata->header_slot_origin->framemetadata[3] = 
+      ones >> (128 - storage_metadata->n_packets_per_frame);
   }
 }
 
 inline void update_rb_header (
-  rb_header* ph, 
-  barebone_packet* bpacket, 
-  int n_packets_per_frame, 
-  counter *counters, 
-  int mod_number )
+  ringbuffer* storage_metadata, barebone_packet* bpacket, counter *counters )
 {
+  rb_header* ph = storage_metadata->header_slot_origin;
+
   ph->framemetadata[0] = bpacket->framenum; // this could be avoided mayne
-  ph->framemetadata[1] = n_packets_per_frame - counters->current_frame_recv_packets;
+  ph->framemetadata[1] = 
+    storage_metadata->n_packets_per_frame - counters->current_frame_recv_packets;
     
   const uint64_t mask = 1;
   if(bpacket->packetnum < 64){
@@ -153,17 +186,17 @@ inline void update_rb_header (
 
   ph->framemetadata[4] = (uint64_t) bpacket->bunchid;
   ph->framemetadata[5] = (uint64_t) bpacket->debug;
-  ph->framemetadata[6] = (uint64_t) mod_number;
+  ph->framemetadata[6] = (uint64_t) storage_metadata->mod_number;
   ph->framemetadata[7] = (uint64_t) 1;
 }
 
-inline void print_statistics (counter* counters, struct timeval last_stats_print_time)
+inline void print_statistics (counter* counters, struct timeval* last_stats_print_time)
 {
   struct timeval current_time;
   gettimeofday(&current_time, NULL);
 
-  double elapsed_seconds = (current_time.tv_sec - last_stats_print_time.tv_sec) + 
-    ((long)(current_time.tv_usec) - (long)(last_stats_print_time.tv_usec)) / 1e6;
+  double elapsed_seconds = (current_time.tv_sec - last_stats_print_time->tv_sec) + 
+    ((long)(current_time.tv_usec) - (long)(last_stats_print_time->tv_usec)) / 1e6;
 
   double frame_rate = (double) PRINT_STATS_N_FRAMES_MODULO / elapsed_seconds;
 
@@ -176,6 +209,15 @@ inline void print_statistics (counter* counters, struct timeval last_stats_print
     sched_getcpu(), getpid(), counters->current_frame, frame_rate, 
     counters->total_lost_packets, percentage_lost_packets
   );
+
+  gettimeofday(last_stats_print_time, NULL);
+}
+
+int inline get_packet_line_number(ringbuffer* storage_metadata, uint32_t packet_number)
+{
+  // assuming packetnum sequence is 0..N-1
+  return storage_metadata->n_lines_per_packet * 
+    (storage_metadata->n_packets_per_frame - packet_number - 1);
 }
 
 inline bool is_acquisition_completed(int16_t n_frames, counter* counters)

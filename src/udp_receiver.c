@@ -19,84 +19,83 @@
 #include "utils.c"
 
 
-inline void claim_next_slot (
-  int* rb_current_slot, char** data_slot_origin, rb_header** header_slot_origin, 
-  int rb_writer_id, int rb_dbuffer_id, int rb_hbuffer_id, int mod_number, int mod_origin,
-  int bit_depth, int n_packets_per_frame)
+inline void claim_next_slot(ringbuffer* storage_metadata)
 {
-  *rb_current_slot = rb_claim_next_slot(rb_writer_id);
-  while(*rb_current_slot == -1)
+  storage_metadata->rb_current_slot = rb_claim_next_slot (
+    storage_metadata->rb_writer_id );
+  while(storage_metadata->rb_current_slot == -1)
   {
-    *rb_current_slot = rb_claim_next_slot(rb_writer_id);
+    storage_metadata->rb_current_slot = rb_claim_next_slot(
+      storage_metadata->rb_writer_id );
   }
 
-  *data_slot_origin = (char *) rb_get_buffer_slot(rb_dbuffer_id, *rb_current_slot);
+  storage_metadata->data_slot_origin = (char *) rb_get_buffer_slot (
+    storage_metadata->rb_dbuffer_id, storage_metadata->rb_current_slot );
+
   // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
-  *data_slot_origin += (mod_origin * bit_depth) / 8;
+  storage_metadata->data_slot_origin += (storage_metadata->mod_origin * storage_metadata->bit_depth) / 8;
   
-  *header_slot_origin = (rb_header *) rb_get_buffer_slot(rb_hbuffer_id, *rb_current_slot);
+  storage_metadata->header_slot_origin = (rb_header *) rb_get_buffer_slot(storage_metadata->rb_hbuffer_id, storage_metadata->rb_current_slot);
   // computing the origin and stride of memory locations
-  *header_slot_origin += mod_number;
+  storage_metadata->header_slot_origin += storage_metadata->mod_number;
 }
 
-inline bool receive_save_packet(int sock, int rb_hbuffer_id, int *rb_current_slot, int rb_dbuffer_id, int rb_writer_id, uint32_t mod_origin, 
-  int mod_number, int n_lines_per_packet, int n_packets_per_frame, counter* counters, detector det, int bit_depth, detector_definition det_definition,
-  char** data_slot_origin, rb_header** header_slot_origin)
+inline bool receive_packet (int sock, char* buffer, size_t udp_packet_bytes, 
+  barebone_packet* bpacket, detector_definition* det_definition )
 {
-  char udp_packet[det_definition.udp_packet_bytes];
-  const int received_data_len = get_udp_packet(sock, &udp_packet, det_definition.udp_packet_bytes);
+  const int received_data_len = get_udp_packet(sock, buffer, udp_packet_bytes);
 
-  barebone_packet bpacket = det_definition.interpret_udp_packet(udp_packet, received_data_len);
+  *bpacket = det_definition->interpret_udp_packet(buffer, received_data_len);
 
   #ifdef DEBUG
     if(received_data_len > 0){
-      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", getpid(), bpacket.data_len, bpacket.framenum, bpacket.packetnum);
+      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", 
+        getpid(), bpacket->data_len, bpacket->framenum, bpacket->packetnum);
     }
   #endif
 
-  // Invalid size/empty packet. received_data_len == 0 in this case.
-  if(received_data_len != det_definition.udp_packet_bytes)
-  {
-    return false;
-  }
+  return received_data_len == udp_packet_bytes;
+}
 
-  if (!is_slot_ready_for_frame(bpacket.framenum, counters))
+inline bool save_packet (
+  barebone_packet* bpacket, ringbuffer* rb_meta, 
+  counter* counters, detector* det, detector_definition* det_definition ) 
+{
+  
+  if (!is_slot_ready_for_frame(bpacket->framenum, counters))
   {
-    commit_if_slot_dangling(counters, rb_writer_id, *rb_current_slot, n_packets_per_frame, *header_slot_origin);
+    commit_if_slot_dangling(counters, rb_meta);
     
-    claim_next_slot(rb_current_slot, data_slot_origin, header_slot_origin,
-      rb_writer_id, rb_dbuffer_id, rb_hbuffer_id, mod_number, mod_origin, bit_depth, n_packets_per_frame);
+    claim_next_slot(rb_meta);
 
-    initialize_rb_header(*header_slot_origin, n_packets_per_frame);
+    initialize_rb_header(rb_meta);
 
-    initialize_counters_for_new_frame(counters, bpacket.framenum);
+    initialize_counters_for_new_frame(counters, bpacket->framenum);
   }
 
   counters->current_frame_recv_packets++;
   counters->total_recv_packets++;
 
-  // assuming packetnum sequence is 0..N-1
-  int line_number = n_lines_per_packet * (n_packets_per_frame - bpacket.packetnum - 1);
+  int line_number = get_packet_line_number(rb_meta, bpacket->packetnum);  
 
-  det_definition.copy_data(det, line_number, n_lines_per_packet, *data_slot_origin, bpacket.data, bit_depth);
+  det_definition->copy_data (*det, line_number, rb_meta->n_lines_per_packet, rb_meta->data_slot_origin, 
+    bpacket->data, rb_meta->bit_depth );
 
-  update_rb_header(*header_slot_origin, &bpacket, n_packets_per_frame, counters, mod_number);
+  update_rb_header(rb_meta, bpacket, counters);
 
-  if(is_frame_complete(n_packets_per_frame, counters))
+  if(is_frame_complete(rb_meta->n_packets_per_frame, counters))
   {
     #ifdef DEBUG
       printf("[receive_save_packet][mod_number %d] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", 
-        mod_number, bpacket->packetnum, counters->current_frame_recv_packets, n_packets_per_frame, 
-        bpacket->framenum, counters->current_frame);
+        rb_meta->mod_number, bpacket->packetnum, counters->current_frame_recv_packets, 
+        rb_meta->n_packets_per_frame, bpacket->framenum, counters->current_frame);
     #endif
 
-    commit_slot(rb_writer_id, *rb_current_slot);
+    commit_slot(rb_meta->rb_writer_id, rb_meta->rb_current_slot);
 
     counters->current_frame = NO_CURRENT_FRAME;
     counters->total_recv_frames++;
   }
-
-  return true;
 }
 
 int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
@@ -128,15 +127,9 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     det_definition = jungfrau_definition;
   }
 
-  uint32_t mod_origin = get_current_module_offset_in_pixels(det);
-  int mod_number = get_current_module_index(det);
-  int n_packets_per_frame = get_n_packets_per_frame(det, det_definition.data_bytes_per_packet, bit_depth);
-  int n_lines_per_packet = get_n_lines_per_packet(det, det_definition.data_bytes_per_packet, bit_depth);
-
-  #ifdef DEBUG
-    printf("[put_data_in_rb][%d] mod_origin: %d mod_number: %d bit_depth: %d n_frames:%d\n",
-      getpid(), mod_origin, mod_number, bit_depth, n_frames);
-  #endif
+  ringbuffer rb_meta = get_ringbuffer_metadata (
+    rb_writer_id, rb_header_id, rb_hbuffer_id, rb_dbuffer_id, rb_current_slot, 
+    det, det_definition.data_bytes_per_packet, bit_depth );
 
   struct timeval udp_socket_timeout;
   udp_socket_timeout.tv_sec = 0;
@@ -150,23 +143,30 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   gettimeofday(&last_stats_print_time, NULL);
 
   counter counters = {NO_CURRENT_FRAME, 0, 0, 0, 0, 0};
+  char udp_packet[det_definition.udp_packet_bytes];
+  barebone_packet bpacket;
   
   char* data_slot_origin = NULL;
   rb_header* header_slot_origin = NULL;
 
-  while(true)
+  while (true)
   {
-    bool is_packet_received = receive_save_packet (
-      sock, rb_hbuffer_id, &rb_current_slot, rb_dbuffer_id, rb_writer_id, 
-      mod_origin, mod_number, n_lines_per_packet, n_packets_per_frame, 
-      &counters, det, bit_depth, det_definition, &data_slot_origin, &header_slot_origin );
+    bool is_packet_received = receive_packet (
+      sock, &udp_packet, det_definition.udp_packet_bytes, &bpacket, &det_definition );
 
-    if (!is_packet_received && is_timeout_expired(timeout, timeout_start_time)) 
+    if (is_packet_received) 
+    {
+      save_packet (
+        &bpacket, &rb_meta, &counters, &det, &det_definition);
+      );
+
+      // Reset timeout time.
+      gettimeofday(&timeout_start_time, NULL);
+    } 
+    else if (is_timeout_expired(timeout, timeout_start_time))
     {
       // If images are lost in the last frame.
-      commit_if_slot_dangling(&counters, rb_writer_id, rb_current_slot, 
-        n_packets_per_frame, header_slot_origin);
-
+      commit_if_slot_dangling(&counters, &rb_meta);
       break;
     }
 
@@ -180,12 +180,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
       && counters.total_recv_frames != 0)
     {
       print_statistics(&counters, last_stats_print_time);
-      
-      gettimeofday(&last_stats_print_time, NULL);
     }
-
-    // Reset timeout time.
-    gettimeofday(&timeout_start_time, NULL);
   }
 
   return counters.total_recv_frames + counters.total_lost_frames;
