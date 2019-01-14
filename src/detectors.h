@@ -9,9 +9,7 @@
 
 typedef struct Counter{
   uint64_t current_frame;
-  
   uint64_t current_frame_recv_packets;
-  uint64_t current_frame_lost_packets;
 
   uint64_t total_recv_packets;
   uint64_t total_lost_packets;

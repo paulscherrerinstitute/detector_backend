@@ -93,10 +93,7 @@ inline bool is_slot_ready_for_frame (uint64_t frame_number, counter *counters)
 }
 
 inline bool is_frame_complete (int n_packets_per_frame, counter* counters)
-{
-  uint64_t total_frame_packets = 
-    counters->current_frame_recv_packets + counters->current_frame_lost_packets;
-    
+{   
   return counters->current_frame_recv_packets == n_packets_per_frame;
 }
 
@@ -192,5 +189,4 @@ inline void initialize_counters_for_new_frame (
 {
   counters->current_frame = bpacket.framenum;
   counters->current_frame_recv_packets = 0;
-  counters->current_frame_lost_packets = 0;
 }
