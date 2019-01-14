@@ -19,12 +19,12 @@
 #include "utils.c"
 
 
-inline bool receive_packet (int sock, char* buffer, size_t udp_packet_bytes, 
+inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
   barebone_packet* bpacket, detector_definition* det_definition )
 {
-  const int received_data_len = get_udp_packet(sock, buffer, udp_packet_bytes);
+  const int received_data_len = get_udp_packet(sock, udp_packet, udp_packet_bytes);
 
-  *bpacket = det_definition->interpret_udp_packet(buffer, received_data_len);
+  *bpacket = det_definition->interpret_udp_packet(udp_packet, received_data_len);
 
   #ifdef DEBUG
     if(received_data_len > 0){
@@ -36,7 +36,7 @@ inline bool receive_packet (int sock, char* buffer, size_t udp_packet_bytes,
   return received_data_len == udp_packet_bytes;
 }
 
-inline bool save_packet (
+inline void save_packet (
   barebone_packet* bpacket, rb_metadata* rb_meta, 
   counter* counters, detector* det, detector_definition* det_definition ) 
 {
@@ -124,41 +124,38 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   counter counters = {NO_CURRENT_FRAME, 0, 0, 0, 0, 0};
   char udp_packet[det_definition.udp_packet_bytes];
   barebone_packet bpacket;
-  
-  char* data_slot_origin = NULL;
-  rb_header* header_slot_origin = NULL;
 
   while (true)
   {
     bool is_packet_received = receive_packet (
-      sock, &udp_packet, det_definition.udp_packet_bytes, &bpacket, &det_definition );
+      sock, &udp_packet, det_definition.udp_packet_bytes, &bpacket, &det_definition
+    );
 
     if (is_packet_received) 
     {
-      save_packet (
-        &bpacket, &rb_meta, &counters, &det, &det_definition);
-      );
+      save_packet(&bpacket, &rb_meta, &counters, &det, &det_definition);
 
       // Reset timeout time.
       gettimeofday(&timeout_start_time, NULL);
-    } 
+    }
     else if (is_timeout_expired(timeout, timeout_start_time))
     {
       // If images are lost in the last frame.
       commit_if_slot_dangling(&counters, &rb_meta);
+      
       break;
     }
 
     if (is_acquisition_completed(n_frames, &counters)) 
     {
-      printf("[put_data_in_rb][mod_number %d] Acquisition finished.", mod_number);
+      printf("[put_data_in_rb][mod_number %d] Acquisition finished.", rb_meta.mod_number);
       break;
     }
 
     if (counters.total_recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
       && counters.total_recv_frames != 0)
     {
-      print_statistics(&counters, last_stats_print_time);
+      print_statistics(&counters, &last_stats_print_time);
     }
   }
 
