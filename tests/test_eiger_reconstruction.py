@@ -174,4 +174,5 @@ class BaseTests(unittest.TestCase):
         self.assertEqual([bin(i) for i in md_data[0][0]["missing_packets_1"]], n_modules * ['0b0', ])
         self.assertEqual([bin(i) for i in md_data[0][0]["missing_packets_2"]], n_modules * ['0b1' + 63 * '0', ])
 
-        
+if __name__ == "__main__":
+    unittest.main()

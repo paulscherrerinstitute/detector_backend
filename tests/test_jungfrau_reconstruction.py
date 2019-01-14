@@ -187,3 +187,6 @@ class BaseTests(unittest.TestCase):
 
         np.save("result_%s.npy" % name, md_data)
         self.return_test(name, md_data, reference)
+
+if __name__ == "__main__":
+    unittest.main()
