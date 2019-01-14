@@ -37,7 +37,7 @@ inline bool receive_packet (int sock, char* buffer, size_t udp_packet_bytes,
 }
 
 inline bool save_packet (
-  barebone_packet* bpacket, ringbuffer* rb_meta, 
+  barebone_packet* bpacket, rb_metadata* rb_meta, 
   counter* counters, detector* det, detector_definition* det_definition ) 
 {
   
@@ -106,7 +106,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     det_definition = jungfrau_definition;
   }
 
-  ringbuffer rb_meta = get_ringbuffer_metadata (
+  rb_metadata rb_meta = get_ringbuffer_metadata (
     rb_writer_id, rb_header_id, rb_hbuffer_id, rb_dbuffer_id, rb_current_slot, 
     det, det_definition.data_bytes_per_packet, bit_depth );
 

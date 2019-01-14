@@ -50,11 +50,11 @@ inline int get_n_lines_per_packet (detector det, size_t data_bytes_per_packet, i
   return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
 }
 
-inline ringbuffer get_ringbuffer_metadata (
+inline rb_metadata get_ringbuffer_metadata (
   int rb_writer_id, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_current_slot,  
-    detector det, size_t data_bytes_per_packet, int bit_depth )
+  detector det, size_t data_bytes_per_packet, int bit_depth )
 {
-  ringbuffer metadata;
+  rb_metadata metadata;
 
   metadata.rb_writer_id = rb_writer_id;
   metadata.rb_header_id = rb_header_id;
@@ -130,7 +130,7 @@ inline bool is_frame_complete (int n_packets_per_frame, counter* counters)
 }
 
 inline void commit_if_slot_dangling (
-  counter* counters, ringbuffer* rb_meta)
+  counter* counters, rb_metadata* rb_meta)
 {
   if (counters->current_frame != NO_CURRENT_FRAME)
   {
@@ -148,7 +148,7 @@ inline void commit_if_slot_dangling (
   }
 }
 
-inline void initialize_rb_header (ringbuffer* rb_meta)
+inline void initialize_rb_header (rb_metadata* rb_meta)
 {
   uint64_t ones = ~((uint64_t)0);
   
@@ -170,7 +170,7 @@ inline void initialize_rb_header (ringbuffer* rb_meta)
 }
 
 inline void update_rb_header (
-  ringbuffer* rb_meta, barebone_packet* bpacket, counter *counters )
+  rb_metadata* rb_meta, barebone_packet* bpacket, counter *counters )
 {
   rb_header* ph = rb_meta->header_slot_origin;
 
@@ -215,7 +215,7 @@ inline void print_statistics (counter* counters, struct timeval* last_stats_prin
   gettimeofday(last_stats_print_time, NULL);
 }
 
-int inline get_packet_line_number(ringbuffer* rb_meta, uint32_t packet_number)
+int inline get_packet_line_number(rb_metadata* rb_meta, uint32_t packet_number)
 {
   // assuming packetnum sequence is 0..N-1
   return rb_meta->n_lines_per_packet * 
@@ -235,7 +235,7 @@ inline void initialize_counters_for_new_frame (
   counters->current_frame_recv_packets = 0;
 }
 
-inline void claim_next_slot(ringbuffer* rb_meta)
+inline void claim_next_slot(rb_metadata* rb_meta)
 {
   rb_meta->rb_current_slot = rb_claim_next_slot (rb_meta->rb_writer_id );
   while(rb_meta->rb_current_slot == -1)

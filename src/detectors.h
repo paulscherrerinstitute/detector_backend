@@ -86,7 +86,7 @@ typedef struct _detector_definition{
   size_t data_bytes_per_packet;
 } detector_definition;
 
-typedef struct Ringbuffer
+typedef struct _rb_metadata
 {
   int rb_writer_id;
   int rb_header_id;
@@ -104,6 +104,6 @@ typedef struct Ringbuffer
   int n_lines_per_packet;
   int n_packets_per_frame;
   int bit_depth;
-} ringbuffer;
+} rb_metadata;
 
 #endif
