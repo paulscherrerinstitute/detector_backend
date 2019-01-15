@@ -75,7 +75,7 @@ submodule_index = n_modules * [0, 1, 2, 3]
 # Ring Buffers settings
 rb_writers_id = range(len(RECEIVER_RANKS))
 #rb_followers_id = []
-rb_fdir = "/dev/shm/eiger/"
+rb_fdir = "/dev/shm/rb/"
 rb_head_file = rb_fdir + "rb_header.dat"
 rb_imghead_file = rb_fdir + "rb_image_header.dat"
 rb_imgdata_file = rb_fdir + "rb_image_data.dat"
@@ -99,6 +99,7 @@ if rank in RECEIVER_RANKS:
     c.ModuleReceiver.rb_head_file = rb_head_file
     c.ModuleReceiver.rb_imghead_file = rb_imghead_file
     c.ModuleReceiver.rb_imgdata_file = rb_imgdata_file
+    c.ModuleReceiver.detector_name = "EIGER"
     c.ModuleReceiver.timeout = 0.5
 
     
