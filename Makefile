@@ -16,3 +16,6 @@ all: src/udp_receiver.c
 
 debug: CFLAGS+= -DDEBUG
 debug: all
+
+clean: 
+	rm $(LIBNAME).so
