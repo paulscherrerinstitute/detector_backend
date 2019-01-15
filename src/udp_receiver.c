@@ -30,7 +30,7 @@ inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes,
 
   #ifdef DEBUG
     if(received_data_len > 0){
-      printf("[UDPRECEIVER][%d] nbytes %ld framenum: %lu packetnum: %i\n", 
+      printf("[receive_packet][%d] nbytes %ld framenum: %lu packetnum: %i\n", 
         getpid(), bpacket->data_len, bpacket->framenum, bpacket->packetnum);
     }
   #endif

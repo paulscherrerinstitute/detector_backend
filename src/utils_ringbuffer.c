@@ -30,6 +30,12 @@ inline void commit_if_slot_dangling (
     
     counters->total_lost_packets += lost_packets;
     counters->total_lost_frames++;
+
+    #ifdef DEBUG
+      printf("[commit_if_slot_dangling][%d] framenum: %lu lost_packets: %lu\n", 
+        getpid(), counters->current_frame, bpacket->framenum, lost_packets);
+    #endif
+    }
   }
 }
 
