@@ -33,7 +33,7 @@ inline void commit_if_slot_dangling (
 
     #ifdef DEBUG
       printf("[commit_if_slot_dangling][%d] framenum: %lu lost_packets: %lu\n", 
-        getpid(), counters->current_frame, bpacket->framenum, lost_packets);
+        getpid(), counters->current_frame, lost_packets);
     #endif
   }
 }
