@@ -70,10 +70,5 @@ inline rb_metadata get_ringbuffer_metadata (
   metadata.data_slot_origin = NULL;
   metadata.header_slot_origin = NULL;
 
-  #ifdef DEBUG
-    printf("[get_ringbuffer_metadata][%d] mod_origin: %d mod_number: %d bit_depth: %d\n",
-      getpid(), metadata.mod_origin, metadata.mod_number, bit_depth);
-  #endif
-
   return metadata;
 }
