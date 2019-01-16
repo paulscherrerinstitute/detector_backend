@@ -13,14 +13,7 @@ inline bool is_timeout_expired (double timeout, struct timeval timeout_start_tim
 
 inline int get_udp_packet (int socket_fd, char* buffer, size_t buffer_len) 
 {
-  size_t n_bytes = recv(socket_fd, buffer, buffer_len, 0);
-
-  // Did not receive a valid frame packet.
-  if (n_bytes != buffer_len) {
-    return 0;
-  }
-
-  return n_bytes;
+  return recv(socket_fd, buffer, buffer_len, 0);
 }
 
 inline bool is_slot_ready_for_frame (uint64_t frame_number, counter *counters)
