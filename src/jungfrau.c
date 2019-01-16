@@ -38,13 +38,13 @@ void copy_data_jungfrau (
   int reverse = -1;
   int reverse_factor = det.submodule_size[0] - 1;
 
-  int submodule_line_data_len = (8 * det.submodule_size[1]) / bit_depth;
+  int submodule_line_data_len = (det.submodule_size[1] * bit_depth) / 8;
 
   int int_line = 0;
   for (int i=line_number + n_lines_per_packet - 1; i >= line_number; i--)
   {
-    long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
-    long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
+    long destination_offset = ((reverse_factor + (reverse * i)) * det.detector_size[1] * bit_depth) / 8;
+    long source_offset = (int_line * det.submodule_size[1] * bit_depth) / 8;
     
     memcpy(
       (char*)ringbuffer_slot_origin + destination_offset, 
