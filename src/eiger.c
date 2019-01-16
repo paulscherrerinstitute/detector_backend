@@ -20,6 +20,7 @@ barebone_packet interpret_udp_packet_eiger (
   bpacket.data_len = received_packet_len;
   bpacket.framenum = packet->metadata.framenum;
   bpacket.packetnum = packet->metadata.packetnum;
+  bpacket.is_valid = received_packet_len > 40;
 
   return bpacket;
 }

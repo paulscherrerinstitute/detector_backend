@@ -26,6 +26,7 @@ barebone_packet interpret_udp_packet_jungfrau (
   bpacket.packetnum = packet->metadata.packetnum;
   bpacket.bunchid = packet->metadata.bunchid;
   bpacket.debug = packet->metadata.debug;
+  bpacket.is_valid = received_packet_len > 0;
 
   return bpacket;
 }

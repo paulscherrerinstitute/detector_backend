@@ -70,6 +70,7 @@ typedef struct _barebone_packet{
   uint64_t framenum;
   double bunchid;
   uint32_t debug;
+  bool is_valid;
 } barebone_packet;
 
 // Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth

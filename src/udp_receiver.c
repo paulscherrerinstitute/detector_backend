@@ -30,12 +30,12 @@ inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes,
 
   #ifdef DEBUG
     if(received_data_len > 0){
-      printf("[receive_packet][%d] nbytes %ld framenum: %lu packetnum: %i\n", 
+      printf("[receive_packet][%d] nbytes %ld framenum: %lu packetnum: %i\n",
         getpid(), bpacket->data_len, bpacket->framenum, bpacket->packetnum);
     }
   #endif
 
-  return received_data_len == udp_packet_bytes;
+  return bpacket->is_valid;
 }
 
 inline void save_packet (
@@ -60,7 +60,7 @@ inline void save_packet (
   int line_number = get_packet_line_number(rb_meta, bpacket->packetnum);  
 
   det_definition->copy_data (*det, line_number, rb_meta->n_lines_per_packet, rb_meta->data_slot_origin, 
-    bpacket->data, rb_meta->bit_depth );
+    bpacket->data, rb_meta->bit_depth);
 
   update_rb_header(rb_meta, bpacket, counters);
 
