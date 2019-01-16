@@ -109,7 +109,7 @@ class BaseTests(unittest.TestCase):
             for k, v in reference_data[0][i].items():
                 self.assertEqual(v, md_data[0][i][k])
                 
-        self.assertTrue((np.array([x for x in md_data[1]]) == np.array([x for  x in reference_data[1]])).all())
+        np.testing.assert_array_equal(np.array([x for x in md_data[1]]), np.array([x for x in reference_data[1]]))
 
     def test_reco4p5M(self, start_backend=True):
         # self.data_dir = "../data/jungfrau_alvra_4p5/"

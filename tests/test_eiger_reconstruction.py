@@ -106,9 +106,9 @@ class BaseTests(unittest.TestCase):
         #self.assertTrue((md_data[0] == reference_data[0]).all())
         #for i in range(self.n_frames):
         if len(reference_data.shape) == 2:
-            self.assertTrue((np.array([x for  x in md_data[1]]) == np.array(reference_data)).all())
+            np.testing.assert_array_equal(np.array([x for x in md_data[1]]), np.array([x for x in reference_data))
         else:
-            self.assertTrue((np.array([x for  x in md_data[1]]) == np.array([x for  x in reference_data[1]])).all())
+            np.testing.assert_array_equal(np.array([x for x in md_data[1]]), np.array([x for  x in reference_data[1]]))
 
     def test_reco05M_16b(self):
         name = "eiger9M_hv1_test_16b"
