@@ -36,14 +36,17 @@ inline int get_current_module_index (detector det)
 
 inline int get_n_lines_per_packet (detector det, size_t data_bytes_per_packet, int bit_depth)
 {
-  // (Bytes in packet) / (Bytes in submodule line)
-  return 8 * data_bytes_per_packet / (bit_depth * det.submodule_size[1]);
+  int bytes_in_line = (det.submodule_size[1] * bit_depth) / 8;
+  return data_bytes_per_packet / bytes_in_line;
 }
 
 inline int get_n_packets_per_frame (detector det, size_t data_bytes_per_packet, int bit_depth)
 {
-  // (Pixels in submodule) * (bytes per pixel) / (bytes per packet)
-  return det.submodule_size[0] * det.submodule_size[1] / (8 * data_bytes_per_packet / bit_depth);
+  int n_pixels_in_frame = (det.submodule_size[0] * det.submodule_size[1]);
+  // data_bytes_per_packet / (bit_depth/8)
+  int n_pixels_in_packet = (data_bytes_per_packet * 8) / bit_depth;
+
+  return n_pixels_in_frame / n_pixels_in_packet;
 }
 
 inline rb_metadata get_ringbuffer_metadata (
