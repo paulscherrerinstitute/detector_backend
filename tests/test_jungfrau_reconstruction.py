@@ -115,10 +115,7 @@ class BaseTests(unittest.TestCase):
 
                 self.assertEqual(v, md_data[0][i][k], "Difference in value %s." % k)
                 
-        acquired_data = np.array(md_data[1])
-        comparison_data = np.array(reference_data[1])
-
-        np.testing.assert_array_equal(acquired_data, comparison_data)
+            np.testing.assert_array_equal(md_data[1][i], reference_data[1][i])
 
     def test_reco4p5M(self, start_backend=True):
         # self.data_dir = "../data/jungfrau_alvra_4p5/"
