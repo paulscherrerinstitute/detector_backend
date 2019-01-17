@@ -106,7 +106,7 @@ class BaseTests(unittest.TestCase):
         #self.assertTrue((md_data[0] == reference_data[0]).all())
         #for i in range(self.n_frames):
         if len(reference_data.shape) == 2:
-            np.testing.assert_array_equal(np.array([x for x in md_data[1]]), np.array([x for x in reference_data))
+            np.testing.assert_array_equal(np.array([x for x in md_data[1]]), np.array([x for x in reference_data]))
         else:
             np.testing.assert_array_equal(np.array([x for x in md_data[1]]), np.array([x for  x in reference_data[1]]))
 
