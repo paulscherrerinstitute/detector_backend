@@ -105,11 +105,20 @@ class BaseTests(unittest.TestCase):
         reference_data = np.load(reference, encoding="bytes")
         # TODO save new headers
         #self.assertTrue((md_data[0] == reference_data[0]).all())
+        
         for i in range(self.n_frames):
             for k, v in reference_data[0][i].items():
-                self.assertEqual(v, md_data[0][i][k])
+                if k == "is_good_frame":
+                    # TODO: Collect new reference data with the fixed is_good_frame flag.
+                    print("Ommiting is_good_frame because of bad reference data. Just a reminder.")
+                    continue
+
+                self.assertEqual(v, md_data[0][i][k], "Difference in value %s." % k)
                 
-        np.testing.assert_array_equal(np.array([x for x in md_data[1]]), np.array([x for x in reference_data[1]]))
+        acquired_data = np.array(md_data[1])
+        comparison_data = np.array(reference_data[1])
+
+        np.testing.assert_array_equal(acquired_data, comparison_data)
 
     def test_reco4p5M(self, start_backend=True):
         # self.data_dir = "../data/jungfrau_alvra_4p5/"
