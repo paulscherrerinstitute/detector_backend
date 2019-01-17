@@ -104,17 +104,12 @@ class BaseTests(unittest.TestCase):
         reference_data = np.load(reference, encoding="bytes")
         # TODO save new headers
         #self.assertTrue((md_data[0] == reference_data[0]).all())
-        #for i in range(self.n_frames):
+
         if len(reference_data.shape) == 2:
-            acquired_data = np.array(md_data[1])
-            comparison_data = np.array(reference_data)
-
-            np.testing.assert_array_equal(acquired_data, comparison_data)
+            self.assertTrue((np.array([x for  x in md_data[1]]) == np.array(reference_data)).all())
         else:
-            acquired_data = np.array(md_data[1])
-            comparison_data = np.array(reference_data[1])
+            self.assertTrue((np.array([x for  x in md_data[1]]) == np.array([x for  x in reference_data[1]])).all())
 
-            np.testing.assert_array_equal(acquired_data, comparison_data)
 
     def test_reco05M_16b(self):
         name = "eiger9M_hv1_test_16b"
