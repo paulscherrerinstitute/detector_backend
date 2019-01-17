@@ -3,6 +3,7 @@
 
 #define EIGER_BYTES_PER_PACKET 4144
 #define EIGER_DATA_BYTES_PER_PACKET 4096
+#define EIGER_MIN_VALID_PACKET_SIZE 41
 
 // 48 bytes + 4096 bytes = 4144 bytes.
 typedef struct _eiger_packet {
@@ -20,7 +21,7 @@ barebone_packet interpret_udp_packet_eiger (
   bpacket.data_len = received_packet_len;
   bpacket.framenum = packet->metadata.framenum;
   bpacket.packetnum = packet->metadata.packetnum;
-  bpacket.is_valid = received_packet_len > 40;
+  bpacket.is_valid = received_packet_len >= EIGER_MIN_VALID_PACKET_SIZE;
 
   return bpacket;
 }
@@ -42,22 +43,22 @@ void copy_data_eiger (
       reverse_factor = det.submodule_size[0] - 1;
   }
 
-  int submodule_line_data_len = (8 * det.submodule_size[1]) / bit_depth;
+  int submodule_line_data_len = (det.submodule_size[1] * bit_depth) / 8;
 
   int int_line = 0;
   for(int i=line_number + n_lines_per_packet - 1; i >= line_number; i--){
 
-    long destination_offset = (8 * (reverse_factor + reverse * i) * det.detector_size[1]) / bit_depth;
-    long source_offset = (8 * int_line * det.submodule_size[1]) / bit_depth;
+    long destination_offset = ((reverse_factor + (reverse * i)) * det.detector_size[1] * bit_depth) / 8;
+    long source_offset = (int_line * det.submodule_size[1] * bit_depth) / 8;
 
     memcpy (
       (char*)ringbuffer_slot_origin + destination_offset, 
-      (char*) data + source_offset, 
+      (char*)data + source_offset, 
       submodule_line_data_len/2
     );
 
-    long destination_gap_offset = 8 * (det.gap_px_chips[1] + det.submodule_size[1] / 2) / bit_depth;
-    long source_gap_offset = 8 * (det.submodule_size[1] / 2) / bit_depth;
+    long destination_gap_offset = ((det.gap_px_chips[1] + (det.submodule_size[1] / 2)) * bit_depth) / 8;
+    long source_gap_offset = ((det.submodule_size[1] / 2) * bit_depth) / 8;
 
     memcpy(
       (char*)ringbuffer_slot_origin + destination_offset + destination_gap_offset,
