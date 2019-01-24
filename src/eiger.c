@@ -44,22 +44,22 @@ void copy_data_eiger (
   }
 
   uint32_t n_bytes_per_frame_line = (det.detector_size[1] * bit_depth) / 8;
-  uint32_t n_bytes_per_packet_line = (det.submodule_size[1] * bit_depth) / 8;
+  uint32_t n_bytes_per_submodule_line = (det.submodule_size[1] * bit_depth) / 8;
   // Each packet line is made of 2 chip lines -> [CHIP1]<gap>[CHIP2]
-  uint32_t n_bytes_per_chip_line = n_bytes_per_packet_line / 2;
+  uint32_t n_bytes_per_chip_line = n_bytes_per_submodule_line / 2;
   uint32_t n_bytes_per_chip_gap = (det.gap_px_chips[1] * bit_depth) / 8;
 
   uint32_t dest_chip_offset = n_bytes_per_chip_line + n_bytes_per_chip_gap;
 
   // Packets are stream from the top to the bottom of the module.
   // module_line goes from 255..0
-  uint32_t dest_module_line = line_number + n_lines_per_packet - 1;
+  uint32_t dest_submodule_line = line_number + n_lines_per_packet - 1;
 
   for (uint32_t packet_line=0; packet_line<n_lines_per_packet; packet_line++)
   {
     // TODO: Optimize this by moving calculation out of the loop.
-    uint32_t dest_line_offset = (reverse_factor + (reverse * dest_module_line)) * n_bytes_per_frame_line;
-    uint32_t source_offset = packet_line * n_bytes_per_packet_line;
+    uint32_t dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * n_bytes_per_frame_line;
+    uint32_t source_offset = packet_line * n_bytes_per_submodule_line;
 
     // Copy each chip line individually, to allow a gap of n_bytes_per_chip_gap in the destination memory.
     memcpy (
@@ -74,7 +74,7 @@ void copy_data_eiger (
       n_bytes_per_chip_line
     );
 
-    dest_module_line--;
+    dest_submodule_line--;
   }
 }
 
