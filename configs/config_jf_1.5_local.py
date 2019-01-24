@@ -13,7 +13,7 @@ import logging
 c = get_config()  # @UndefinedVariable
 
 
-
+detector_name = "JUNGFRAU"
 rb_fdir = "/dev/shm/rb/"
 #rb_fdir = "/mnt/north/"
 rb_head_file = rb_fdir + "rb_header.dat"
@@ -30,11 +30,9 @@ debug = dict(level='DEBUG')
 info  = dict(level='INFO')
 undef = dict(level=0)
 
-log_config = dict( loggers =
-                   {
-                       'ModuleReceiver': info,
-                       'ZMQSender': info
-                   }
+log_config = dict(loggers = {
+    'ModuleReceiver': info,
+    'ZMQSender': info}
 )
 
 c.XblBaseApplication.log_config = log_config
@@ -54,12 +52,32 @@ size = mpi_size - 2
 geometry = [1, 3]
 module_size = [512, 1024]
 
-RECEIVER_RANKS = [0, 1, 2]
-SENDERS_RANKS = [3, ]
-#ip = 3 * ["10.30.10.3", ]
-ip = 3 * ["127.0.0.1", ]
-port = [10001, 10002, 10003]
+n_modules = geometry[0] * geometry[1]
+#gap_chips = [2, 2]
+#gap_modules = [36, 8]
+gap_chips = [0, 0]
+gap_modules = [0, 0]
+#module_size_wgaps = [module_size[0] + gap_chips[0], module_size[1] + gap_chips[1] + 4]
+module_size_wgaps = [module_size[0], module_size[1]]
+detector_size = [(geometry[0] - 1) * gap_modules[0] + module_size_wgaps[0] * geometry[0], 
+                (geometry[1] - 1) * gap_modules[1] + module_size_wgaps[1] * geometry[1]]
+#detector_size = [(GEOMETRY[0] - 1) * gap_modules[0] + detector_size[0],
+#                 (GEOMETRY[1] - 1) * gap_modules[1] + detector_size[1]]
 
+c.ModuleReceiver.geometry = geometry  # number of modules, x and y
+c.ModuleReceiver.module_size = module_size
+c.ModuleReceiver.detector_size = detector_size
+c.ZMQSender.module_size = module_size
+c.ZMQSender.detector_size = detector_size
+
+
+RECEIVER_RANKS = [i for i in range(n_modules)]
+SENDERS_RANKS = [RECEIVER_RANKS[-1] + 1]
+#ip = 3 * ["10.30.10.3", ]
+ip = n_modules * ["127.0.0.1", ]
+port = [10001 + i for i in range(9)]
+
+# print ip, port, RECEIVER_RANKS
 
 c.BulletinBoardClient.prefix = u'backend'
 c.BulletinBoardClient.postfix = str(rank)
@@ -75,12 +93,11 @@ if rank in RECEIVER_RANKS:
     ]
     c.DataFlow.targets_per_node = { 'RECV' : []}
 
-    #c.ModuleReceiver.ip = "192.168.10.10"
+    c.ModuleReceiver.detector_name = detector_name
     c.ModuleReceiver.ip = ip[rank]
     c.ModuleReceiver.port = port[rank]
 
     c.ModuleReceiver.rb_id = rank
-    #if rank != 2:
     c.ModuleReceiver.rb_followers = SENDERS_RANKS
     c.ModuleReceiver.rb_head_file = rb_head_file
     c.ModuleReceiver.rb_imghead_file = rb_imghead_file
@@ -88,7 +105,6 @@ if rank in RECEIVER_RANKS:
     c.ModuleReceiver.geometry = geometry
     c.ModuleReceiver.module_size = module_size
     c.ModuleReceiver.module_index = rank # FIXME
-    c.ModuleReceiver.detector_name = "JUNGFRAU"
 
 elif rank in SENDERS_RANKS:
     c.DataFlow.nodelist = [

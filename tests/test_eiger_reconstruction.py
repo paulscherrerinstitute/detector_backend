@@ -104,11 +104,12 @@ class BaseTests(unittest.TestCase):
         reference_data = np.load(reference, encoding="bytes")
         # TODO save new headers
         #self.assertTrue((md_data[0] == reference_data[0]).all())
-        #for i in range(self.n_frames):
+
         if len(reference_data.shape) == 2:
             self.assertTrue((np.array([x for  x in md_data[1]]) == np.array(reference_data)).all())
         else:
             self.assertTrue((np.array([x for  x in md_data[1]]) == np.array([x for  x in reference_data[1]])).all())
+
 
     def test_reco05M_16b(self):
         name = "eiger9M_hv1_test_16b"
@@ -174,4 +175,5 @@ class BaseTests(unittest.TestCase):
         self.assertEqual([bin(i) for i in md_data[0][0]["missing_packets_1"]], n_modules * ['0b0', ])
         self.assertEqual([bin(i) for i in md_data[0][0]["missing_packets_2"]], n_modules * ['0b1' + 63 * '0', ])
 
-        
+if __name__ == "__main__":
+    unittest.main()

@@ -52,15 +52,6 @@ def do_corrections(m, n, image, G, P, pede_mask, mask, mask2):
     return res
 
 
-def send_array(socket, A, flags=0, copy=False, track=True, metadata={}):
-    """send a numpy array with metadata"""
-    metadata["htype"] = "array-1.0"
-    metadata["type"] = str(A.dtype)
-    metadata["shape"] = A.shape
-
-    socket.send_json(metadata, flags | zmq.SNDMORE)
-    return socket.send(A, flags, copy=copy, track=track)
-
 
 def expand_image(image, mods, mod_gaps, chip_gaps, chips):
     shape = [512 * mods[0], 1024 * mods[1]]
@@ -119,14 +110,15 @@ class ZMQSender(DataFlowNode):
     socket_type = Unicode('PUB', config=True, help="ZMQ socket type")
 
     send_every_s = Float(0, config=True, help="send every n second")
-    send_modulo = Int(0, config=True, help="Send on modulo. 0 for turning off.")
-    send_modulo_offset = Int(0, config=True, help="Offset to add to the modulo calculation. Default: 0.")
+    preview_modulo = Int(0, config=True, help="Send on modulo. 0 for turning off.")
+    preview_modulo_offset = Int(0, config=True, help="Offset to add to the modulo calculation. Default: 0.")
 
     module_size = List((512, 1024), config=True)
     exp_module_size = List((0, 0), config=True) 
     expand_gaps = Bool(True, config=True)
     geometry = List((1, 1), config=True)
     detector_size = List((-1, -1), config=True)
+    submodule_n = Int(1, config=True)
 
     gap_px_chip = List((2, 2), config=True, reconfig=False)  # possibly not used
     gap_px_module = List((0, 0), config=True, reconfig=False)
@@ -197,15 +189,26 @@ class ZMQSender(DataFlowNode):
         self.worker_communicator = app.worker_communicator
         self.worker_communicator.barrier()
         
+        self.n_modules = self.geometry[0] * self.geometry[1]
+        self.n_submodules = self.geometry[0] * self.geometry[1] * self.submodule_n
+        self.log.debug("Using n_modules %d and n_submodules %d", self.n_modules, self.n_submodules)
+
+        self.HEADER = Mystruct * self.n_submodules
+
         self.rb_header_id = rb.open_header_file(self.rb_head_file)
         self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
+
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.n_submodules)
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
                                      int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
-        rb.adjust_nslots(self.rb_header_id)
+        n_slots = rb.adjust_nslots(self.rb_header_id)
+
+        self.log.info("RB %d slots: %d" % (self.rb_header_id, n_slots))
+        self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
+        self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
 
         self.context = zmq.Context(io_threads=4)
         self.open_sockets()
@@ -214,10 +217,6 @@ class ZMQSender(DataFlowNode):
 
         self.n_frames = -1
         self.period = 1
-
-        self.n_modules = self.geometry[0] * self.geometry[1]
-        self.HEADER = Mystruct * self.n_modules
-
 
         self.counter = 0
         self.sent_frames = 0
@@ -286,7 +285,7 @@ class ZMQSender(DataFlowNode):
 
         self.log.info("[%s] RB buffers: Header %d Data %d" % (self.name, self.rb_hbuffer_id, self.rb_dbuffer_id))
         
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.geometry[0] * self.geometry[1])
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.n_submodules)
 
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
                                      int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
@@ -370,7 +369,7 @@ class ZMQSender(DataFlowNode):
         ref_time = time()
         # frame_comp_time = time()
         frame_comp_counter = 0
-        is_good_frame = int(True)
+        is_good_frame = True
 
         # need to stay here because of numba
         # for gain plus data masking
@@ -409,22 +408,24 @@ class ZMQSender(DataFlowNode):
                 #self.log.debug("No RB slot")
                 continue
 
-            pointerh = ctypes.cast(rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot),
-                                   ctypes.POINTER(self.HEADER))
+            rb_header_slot = rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot)
+            pointerh = ctypes.cast(rb_header_slot, ctypes.POINTER(self.HEADER))
 
             # check that all frame numbers are the same
             try:
                 framenum = copy(pointerh.contents[0].framemetadata[0])
-                daq_recs = [pointerh.contents[i].framemetadata[5] for i in range(self.n_modules)]
-                framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_modules)]
-                pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_modules)]
+                self.log.debug("Preparing to send rb_current_slot %d, framenum %d", self.rb_current_slot, framenum)
+
+                daq_recs = [pointerh.contents[i].framemetadata[5] for i in range(self.n_submodules)]
+                framenums = [pointerh.contents[i].framemetadata[0] for i in range(self.n_submodules)]
+                pulseids = [pointerh.contents[i].framemetadata[4] for i in range(self.n_submodules)]
                 framenum = copy(pointerh.contents[0].framemetadata[0])
                 pulseid = pointerh.contents[0].framemetadata[4]
                 daq_rec = pointerh.contents[0].framemetadata[5]
-                mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_modules)]
-                mod_enabled = [pointerh.contents[i].framemetadata[7] for i in range(self.n_modules)]
+                mod_numbers = [pointerh.contents[i].framemetadata[6] for i in range(self.n_submodules)]
+                mod_enabled = [pointerh.contents[i].framemetadata[7] for i in range(self.n_submodules)]
                 if self.check_framenum:
-                    is_good_frame = int(len(set(framenums)) == 1)
+                    is_good_frame = len(set(framenums)) == 1
             except:
                 # FIXME: not clear why I get here
                 print(rb.gf_perror())
@@ -445,30 +446,34 @@ class ZMQSender(DataFlowNode):
 
             self.recv_frames += 1
 
-            # TODO: use milliseconds
-            if self.send_every_s != 0:
-                if framenum != 0 and (time() - self.send_time) < self.send_every_s:
+            # Use the modulo and every_s only for the preview strem.
+            # TODO: Refactor this in separate class.
+            if self.name == "preview":
 
-                    if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
-                        self.log.error("RINGBUFFER: CANNOT COMMIT SLOT on send_every_s.")
+                # TODO: use milliseconds
+                if self.send_every_s != 0:
+                   if framenum != 0 and (time() - self.send_time) < self.send_every_s:
 
-                    continue
+                        if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
+                           self.log.error("RINGBUFFER: CANNOT COMMIT SLOT on send_every_s.")
 
-            # TODO: Modulo currently works on the consequtive received frame - pulse_id for JF?
-            elif self.send_modulo != 0:
-                if (self.recv_frames + self.send_modulo_offset) % self.send_modulo:
+                        continue
 
-                    if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
-                        self.log.error("RINGBUFFER: CANNOT COMMIT SLOT on send_modulo.")
+                # TODO: Modulo currently works on the consequtive received frame - pulse_id for JF?
+                elif self.preview_modulo != 0:
+                    if (self.recv_frames + self.preview_modulo_offset) % self.preview_modulo:
 
-                    continue
+                        if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
+                            self.log.error("RINGBUFFER: CANNOT COMMIT SLOT on send_modulo.")
+
+                        continue
 
             self.send_time = time()
 
             # check if packets are missing
-            missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_modules)])
+            missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_submodules)])
             #missing_packets = 0
-            is_good_frame = missing_packets == 0
+            is_good_frame &= missing_packets == 0
             if missing_packets != 0:
                 self.log.warning("Frame %d lost frames %d" % (framenum, missing_packets))
                 self.frames_with_missing_packets += 1
@@ -476,7 +481,7 @@ class ZMQSender(DataFlowNode):
 
             entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
             pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-            #data = np.ctypeslib.as_array(pointer, self.detector_size, )
+            
             data = np.ctypeslib.as_array(pointer, (int(entry_size_in_bytes / (self.bit_depth / 8)), ), ).reshape(self.detector_size)
 
             self.log.debug("Got Frame %d %d" % (framenum, pulseid))
@@ -514,17 +519,24 @@ class ZMQSender(DataFlowNode):
                     data = convert_stripsel(data)
 
             try:
-                send_array(self.skt, data, metadata={"frame": framenum, 
-                                                     "is_good_frame": int(is_good_frame), "daq_rec": daq_rec, "pulse_id": pulseid, 
-                                                     "daq_recs": daq_recs, "pulse_ids": pulseids, "framenums": framenums, 
-                                                     "pulse_id_diff": [pulseids[0] - i for i in pulseids], 
-                                                     "framenum_diff": [framenums[0] - i for i in framenums], 
-                                                     "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_modules)], 
-                                                     "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_modules)],
-                                                     "module_number": mod_numbers,
-                                                    "module_enabled": mod_enabled
-                                                 }, copy=True
-                       )
+                
+                metadata = {
+                  "frame": framenum, 
+                  "daq_rec": daq_rec, 
+                  "pulse_id": pulseid, 
+                  "is_good_frame": int(is_good_frame), 
+                  "daq_recs": daq_recs, 
+                  "pulse_ids": pulseids, 
+                  "framenums": framenums,                        
+                  "pulse_id_diff": [pulseids[0] - i for i in pulseids], 
+                  "framenum_diff": [framenums[0] - i for i in framenums], 
+                  "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_submodules)], 
+                  "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_submodules)],
+                  "module_number": mod_numbers,
+                  "module_enabled": mod_enabled
+                }
+
+                self.send_array(self.skt, data, metadata=metadata, copy=True)
                 
             except:
                 self.log.error("Error in sending array: %s" % sys.exc_info()[1])
@@ -549,3 +561,15 @@ class ZMQSender(DataFlowNode):
         return(self.counter)
     
         
+    def send_array(self, socket, A, flags=0, copy=False, track=True, metadata={}):
+        """send a numpy array with metadata"""
+        metadata["htype"] = "array-1.0"
+        metadata["type"] = str(A.dtype)
+        metadata["shape"] = A.shape
+
+        self.log.info("[%s] Sending frame %d", self.name, metadata["frame"])
+        self.log.debug("[%s] Frame %d metadata %s", self.name, metadata["frame"], metadata)
+
+        socket.send_json(metadata, flags | zmq.SNDMORE)
+        return socket.send(A, flags, copy=copy, track=track)
+

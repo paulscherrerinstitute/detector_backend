@@ -44,7 +44,7 @@ def replay_jungfrau(data_dir, n_modules, n_packets=128, skip_module=[]):
 def recv_array(socket, flags=0, copy=True, track=False, modulo=10):
     """recv a numpy array"""
     md = socket.recv_json(flags=flags)
-    # print(md)
+    #print(md)
     msg = socket.recv(copy=copy, track=track)
     buf = buffer(msg)
     A = np.frombuffer(buf, dtype=md['type'])
@@ -75,21 +75,21 @@ class BaseTests(unittest.TestCase):
 
         sleep(2)
         while self.client.state is None:
-            sleep(2)
+            sleep(1)
             continue
         sleep(2)
         self.assertEqual(self.client.state, "INITIALIZED")
 
         self.client.configure({"settings": {"bit_depth": 16}})
-        sleep(2)
+        sleep(1)
         self.assertEqual(self.client.state, "CONFIGURED")
         self.client.open()
-        sleep(2)
+        sleep(1)
         self.assertEqual(self.client.state, "OPEN")
 
         self.zmq_recv.connect("tcp://127.0.0.1:40000")
         sleep(1)
-        replay_jungfrau(data_dir, n_modules, n_packets=n_packets*n_frames)
+        replay_jungfrau(data_dir, n_modules, n_packets=n_packets * n_frames)
         md_data = [[], []]
         for i in range(n_frames):
             md, data = recv_array(self.zmq_recv)
@@ -105,24 +105,33 @@ class BaseTests(unittest.TestCase):
         reference_data = np.load(reference, encoding="bytes")
         # TODO save new headers
         #self.assertTrue((md_data[0] == reference_data[0]).all())
-        #for i in range(self.n_frames):
-        self.assertTrue((np.array([x for  x in md_data[1]]) == np.array([x for  x in reference_data[1]])).all())
+        
+        for i in range(self.n_frames):
+            for k, v in reference_data[0][i].items():
+                if k == "is_good_frame":
+                    # TODO: Collect new reference data with the fixed is_good_frame flag.
+                    print("Ommiting is_good_frame because of bad reference data. Just a reminder.")
+                    continue
 
-    def test_reco4p5M(self):
+                self.assertEqual(v, md_data[0][i][k], "Difference in value %s." % k)
+                
+            np.testing.assert_array_equal(md_data[1][i], reference_data[1][i])
+
+    def test_reco4p5M(self, start_backend=True):
         # self.data_dir = "../data/jungfrau_alvra_4p5/"
         name = "jungfrau_alvra_4p5"
         reference = "../data/jungfrau_alvra_4p5_reference.npy"
         n_modules = 9
         # maybe use picke.dump here
         md_data = self.run_test(name=name, n_modules=n_modules,
-                      config="../configs/config_jf_4.5_local.py", reference=reference, n_frames=self.n_frames)
+                      config="../configs/config_jf_4.5_local.py", reference=reference, n_frames=self.n_frames, start_backend=start_backend)
         np.save("result_%s.npy" % name, md_data)
         self.return_test(name, md_data, reference)
         
-    def atest_reco0p5M(self):
+    def test_reco0p5M(self):
         # self.data_dir = "../data/jungfrau_alvra_4p5/"
         name = "jungfrau_alvra_4p5"
-        reference = "../data/jungfrau_alvra_4p5_reference.npy"
+        reference = "../data/jungfrau_alvra_0p5_reference.npy"
         n_modules = 1
         # maybe use picke.dump here
         md_data = self.run_test(name=name, n_modules=n_modules,
@@ -130,21 +139,10 @@ class BaseTests(unittest.TestCase):
         np.save("result_%s.npy" % name, md_data)
         self.return_test(name, md_data, reference)
 
-    def test_reco1p5M_testbed(self, start_backend=True):
-        # self.data_dir = "../data/jf_testbed_15_newfw/"
-        name = "jf_testbed_15_newfw"
-        reference = "../data/jf_testbed_15_newfw_reference.npy"
-        n_modules = 3
-        config = "../configs/config_jf_1.5_local.py"
-        md_data = self.run_test(name=name, n_modules=n_modules,
-                                 config=config, reference=reference, n_frames=self.n_frames, start_backend=start_backend)
-        np.save("result_%s.npy" % name, md_data)
-        self.return_test(name, md_data, reference)
-
     def test_multiple_runs(self):
         first_run = True
-        for i in range(10):
-            self.test_reco1p5M_testbed(start_backend=first_run)
+        for i in range(3):
+            self.test_reco4p5M(start_backend=first_run)
             first_run = False
 
     def test_packetloss(self, ):
@@ -159,35 +157,42 @@ class BaseTests(unittest.TestCase):
         self.assertEqual([bin(i) for i in md_data[0][0]["missing_packets_2"]], n_modules * ['0b1' + 63 * '0', ])
 
     def test_moduleloss(self, ):
-        name = "jf_testbed_15_newfw"
-        reference = "../data/jf_testbed_15_newfw_reference_missingmodule.npy"
-        n_modules = 3
-        config = "../configs/config_jf_1.5_local_missingmodule.py"
+        name = "jungfrau_alvra_4p5"
+        #name = "jf_testbed_15_newfw"
+        reference = "../data/jungfrau_alvra_4p5_reference_missingmodule.npy"
+        n_modules = 9
+        config = "../configs/config_jf_4.5_local_missingmodule.py"
 
         data_dir = "../data/" + name + "/"
+
         self.p = subprocess.Popen(shlex.split("mpirun -n %d mpi-dafld --config-file %s" % (n_modules + 3, config)))
 
         sleep(2)
         while self.client.state is None:
-            sleep(2)
+            sleep(1)
             continue
-        sleep(2)
+        sleep(1)
         self.assertEqual(self.client.state, "INITIALIZED")
 
         self.client.configure({"settings": {}})
-        sleep(2)
+        sleep(1)
         self.assertEqual(self.client.state, "CONFIGURED")
         self.client.open()
-        sleep(2)
+        sleep(1)
         self.assertEqual(self.client.state, "OPEN")
 
         self.zmq_recv.connect("tcp://127.0.0.1:40000")
         sleep(1)
-        replay_jungfrau(data_dir, n_modules, skip_module=[2,])
+        replay_jungfrau(data_dir, n_modules, skip_module=[2,], n_packets=self.n_frames * 128)
 
-        md, data = recv_array(self.zmq_recv)
+        md_data = [[], []]
+        for i in range(self.n_frames):
+            md, data = recv_array(self.zmq_recv)
+            md_data[0].append(md)
+            md_data[1].append(data)
 
-        print(md)
-        np.save("result_%s.npy" % name, data)
-        reference_data = np.load(reference)
-        self.assertTrue((data == reference_data).all())
+        np.save("result_%s.npy" % name, md_data)
+        self.return_test(name, md_data, reference)
+
+if __name__ == "__main__":
+    unittest.main()

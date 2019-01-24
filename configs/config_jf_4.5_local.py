@@ -31,8 +31,8 @@ info  = dict(level='INFO')
 undef = dict(level=0)
 
 log_config = dict(loggers = {
-    'ModuleReceiver': debug,
-    'ZMQSender': debug}
+    'ModuleReceiver': info,
+    'ZMQSender': info}
 )
 
 c.XblBaseApplication.log_config = log_config
