@@ -28,7 +28,7 @@ barebone_packet interpret_udp_packet_eiger (
 
 void copy_data_eiger (
   detector det, int line_number, int n_lines_per_packet, 
-  void* ringbuffer_slot_origin, void * data, int bit_depth )
+  void* ringbuffer_slot_origin, void* packet_data, int bit_depth )
 {  
   int reverse;
   int reverse_factor;
@@ -43,30 +43,38 @@ void copy_data_eiger (
       reverse_factor = det.submodule_size[0] - 1;
   }
 
-  int submodule_line_data_len = (det.submodule_size[1] * bit_depth) / 8;
+  uint32_t n_bytes_per_frame_line = (det.detector_size[1] * bit_depth) / 8;
+  uint32_t n_bytes_per_packet_line = (det.submodule_size[1] * bit_depth) / 8;
+  // Each packet line is made of 2 chip lines -> [CHIP1]<gap>[CHIP2]
+  uint32_t n_bytes_per_chip_line = n_bytes_per_packet_line / 2;
+  uint32_t n_bytes_per_chip_gap = (det.gap_px_chips[1] * bit_depth) / 8;
 
-  int int_line = 0;
-  for(int i=line_number + n_lines_per_packet - 1; i >= line_number; i--){
+  uint32_t dest_chip_offset = n_bytes_per_chip_line + n_bytes_per_chip_gap;
 
-    long destination_offset = ((reverse_factor + (reverse * i)) * det.detector_size[1] * bit_depth) / 8;
-    long source_offset = (int_line * det.submodule_size[1] * bit_depth) / 8;
+  // Packets are stream from the top to the bottom of the module.
+  // module_line goes from 255..0
+  uint32_t dest_module_line = line_number + n_lines_per_packet - 1;
 
+  for (uint32_t packet_line=0; packet_line<n_lines_per_packet; packet_line++)
+  {
+    // TODO: Optimize this by moving calculation out of the loop.
+    uint32_t dest_line_offset = (reverse_factor + (reverse * dest_module_line)) * n_bytes_per_frame_line;
+    uint32_t source_offset = packet_line * n_bytes_per_packet_line;
+
+    // Copy each chip line individually, to allow a gap of n_bytes_per_chip_gap in the destination memory.
     memcpy (
-      (char*)ringbuffer_slot_origin + destination_offset, 
-      (char*)data + source_offset, 
-      submodule_line_data_len/2
+      (char*)ringbuffer_slot_origin + dest_line_offset, 
+      (char*)packet_data + source_offset, 
+      n_bytes_per_chip_line
     );
 
-    long destination_gap_offset = ((det.gap_px_chips[1] + (det.submodule_size[1] / 2)) * bit_depth) / 8;
-    long source_gap_offset = ((det.submodule_size[1] / 2) * bit_depth) / 8;
+    memcpy (
+      (char*)ringbuffer_slot_origin + dest_line_offset + dest_chip_offset,
+      (char*)packet_data + source_offset + n_bytes_per_chip_line, 
+      n_bytes_per_chip_line
+    );
 
-    memcpy(
-      (char*)ringbuffer_slot_origin + destination_offset + destination_gap_offset,
-      (char*)data + source_offset + source_gap_offset, 
-      submodule_line_data_len/2
-      );
-
-    int_line ++;
+    dest_module_line--;
   }
 }
 
