@@ -130,7 +130,7 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   while (true)
   {
     bool is_packet_received = receive_packet (
-      sock, &udp_packet, det_definition.udp_packet_bytes, &bpacket, &det_definition
+      sock, (char*)&udp_packet, det_definition.udp_packet_bytes, &bpacket, &det_definition
     );
 
     if (is_packet_received) 
