@@ -90,10 +90,12 @@ inline void update_rb_header (
     rb_meta->n_packets_per_frame - counters->current_frame_recv_packets;
     
   const uint64_t mask = 1;
-  if(bpacket->packetnum < 64){
+  if(bpacket->packetnum < 64)
+  {
     ph->framemetadata[2] &= ~(mask << bpacket->packetnum);
   }
-  else{
+  else
+  {
     ph->framemetadata[3] &= ~(mask << (bpacket->packetnum - 64));
   }
 
