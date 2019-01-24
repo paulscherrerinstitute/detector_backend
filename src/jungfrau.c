@@ -35,24 +35,27 @@ void copy_data_jungfrau (
   detector det, int line_number, int n_lines_per_packet, 
   void* ringbuffer_slot_origin, void* data, int bit_depth )
 {
-  int reverse = -1;
-  int reverse_factor = det.submodule_size[0] - 1;
+  // -1 to convert from 1 based submodule height to 0 based array indexing.
+  uint32_t submodule_height = det.submodule_size[0] - 1;
+  uint32_t n_bytes_per_frame_line = (det.detector_size[1] * bit_depth) / 8;
+  uint32_t n_bytes_per_submodule_line = (det.submodule_size[1] * bit_depth) / 8;
 
-  int submodule_line_data_len = (det.submodule_size[1] * bit_depth) / 8;
+  // Packets are stream from the top to the bottom of the module.
+  // module_line goes from 255..0
+  uint32_t dest_submodule_line = line_number + n_lines_per_packet - 1;
 
-  int int_line = 0;
-  for (int i=line_number + n_lines_per_packet - 1; i >= line_number; i--)
+  for (uint32_t packet_line=0; packet_line<n_lines_per_packet; packet_line++)
   {
-    long destination_offset = ((reverse_factor + (reverse * i)) * det.detector_size[1] * bit_depth) / 8;
-    long source_offset = (int_line * det.submodule_size[1] * bit_depth) / 8;
+    long dest_offset = (submodule_height - dest_submodule_line) * n_bytes_per_frame_line;
+    long source_offset = packet_line * n_bytes_per_submodule_line;
     
     memcpy(
-      (char*)ringbuffer_slot_origin + destination_offset, 
+      (char*)ringbuffer_slot_origin + dest_offset, 
       (char*)data + source_offset, 
-      submodule_line_data_len
+      n_bytes_per_submodule_line
     );
                 
-    int_line++;
+    dest_submodule_line--;
   }
 }
 
