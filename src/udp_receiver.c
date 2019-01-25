@@ -67,7 +67,7 @@ inline void save_packet (
   if(is_frame_complete(rb_meta->n_packets_per_frame, counters))
   {
     #ifdef DEBUG
-      printf("[receive_save_packet][mod_number %d] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", 
+      printf("[save_packet][mod_number %d] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n", 
         rb_meta->mod_number, bpacket->packetnum, counters->current_frame_recv_packets, 
         rb_meta->n_packets_per_frame, bpacket->framenum, counters->current_frame);
     #endif
