@@ -294,6 +294,7 @@ class ZMQSender(DataFlowNode):
         
     def initialize(self):
         self.log.info("%s.initialize()", self.__class__.__name__)
+        self.log.info("Initializing writer name=%s.", self.name)
         #super(ZMQSender, self).initialize()
 
     def reset(self):
