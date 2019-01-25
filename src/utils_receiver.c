@@ -42,7 +42,7 @@ inline void print_statistics (counter* counters, struct timeval* last_stats_prin
   // CPU | pid | framenum | frame_rate | tot_lost_packets | % lost packets |
   printf(
     "| %d | %d | %"PRIu64" | %.2f | %"PRIu64" | %.1f |\n", 
-    sched_getcpu(), getpid(), counters->current_frame, frame_rate, 
+    sched_getcpu(), getpid(), counters->total_recv_frames, frame_rate, 
     counters->total_lost_packets, percentage_lost_packets
   );
 
