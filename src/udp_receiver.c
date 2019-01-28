@@ -120,6 +120,8 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
   struct timeval timeout_start_time;
   gettimeofday(&timeout_start_time, NULL);
 
+  uint64_t last_stats_print_total_recv_frames = 0;
+  
   struct timeval last_stats_print_time;
   gettimeofday(&last_stats_print_time, NULL);
 
@@ -155,9 +157,11 @@ int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_i
     }
 
     if (counters.total_recv_frames % PRINT_STATS_N_FRAMES_MODULO == 0 
-      && counters.total_recv_frames != 0)
+      && counters.total_recv_frames != last_stats_print_total_recv_frames)
     {
       print_statistics(&counters, &last_stats_print_time);
+
+      last_stats_print_total_recv_frames = counters.total_recv_frames;
     }
   }
 

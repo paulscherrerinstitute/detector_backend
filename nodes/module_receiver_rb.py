@@ -261,6 +261,9 @@ class ModuleReceiver(DataFlowNode):
             self.period = settings["period"] / 1000000000
         if "n_frames" in settings:
             self.n_frames = settings["n_frames"]
+        if "bit_depth" in settings:
+            self.bit_depth = settings["bit_depth"]
+
         self._prepare_ringbuffer_header_files()
 
         rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__('c_uint' + str(self.bit_depth)))
