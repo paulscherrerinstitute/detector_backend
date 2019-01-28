@@ -91,7 +91,7 @@ int setup_rb(int* rb_header_id, int* rb_writer_id, int* rb_hbuffer_id, int* rb_d
 detector get_eiger9M_definition()
 {
     detector det;
-    //strlcpy(det.detector_name, "EIGER", 5);
+    strcpy(det.detector_name, "EIGER");
     det.submodule_n = 4;
 
     det.detector_size[0] = 3264;
