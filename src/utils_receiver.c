@@ -49,7 +49,7 @@ inline void print_statistics (counter* counters, struct timeval* last_stats_prin
   gettimeofday(last_stats_print_time, NULL);
 }
 
-int inline get_packet_line_number(rb_metadata* rb_meta, uint32_t packet_number)
+inline int get_packet_line_number(rb_metadata* rb_meta, uint32_t packet_number)
 {
   // assuming packetnum sequence is 0..N-1
   return rb_meta->n_lines_per_packet * 
