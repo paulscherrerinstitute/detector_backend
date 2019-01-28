@@ -122,9 +122,9 @@ detector get_eiger9M_definition()
 
 int main(int argc, char *argv[])
 {
-    if (argc<3)
+    if (argc-1!=2)
     {
-        printf("Invalid number of parameters. Provided %d, but expected:\n", argc);
+        printf("Invalid number of parameters. Provided %d, but expected:\n", argc-1);
         printf("\t[udp_port] - Port to bind for receiving the UDP stream.\n");
         printf("\t[bit_depth] - Bit depth of data stream.\n");
         exit(1);
