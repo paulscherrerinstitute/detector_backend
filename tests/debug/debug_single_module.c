@@ -18,7 +18,7 @@ extern inline void save_packet (
   counter* counters, detector* det, detector_definition* det_definition);
 extern int put_data_in_rb(
   int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
-  int16_t n_frames, float timeout, detector det);
+  uint32_t n_frames, float timeout, detector det);
 
 // utils_metadata.c
 extern inline uint32_t get_current_module_offset_in_pixels (detector det);
@@ -36,7 +36,7 @@ extern inline bool is_slot_ready_for_frame (uint64_t frame_number, counter *coun
 extern inline bool is_frame_complete (int n_packets_per_frame, counter* counters);
 extern inline void print_statistics (counter* counters, struct timeval* last_stats_print_time);
 extern inline int get_packet_line_number(rb_metadata* rb_meta, uint32_t packet_number);
-extern inline bool is_acquisition_completed(int16_t n_frames, counter* counters);
+extern inline bool is_acquisition_completed(uint32_t n_frames, counter* counters);
 extern inline void initialize_counters_for_new_frame (counter* counters, uint64_t frame_number);
 
 // utils_ringbuffer.c
@@ -122,11 +122,12 @@ detector get_eiger9M_definition()
 
 int main(int argc, char *argv[])
 {
-    if (argc-1!=2)
+    if (argc-1!=3)
     {
         printf("Invalid number of parameters. Provided %d, but expected:\n", argc-1);
         printf("\t[udp_port] - Port to bind for receiving the UDP stream.\n");
         printf("\t[bit_depth] - Bit depth of data stream.\n");
+        printf("\t[n_frames] - Number of frames to acquire (uint32_t).\n");
         exit(1);
     }
 
@@ -140,14 +141,17 @@ int main(int argc, char *argv[])
     int rb_header_id, rb_writer_id, rb_hbuffer_id, rb_dbuffer_id;
     setup_rb(&rb_header_id, &rb_writer_id, &rb_hbuffer_id, &rb_dbuffer_id);
 
-    int n_frames = 2;
-    int timeout = 100000;
+    uint32_t n_frames = (uint32_t)atol(argv[3]);
+    float timeout = 100000;
 
     detector det = get_eiger9M_definition();
+
+    printf("Starting acquisition with udp_port=%d bit_depth=%d n_frames=%"PRIu32" timeout=%.2f\n",
+      udp_port, bit_depth, n_frames, timeout);
 
     put_data_in_rb (
         socket_fd, bit_depth, 
         rb_current_slot, rb_header_id, rb_hbuffer_id, rb_dbuffer_id, rb_writer_id,
         n_frames, timeout, det );
-    
+    exit(0);
 }
