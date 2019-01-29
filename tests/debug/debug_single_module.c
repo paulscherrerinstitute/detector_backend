@@ -122,11 +122,12 @@ detector get_eiger9M_definition()
 
 int main(int argc, char *argv[])
 {
-    if (argc-1!=2)
+    if (argc-1!=3)
     {
         printf("Invalid number of parameters. Provided %d, but expected:\n", argc-1);
         printf("\t[udp_port] - Port to bind for receiving the UDP stream.\n");
         printf("\t[bit_depth] - Bit depth of data stream.\n");
+        printf("\t[n_frames] - Number of frames to acquire (uint32_t).\n");
         exit(1);
     }
 
@@ -140,10 +141,13 @@ int main(int argc, char *argv[])
     int rb_header_id, rb_writer_id, rb_hbuffer_id, rb_dbuffer_id;
     setup_rb(&rb_header_id, &rb_writer_id, &rb_hbuffer_id, &rb_dbuffer_id);
 
-    uint32_t n_frames = 100000;
+    uint32_t n_frames = (uint32_t)atol(argv[3]);
     float timeout = 100000;
 
     detector det = get_eiger9M_definition();
+
+    printf("Starting acquisition with udp_port=%d bit_depth=%d n_frames=%"PRIu32" timeout=%.2f\n",
+      udp_port, bit_depth, n_frames, timeout);
 
     put_data_in_rb (
         socket_fd, bit_depth, 
