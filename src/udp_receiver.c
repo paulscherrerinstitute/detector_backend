@@ -79,8 +79,10 @@ inline void save_packet (
   }
 }
 
-int put_data_in_rb(int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
-                    int16_t n_frames, float timeout, detector det){
+int put_data_in_rb (
+  int sock, int bit_depth, int rb_current_slot, 
+  int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
+  uint32_t n_frames, float timeout, detector det) {
   /*!
     Main routine to be called from python. Infinite loop with timeout calling for socket receive and putting data in memory, 
     checking that all packets are acquired.

@@ -47,7 +47,7 @@ try:
 
     put_data_in_rb = _mod.put_data_in_rb
     put_data_in_rb.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
-                                 ctypes.c_int16,
+                                 ctypes.c_uint32,
                                  ctypes.c_float, DETECTOR)
     put_data_in_rb.restype = ctypes.c_int
 

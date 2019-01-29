@@ -56,10 +56,10 @@ inline int get_packet_line_number(rb_metadata* rb_meta, uint32_t packet_number)
     (rb_meta->n_packets_per_frame - packet_number - 1);
 }
 
-inline bool is_acquisition_completed(int16_t n_frames, counter* counters)
+inline bool is_acquisition_completed(uint32_t n_frames, counter* counters)
 {
   uint64_t total_frames = counters->total_recv_frames + counters->total_lost_frames;
-  return (n_frames != -1) && total_frames >= n_frames;
+  return (n_frames != 0) && total_frames >= n_frames;
 }
 
 inline void initialize_counters_for_new_frame (
