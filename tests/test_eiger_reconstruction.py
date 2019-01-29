@@ -106,9 +106,11 @@ class BaseTests(unittest.TestCase):
         #self.assertTrue((md_data[0] == reference_data[0]).all())
 
         if len(reference_data.shape) == 2:
-            np.testing.assert_array_equal(np.array([x for  x in md_data[1]]), np.array(reference_data))
+            result_array = np.array(md_data[1][0])
+            np.testing.assert_array_equal(result_array, reference_data)
         else:
-            np.testing.assert_array_equal(np.array([x for  x in md_data[1]]), np.array([x for  x in reference_data[1]]))
+            result_array = np.array(md_data[1])
+            np.testing.assert_array_equal(result_array, reference_data[1])
 
 
     def test_reco05M_16b(self):
