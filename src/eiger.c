@@ -57,7 +57,6 @@ void copy_data_eiger (
   uint32_t dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * n_bytes_per_frame_line;
 
   uint32_t source_offset = 0;
-  
 
   for (uint32_t packet_line=0; packet_line<n_lines_per_packet; packet_line++)
   {
