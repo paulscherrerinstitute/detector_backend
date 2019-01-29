@@ -54,31 +54,24 @@ void copy_data_eiger (
   // Packets are stream from the top to the bottom of the module.
   // module_line goes from 255..0
   uint32_t dest_submodule_line = line_number + n_lines_per_packet - 1;
-
   uint32_t dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * n_bytes_per_frame_line;
-  uint32_t source_offset = 0;
 
-  uint32_t n_bytes_dest_submodule_line = n_bytes_per_submodule_line + n_bytes_per_chip_gap;
-  char submodule_line_buffer[n_bytes_dest_submodule_line] = {0};
+  uint32_t source_offset = 0;
   
+
   for (uint32_t packet_line=0; packet_line<n_lines_per_packet; packet_line++)
   {
-    memcpy(
-      &submodule_line_buffer,
-      (char*)packet_data + source_offset,
-      n_bytes_per_chip_line
-    );
-
-    memcpy(
-      &submodule_line_buffer + dest_chip_offset,
-      (char*)packet_data + source_offset + n_bytes_per_chip_line,
+    // Copy each chip line individually, to allow a gap of n_bytes_per_chip_gap in the destination memory.
+    memcpy (
+      (char*)ringbuffer_slot_origin + dest_line_offset, 
+      (char*)packet_data + source_offset, 
       n_bytes_per_chip_line
     );
 
     memcpy (
-      (char*)ringbuffer_slot_origin + dest_line_offset, 
-      &submodule_line_buffer, 
-      n_bytes_dest_submodule_line;
+      (char*)ringbuffer_slot_origin + dest_line_offset + dest_chip_offset,
+      (char*)packet_data + source_offset + n_bytes_per_chip_line, 
+      n_bytes_per_chip_line
     );
 
     source_offset += n_bytes_per_submodule_line;
