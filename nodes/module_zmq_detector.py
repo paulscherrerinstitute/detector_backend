@@ -249,8 +249,6 @@ class DetectorZMQSender(DataFlowNode):
             else:
                 data = np.ascontiguousarray(np.flip(np.flip(data, 0), 1))
 
-        
-
         return data
 
     def get_frame_metadata(self, pointerh):
@@ -286,13 +284,8 @@ class DetectorZMQSender(DataFlowNode):
         timeout = max(2. * self.period, 1)
 
         ref_time = time()
-        # frame_comp_time = time()
         frame_comp_counter = 0
-        is_good_frame = True
-
-
         pulseid = -1
-        # getting data from RB
 
         while True:
             ti = time()
@@ -300,19 +293,17 @@ class DetectorZMQSender(DataFlowNode):
                 self.log.debug("Timeout %d / %d, %.2f on pulseid %d" % (self.n_frames, self.counter, ti - ref_time, pulseid))
                 break
 
+            self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
+            if self.rb_current_slot == -1:
+                continue
+
             try:
-                self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
-
-                if self.rb_current_slot == -1:
-                    continue
-
                 rb_header_slot = rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot)
-                header_pointer = ctypes.cast(rb_header_slot, ctypes.POINTER(self.HEADER))
+                metadata_pointer = ctypes.cast(rb_header_slot, ctypes.POINTER(self.HEADER))
+                metadata = self.get_frame_metadata(metadata_pointer)
 
                 entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 data_pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-
-                metadata = self.get_frame_metadata(header_pointer)
                 data = self.get_frame_data(data_pointer, entry_size_in_bytes)
 
                 self.log.debug("Retrieved data and metadata for frame %d, pulse_id %d.", metadata["frame"], metadata["pulse_id"])
@@ -354,8 +345,6 @@ class DetectorZMQSender(DataFlowNode):
                 self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
 
         self.log.debug("Writer loop exited")
-        #self.log.info("received_frames %s" % ({"name": self.name, "total": self.recv_frames, "incomplete": self.frames_with_missing_packets, "packets_lost": self.total_missing_packets, "epoch": time()}))
-        #self.log.info("sent_frames %s" % {"name": self.name, "total": self.sent_frames, "epoch": time()})
-        
+
         self.pass_on(self.counter)
         return(self.counter)
