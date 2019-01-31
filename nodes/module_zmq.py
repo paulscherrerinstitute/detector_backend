@@ -537,7 +537,7 @@ class ZMQSender(DataFlowNode):
                   "module_enabled": mod_enabled
                 }
 
-                self.send_array(self.skt, data, metadata=metadata, copy=True)
+                self.send_array(self.skt, data, flags=zmq.NOBLOCK, metadata=metadata, copy=True)
                 
             except:
                 self.log.error("Error in sending array: %s" % sys.exc_info()[1])
