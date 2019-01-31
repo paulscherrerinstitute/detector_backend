@@ -36,7 +36,7 @@ inline int get_current_module_index (detector det)
 
 inline int get_n_lines_per_packet (detector det, size_t data_bytes_per_packet, int bit_depth)
 {
-  int bytes_in_line = (det.submodule_size[0] * bit_depth) / 8;
+  int bytes_in_line = (det.submodule_size[1] * bit_depth) / 8;
   return data_bytes_per_packet / bytes_in_line;
 }
 
