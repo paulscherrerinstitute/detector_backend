@@ -541,6 +541,9 @@ class ZMQSender(DataFlowNode):
                   "module_enabled": mod_enabled
                 }
 
+                if metadata["is_good_frame"] == 0:
+                    self.log.warning("Bad frame detected.\n%s" % metadata)
+
                 self.send_array(self.skt, data, flags=zmq.NOBLOCK, metadata=metadata, copy=True)
                 
             except:
