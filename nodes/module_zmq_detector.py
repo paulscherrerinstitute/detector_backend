@@ -55,6 +55,25 @@ class DetectorZMQSender(DataFlowNode):
 
     flip = List((-1, ), config=True, reconfig=False)
 
+    def _setup_ringbuffer(self):
+        self.HEADER = Mystruct * self.n_submodules
+
+        self.rb_header_id = rb.open_header_file(self.rb_head_file)
+        self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
+        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
+        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
+
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.n_submodules)
+
+        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
+                                     int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
+        n_slots = rb.adjust_nslots(self.rb_header_id)
+        rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__('c_uint' + str(self.bit_depth)))
+
+        self.log.info("RB %d slots: %d" % (self.rb_header_id, n_slots))
+        self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
+        self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+
     def _reset_defaults(self):
         self.reset_framenum = True
         self.gain_corrections_filename = ''
@@ -87,22 +106,7 @@ class DetectorZMQSender(DataFlowNode):
         self.n_submodules = self.geometry[0] * self.geometry[1] * self.submodule_n
         self.log.debug("Using n_modules %d and n_submodules %d", self.n_modules, self.n_submodules)
 
-        self.HEADER = Mystruct * self.n_submodules
-
-        self.rb_header_id = rb.open_header_file(self.rb_head_file)
-        self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
-        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
-        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
-
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.n_submodules)
-
-        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
-                                     int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
-        n_slots = rb.adjust_nslots(self.rb_header_id)
-
-        self.log.info("RB %d slots: %d" % (self.rb_header_id, n_slots))
-        self.log.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
-        self.log.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+        self._setup_ringbuffer()
 
         self.context = zmq.Context(io_threads=4)
         self.open_sockets()
@@ -118,22 +122,13 @@ class DetectorZMQSender(DataFlowNode):
         self.total_missing_packets = 0
         self.first_frame = 0
 
-        self.fake_data = np.zeros([2, 2], dtype=np.uint16)
         self.entry_size_in_bytes = -1
 
         self.recv_frames = 0
 
-        print(self.detector_size)
-        self.gain_corrections = np.ones((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
-        self.pede_corrections = np.zeros((3, self.detector_size[0], self.detector_size[1]), dtype=np.float32)
-        self.pede_mask = np.zeros((self.detector_size[0], self.detector_size[1]), dtype=np.int16)
-
         self.metrics.set("activate_corrections", self.activate_corrections)
         self.metrics.set("activate_corrections_preview", self.activate_corrections_preview)
         self.metrics.set("name", self.name)
-
-        if self.activate_corrections or (self.activate_corrections_preview and self.name == "preview"):
-            self.setup_corrections()
 
         self.send_time = 0
         #if self.output_file != '':
@@ -171,19 +166,7 @@ class DetectorZMQSender(DataFlowNode):
         self.recv_frames = 0
         self.worker_communicator.barrier()
         
-        self.rb_header_id = rb.open_header_file(self.rb_head_file)
-        self.rb_reader_id = rb.create_reader(self.rb_header_id, self.rb_id, self.rb_followers)
-        
-        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
-        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
-
-        self.log.info("[%s] RB buffers: Header %d Data %d" % (self.name, self.rb_hbuffer_id, self.rb_dbuffer_id))
-        
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.n_submodules)
-
-        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
-                                     int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
-        rb.adjust_nslots(self.rb_header_id)
+        self._setup_ringbuffer()
 
         
     def initialize(self):
