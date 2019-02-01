@@ -124,8 +124,6 @@ class DetectorZMQSender(DataFlowNode):
 
         self.entry_size_in_bytes = -1
 
-        self.recv_frames = 0
-
         self.metrics.set("activate_corrections", self.activate_corrections)
         self.metrics.set("activate_corrections_preview", self.activate_corrections_preview)
         self.metrics.set("name", self.name)
@@ -163,7 +161,6 @@ class DetectorZMQSender(DataFlowNode):
             self.setup_corrections()
         
         self.first_frame = 0
-        self.recv_frames = 0
         self.worker_communicator.barrier()
         
         self._setup_ringbuffer()
@@ -271,15 +268,19 @@ class DetectorZMQSender(DataFlowNode):
         pulseid = -1
 
         while True:
+
+            # Check for timeout.
             ti = time()
             if(self.counter >= self.n_frames and self.n_frames != -1) or (ti - ref_time > timeout):
                 self.log.debug("Timeout %d / %d, %.2f on pulseid %d" % (self.n_frames, self.counter, ti - ref_time, pulseid))
                 break
 
+            # Get next slot.
             self.rb_current_slot = rb.claim_next_slot(self.rb_reader_id)
             if self.rb_current_slot == -1:
                 continue
 
+            # Collect data from slot.
             try:
                 rb_header_slot = rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot)
                 metadata_pointer = ctypes.cast(rb_header_slot, ctypes.POINTER(self.HEADER))
@@ -296,10 +297,11 @@ class DetectorZMQSender(DataFlowNode):
                 # rb.gf_get_error does not work
                 self.log.error("[%s] RB got error %s" % (self.name, rb.gf_get_error()))
                 self.log.error("[%s] Issues with getting the RB header pointer (it is %r), current_slot: %d, first frame %d, recv_frame: %d. Casting exception" % 
-                                (self.name, bool(pointerh), self.rb_current_slot, self.first_frame, self.recv_frames))
+                                (self.name, bool(pointerh), self.rb_current_slot, self.first_frame, self.counter))
                 self.log.error(sys.exc_info())
                 raise RuntimeError
             
+            # Some frame math
             if self.first_frame == 0:
                 self.log.info("First frame got: %d pulse_id: %d" % (metadata["frame"], metadata["pulse_id"]))
                 self.first_frame = metadata["frame"]
@@ -307,11 +309,9 @@ class DetectorZMQSender(DataFlowNode):
             if self.reset_framenum:
                 metadata["frame"] -= self.first_frame
 
-            self.recv_frames += 1
-            self.send_time = time()            
-
             self.counter += 1
             
+            # Send frame.
             try:
                 self.send_frame(data, metadata, flags=zmq.NOBLOCK, copy=True)
             except zmq.EAGAIN:
@@ -319,13 +319,14 @@ class DetectorZMQSender(DataFlowNode):
             except:
                 self.log.error("Unknown in sending array: %s" % sys.exc_info()[1])
 
+            if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
+                self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
+
             self.metrics.set("sent_frames", {"name": self.name, "total": self.sent_frames, "epoch": time()})
 
             frame_comp_counter += 1
             ref_time = time()
-
-            if not rb.commit_slot(self.rb_reader_id, self.rb_current_slot):
-                self.log.error("RINGBUFFER: CANNOT COMMIT SLOT")
+            
 
         self.log.debug("Writer loop exited")
 
