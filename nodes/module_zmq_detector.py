@@ -53,8 +53,6 @@ class DetectorZMQSender(DataFlowNode):
 
     reset_framenum = Bool(True, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
 
-    flip = List((-1, ), config=True, reconfig=False)
-
     def _setup_ringbuffer(self):
         self.HEADER = Mystruct * self.n_submodules
 
@@ -201,7 +199,6 @@ class DetectorZMQSender(DataFlowNode):
         self.metrics.set("sent_frames", {"name": self.name, "total": self.sent_frames, "epoch": time()})
 
 
-        #self.flip = [-1, ]
         self._reset_defaults()
         
         self.send_fake_data = False
@@ -223,15 +220,8 @@ class DetectorZMQSender(DataFlowNode):
         self.skt.send_json(metadata, flags | zmq.SNDMORE)
         return self.skt.send(data, flags, copy=copy, track=track)
 
-    def get_frame_data(self, pointerd, flip):
+    def get_frame_data(self, pointerd):
         data = np.ctypeslib.as_array(pointerd, shape=self.detector_size)
-
-        if flip[0] != -1:
-            if len(flip) == 1:
-                data = np.ascontiguousarray(np.flip(data, flip[0]))
-            else:
-                data = np.ascontiguousarray(np.flip(np.flip(data, 0), 1))
-
         return data
 
     def get_frame_metadata(self, metadata_pointer):
