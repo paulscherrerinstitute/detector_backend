@@ -63,10 +63,13 @@ class DetectorZMQSender(DataFlowNode):
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_imghead_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_imgdata_file, self.rb_header_id, 0)
 
-        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, 64 * self.n_submodules)
-
-        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id,
-                                     int(self.bit_depth / 8) * self.detector_size[0] * self.detector_size[1])
+        # 64 bytes = 8 * uint64_t == 8 * (64bit/8bit)
+        frame_header_n_bytes = 64 * self.n_submodules
+        rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, frame_header_n_bytes)
+        
+        frame_data_n_bytes = int((self.detector_size[0] * self.detector_size[1] * self.bit_depth) / 8)
+        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, frame_data_n_bytes)
+                                     
         n_slots = rb.adjust_nslots(self.rb_header_id)
         rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__('c_uint' + str(self.bit_depth)))
 
@@ -220,34 +223,35 @@ class DetectorZMQSender(DataFlowNode):
         self.skt.send_json(metadata, flags | zmq.SNDMORE)
         return self.skt.send(data, flags, copy=copy, track=track)
 
-    def get_frame_data(self, pointerd, some_len):
-        data = np.ctypeslib.as_array(pointerd, (int(some_len / (self.bit_depth / 8)), ), ).reshape(self.detector_size)
+    def get_frame_data(self, pointerd, flip):
+        data = np.ctypeslib.as_array(pointerd, shape=self.detector_size)
 
-        if self.flip[0] != -1:
-            if len(self.flip) == 1:
-                data = np.ascontiguousarray(np.flip(data, self.flip[0]))
+        if flip[0] != -1:
+            if len(flip) == 1:
+                data = np.ascontiguousarray(np.flip(data, flip[0]))
             else:
                 data = np.ascontiguousarray(np.flip(np.flip(data, 0), 1))
 
         return data
 
-    def get_frame_metadata(self, pointerh):
+    def get_frame_metadata(self, metadata_pointer):
+        metadata_struct = ctypes.cast(metadata_pointer, ctypes.POINTER(self.HEADER))
 
         metadata = {
-            "framenums": [pointerh.contents[i].framemetadata[0] for i in range(self.n_submodules)],
-            "missing_packets_1": [pointerh.contents[i].framemetadata[2] for i in range(self.n_submodules)], 
-            "missing_packets_2": [pointerh.contents[i].framemetadata[3] for i in range(self.n_submodules)],
-            "pulse_ids": [pointerh.contents[i].framemetadata[4] for i in range(self.n_submodules)],
-            "daq_recs": [pointerh.contents[i].framemetadata[5] for i in range(self.n_submodules)],
-            "module_number": [pointerh.contents[i].framemetadata[6] for i in range(self.n_submodules)],
-            "module_enabled": [pointerh.contents[i].framemetadata[7] for i in range(self.n_submodules)]
+            "framenums": [metadata_struct.contents[i].framemetadata[0] for i in range(self.n_submodules)],
+            "missing_packets_1": [metadata_struct.contents[i].framemetadata[2] for i in range(self.n_submodules)], 
+            "missing_packets_2": [metadata_struct.contents[i].framemetadata[3] for i in range(self.n_submodules)],
+            "pulse_ids": [metadata_struct.contents[i].framemetadata[4] for i in range(self.n_submodules)],
+            "daq_recs": [metadata_struct.contents[i].framemetadata[5] for i in range(self.n_submodules)],
+            "module_number": [metadata_struct.contents[i].framemetadata[6] for i in range(self.n_submodules)],
+            "module_enabled": [metadata_struct.contents[i].framemetadata[7] for i in range(self.n_submodules)]
         }
 
         metadata["frame"] = metadata["framenums"][0]
         metadata["daq_rec"] = metadata["daq_recs"][0]
         metadata["pulse_id"] = metadata["pulse_ids"][0]
 
-        missing_packets = sum([pointerh.contents[i].framemetadata[1] for i in range(self.n_submodules)])
+        missing_packets = sum([metadata_struct.contents[i].framemetadata[1] for i in range(self.n_submodules)])
         if missing_packets != 0:
             self.log.warning("Frame %d lost frames %d" % (metadata["frame"], missing_packets))
             self.frames_with_missing_packets += 1
@@ -282,13 +286,11 @@ class DetectorZMQSender(DataFlowNode):
 
             # Collect data from slot.
             try:
-                rb_header_slot = rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot)
-                metadata_pointer = ctypes.cast(rb_header_slot, ctypes.POINTER(self.HEADER))
+                metadata_pointer = rb.get_buffer_slot(self.rb_hbuffer_id, self.rb_current_slot)
                 metadata = self.get_frame_metadata(metadata_pointer)
 
-                entry_size_in_bytes = rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)
                 data_pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-                data = self.get_frame_data(data_pointer, entry_size_in_bytes)
+                data = self.get_frame_data(data_pointer, self.flip)
 
                 self.log.debug("Retrieved data and metadata for frame %d, pulse_id %d.", metadata["frame"], metadata["pulse_id"])
 
