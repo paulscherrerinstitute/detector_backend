@@ -19,7 +19,7 @@ build: debug_single_module.c
 	$(CC) --std=c99 -D$(DETECTOR) $(DEBUG_FLAGS) $(CFLAGS) -o $(LIBNAME) $? -lm -lringbuffer 
 
 perf: DEBUG_FLAGS+=-p
-perf: debug
+perf: build
 
 clean: 
 	rm -f $(LIBNAME)
