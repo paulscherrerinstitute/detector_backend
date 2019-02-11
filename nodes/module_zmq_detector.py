@@ -23,13 +23,6 @@ from numba import jit
 from copy import copy
 
 
-BUFFER_LENGTH = 4096
-DATA_ARRAY = np.ctypeslib.as_ctypes(np.zeros(BUFFER_LENGTH, dtype=np.uint16))  # ctypes.c_uint16 * BUFFER_LENGTH
-HEADER_ARRAY = ctypes.c_char * 6
-
-CACHE_LINE_SIZE = 64
-
-
 class Mystruct(ctypes.Structure):
     _fields_ = [("framemetadata", ctypes.c_uint64 * 8), ]
 
@@ -48,8 +41,8 @@ class DetectorZMQSender(DataFlowNode):
     rb_imgdata_file = Unicode('', config=True, help="")
 
     geometry = List((1, 1), config=True)
-    submodule_n = Int(1, config=True)
     detector_size = List((-1, -1), config=True)
+    submodule_n = Int(1, config=True)
 
     reset_framenum = Bool(True, config=True, reconfig=True, help="Normalizes framenumber to the first caught frame")
 
@@ -77,19 +70,11 @@ class DetectorZMQSender(DataFlowNode):
 
     def _reset_defaults(self):
         self.reset_framenum = True
-        self.gain_corrections_filename = ''
-        self.gain_corrections_dataset = ''
-        self.pede_corrections_filename = ''
-        self.pede_corrections_dataset = ''
-        self.pede_mask_dataset = ''
-        self.activate_corrections_preview = False
-        self.activate_corrections = False
     
     def open_sockets(self):
         self.log.info("CALLING OPEN")
         self.skt = self.context.socket(zmq.__getattribute__(self.socket_type))
         self.skt.bind(self.uri)
-        self.skt.SNDTIMEO = 100
 
     def close_sockets(self):
         self.log.info("CALLING CLOSE")
@@ -280,7 +265,7 @@ class DetectorZMQSender(DataFlowNode):
                 metadata = self.get_frame_metadata(metadata_pointer)
 
                 data_pointer = rb.get_buffer_slot(self.rb_dbuffer_id, self.rb_current_slot)
-                data = self.get_frame_data(data_pointer, self.flip)
+                data = self.get_frame_data(data_pointer)
 
                 self.log.debug("Retrieved data and metadata for frame %d, pulse_id %d.", metadata["frame"], metadata["pulse_id"])
 
