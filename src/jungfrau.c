@@ -32,7 +32,7 @@ barebone_packet interpret_udp_packet (
 }
 
 void copy_data (
-  detector* det, rb_metadata* rb_meta, void* ringbuffer_slot_origin, void* packet_data, int line_number)
+  detector* det, rb_metadata* rb_meta, void* packet_data, int line_number)
 {
   // -1 to convert from 1 based submodule height to 0 based array indexing.
   uint32_t submodule_height = det->submodule_size[0] - 1;
@@ -47,7 +47,7 @@ void copy_data (
     long source_offset = packet_line * rb_meta->n_bytes_per_submodule_line;
     
     memcpy(
-      (char*)ringbuffer_slot_origin + dest_offset, 
+      (char*)(rb_meta->data_slot_origin) + dest_offset, 
       (char*)data + source_offset, 
       rb_meta->n_bytes_per_submodule_line
     );
