@@ -14,7 +14,7 @@ typedef struct _jungfrau_packet{
 } jungfrau_packet;
 #pragma pack(pop)
 
-barebone_packet interpret_udp_packet_jungfrau (
+barebone_packet interpret_udp_packet (
   const char* udp_packet, const int received_packet_len )
 {
   jungfrau_packet* packet = (jungfrau_packet*) udp_packet;
@@ -31,7 +31,7 @@ barebone_packet interpret_udp_packet_jungfrau (
   return bpacket;
 }
 
-void copy_data_jungfrau (
+void copy_data (
   detector det, int line_number, int n_lines_per_packet, 
   void* ringbuffer_slot_origin, void* data, int bit_depth )
 {
@@ -60,8 +60,6 @@ void copy_data_jungfrau (
 }
 
 detector_definition jungfrau_definition = {
-  .interpret_udp_packet = (interpret_udp_packet_function) interpret_udp_packet_jungfrau,
-  .copy_data = (copy_data_function) copy_data_jungfrau,
   .udp_packet_bytes = sizeof(jungfrau_packet),
   .data_bytes_per_packet = JUNGFRAU_DATA_BYTES_PER_PACKET
 };

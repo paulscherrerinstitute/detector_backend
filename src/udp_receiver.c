@@ -13,20 +13,25 @@
 #include <sched.h>
 
 #include "detectors.h"
-
-#include "jungfrau.c"
-#include "eiger.c"
-
 #include "utils_metadata.c"
 #include "utils_ringbuffer.c"
 #include "utils_receiver.c"
+
+
+#ifdef JUNGFRAU 
+  #include "jungfrau.c"
+#endif
+
+#ifdef EIGER
+  #include "eiger.c"
+#endif
 
 inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
   barebone_packet* bpacket, detector_definition* det_definition )
 {
   const int received_data_len = get_udp_packet(sock, udp_packet, udp_packet_bytes);
 
-  *bpacket = det_definition->interpret_udp_packet(udp_packet, received_data_len);
+  *bpacket = interpret_udp_packet(udp_packet, received_data_len);
 
   #ifdef DEBUG
     if(received_data_len > 0){
@@ -59,7 +64,7 @@ inline void save_packet (
 
   int line_number = get_packet_line_number(rb_meta, bpacket->packetnum);  
 
-  det_definition->copy_data (*det, line_number, rb_meta->n_lines_per_packet, rb_meta->data_slot_origin, 
+  copy_data(*det, line_number, rb_meta->n_lines_per_packet, rb_meta->data_slot_origin, 
     bpacket->data, rb_meta->bit_depth);
 
   update_rb_header(rb_meta, bpacket, counters);
