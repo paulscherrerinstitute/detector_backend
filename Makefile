@@ -7,19 +7,20 @@ LIBNAME=libudpreceiver
 LIBDIR=$(RINGBUFFER)/ringbuffer/ringbuffer/lib/
 CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath=$(LIBDIR) -Wall
 CFLAGS+=-Wfatal-errors
-DETECTOR=NONE
+
 
 build: src/udp_receiver.c
-	#$(CC) -shared -fPIC -DDEBUG -O3 -o $(LIBNAME).so $?
-	#$(CC) -shared -fPIC -O3 $(CFLAGS) -o $(LIBNAME).so $?
-	$(CC) --std=c99 -march=core-avx2 -shared -fPIC -O2 $(DETECTOR) $(CFLAGS) -o $(LIBNAME).so $? -lringbuffer 
+	@if [ -z $(DETECTOR) ]; then echo "DETECTOR variable is not set"; exit 1; fi;	
+	
+	@echo "-------------------------------"
+	@echo "Building backend for $(DETECTOR)"
+	@echo "-------------------------------"
+	
+	$(CC) --std=c99 -march=core-avx2 -shared -fPIC -O2 -D$(DETECTOR) $(CFLAGS) -o $(LIBNAME).so $? -lringbuffer 
+
 
 debug: CFLAGS+= -DDEBUG
-
-eiger: DETECTOR=-DEIGER
-jungfrau: DETECTOR=-DJUNGFRAU
-
-
+debug: build
 
 clean: 
-	rm $(LIBNAME).so
+	rm -f $(LIBNAME).so
