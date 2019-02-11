@@ -16,7 +16,7 @@ build: debug_single_module.c
 	@echo "Building debug module for $(DETECTOR)"
 	@echo "-------------------------------"
 
-	$(CC) --std=c99 $(DEBUG_FLAGS) $(CFLAGS) -o $(LIBNAME) $? -lm -lringbuffer 
+	$(CC) --std=c99 -D$(DETECTOR) $(DEBUG_FLAGS) $(CFLAGS) -o $(LIBNAME) $? -lm -lringbuffer 
 
 perf: DEBUG_FLAGS+=-p
 perf: debug
