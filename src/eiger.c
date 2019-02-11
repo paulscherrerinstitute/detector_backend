@@ -52,7 +52,7 @@ void calc_copy_data(detector det, rb_metadata rb_meta, int line_number,
   // Packets are stream from the top to the bottom of the module.
   // module_line goes from 255..0
   uint32_t dest_submodule_line = line_number + rb_meta.n_lines_per_packet - 1;
-  *dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * rb_meta.n_bytes_per_frame_line;
+  *dest_line_offset = (*reverse_factor + (*reverse * dest_submodule_line)) * rb_meta.n_bytes_per_frame_line;
 }
 
 void copy_data (
