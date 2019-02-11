@@ -105,6 +105,6 @@ typedef struct _rb_metadata
 typedef barebone_packet (*interpret_udp_packet_function)(const char*, const int);
 
 // Signature: detector* det, rb_metadata* rb_meta, void* packet_data, int line_number
-typedef void (*copy_data_function)(detector*, rb_metadata*, void*, int);
+typedef void (*copy_data_function)(detector, rb_metadata, void*, int);
 
 #endif

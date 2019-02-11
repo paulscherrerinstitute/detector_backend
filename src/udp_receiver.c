@@ -64,7 +64,7 @@ inline void save_packet (
 
   int line_number = get_packet_line_number(rb_meta, bpacket->packetnum);  
 
-  copy_data(det, rb_meta, bpacket->data, line_number);
+  copy_data(*det, *rb_meta, bpacket->data, line_number);
 
   update_rb_header(rb_meta, bpacket, counters);
 
