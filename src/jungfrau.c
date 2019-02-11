@@ -48,7 +48,7 @@ void copy_data (
     
     memcpy(
       (char*)(rb_meta->data_slot_origin) + dest_offset, 
-      (char*)data + source_offset, 
+      (char*)packet_data + source_offset, 
       rb_meta->n_bytes_per_submodule_line
     );
                 
