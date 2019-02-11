@@ -44,8 +44,7 @@ inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes,
 }
 
 inline void save_packet (
-  barebone_packet* bpacket, rb_metadata* rb_meta, 
-  counter* counters, detector* det, detector_definition* det_definition ) 
+  barebone_packet* bpacket, rb_metadata* rb_meta, counter* counters, detector* det) 
 {
   
   if (!is_slot_ready_for_frame(bpacket->framenum, counters))
@@ -133,7 +132,7 @@ int put_data_in_rb (
 
     if (is_packet_received) 
     {
-      save_packet(&bpacket, &rb_meta, &counters, &det, &det_definition);
+      save_packet(&bpacket, &rb_meta, &counters, &det);
 
       // Reset timeout time.
       gettimeofday(&timeout_start_time, NULL);
