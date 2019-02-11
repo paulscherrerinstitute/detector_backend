@@ -73,12 +73,6 @@ typedef struct _barebone_packet{
   bool is_valid;
 } barebone_packet;
 
-// Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
-typedef barebone_packet (*interpret_udp_packet_function)(const char*, const int);
-
-// Signature: detector* det, rb_metadata* rb_meta, void* packet_data, int line_number
-typedef void (*copy_data_function)(detector*, rb_metadata*, void*, int);
-
 typedef struct _detector_definition{
   size_t udp_packet_bytes;
   size_t data_bytes_per_packet;
@@ -106,5 +100,11 @@ typedef struct _rb_metadata
   uint32_t n_bytes_per_frame_line;
   uint32_t n_bytes_per_submodule_line;
 } rb_metadata;
+
+// Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
+typedef barebone_packet (*interpret_udp_packet_function)(const char*, const int);
+
+// Signature: detector* det, rb_metadata* rb_meta, void* packet_data, int line_number
+typedef void (*copy_data_function)(detector*, rb_metadata*, void*, int);
 
 #endif
