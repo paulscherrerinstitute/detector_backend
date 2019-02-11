@@ -88,17 +88,3 @@ inline rb_metadata get_ringbuffer_metadata (
 
   return metadata;
 }
-
-// Common
-
-
-// Eiger
-
-  // Each packet line is made of 2 chip lines -> [CHIP1]<gap>[CHIP2]
-  uint32_t n_bytes_per_chip_line = n_bytes_per_submodule_line / 2;
-  uint32_t n_bytes_per_chip_gap = (det.gap_px_chips[1] * bit_depth) / 8;
-
-  uint32_t dest_chip_offset = n_bytes_per_chip_line + n_bytes_per_chip_gap;
-
-// Jungfrau
-uint32_t submodule_height = det.submodule_size[0] - 1;
