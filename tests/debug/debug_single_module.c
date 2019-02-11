@@ -28,6 +28,8 @@ extern inline int get_n_packets_per_frame (detector det, size_t data_bytes_per_p
 extern inline rb_metadata get_ringbuffer_metadata (
   int rb_writer_id, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_current_slot,  
     detector det, size_t data_bytes_per_packet, int bit_depth );
+extern uint32_t get_n_bytes_per_frame_line(detector det, int bit_depth)
+extern uint32_t get_n_bytes_per_submodule_line(detector det, int bit_depth)
 
 // utils_receiver.c
 extern inline bool is_timeout_expired (double timeout, struct timeval timeout_start_time);

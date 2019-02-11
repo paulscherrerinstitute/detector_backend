@@ -49,12 +49,12 @@ inline int get_n_packets_per_frame (detector det, size_t data_bytes_per_packet, 
   return n_pixels_in_frame / n_pixels_in_packet;
 }
 
-intline uint32_t get_n_bytes_per_frame_line(detector det, int bit_depth)
+inline uint32_t get_n_bytes_per_frame_line(detector det, int bit_depth)
 {
   return (det.detector_size[1] * bit_depth) / 8;
 }
 
-intline uint32_t get_n_bytes_per_submodule_line(detector det, int bit_depth)
+inline uint32_t get_n_bytes_per_submodule_line(detector det, int bit_depth)
 {
   return (det.submodule_size[1] * bit_depth) / 8;
 }
