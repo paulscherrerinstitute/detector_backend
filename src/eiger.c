@@ -50,12 +50,12 @@ void copy_data (
 
   // Packets are stream from the top to the bottom of the module.
   // module_line goes from 255..0
-  uint32_t dest_submodule_line = line_number + n_lines_per_packet - 1;
+  uint32_t dest_submodule_line = line_number + rb_meta->n_lines_per_packet - 1;
   uint32_t dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * rb_meta->n_bytes_per_frame_line;
 
   uint32_t source_offset = 0;
 
-  for (uint32_t packet_line=0; packet_line<n_lines_per_packet; packet_line++)
+  for (uint32_t packet_line=0; packet_line < rb_meta->n_lines_per_packet; packet_line++)
   {
     // Copy each chip line individually, to allow a gap of n_bytes_per_chip_gap in the destination memory.
     memcpy (

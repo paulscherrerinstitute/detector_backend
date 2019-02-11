@@ -41,7 +41,7 @@ void copy_data (
   // module_line goes from 255..0
   uint32_t dest_submodule_line = line_number + rb_meta->n_lines_per_packet - 1;
 
-  for (uint32_t packet_line=0; packet_line<rb_meta->n_lines_per_packet; packet_line++)
+  for (uint32_t packet_line=0; packet_line < rb_meta->n_lines_per_packet; packet_line++)
   {
     long dest_offset = (submodule_height - dest_submodule_line) * rb_meta->n_bytes_per_frame_line;
     long source_offset = packet_line * rb_meta->n_bytes_per_submodule_line;
