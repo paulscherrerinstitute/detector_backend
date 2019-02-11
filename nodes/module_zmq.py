@@ -508,20 +508,20 @@ class ZMQSender(DataFlowNode):
                 self.sent_frames += 1
 
 
-            if self.name == "preview":
-                if self.expand_gaps :  ### True expansion (GAPS) is enabled, False expansion is disabled 
-                    data = expand_image(data, self.geometry, self.gap_px_module, self.gap_px_chip, self.chips_module)
-                
-                if self.modules_orig_x != []:
-                    for i in range(self.n_modules):
-                        data_with_geom[self.modules_orig_x[i]:self.modules_orig_x[i] + self.exp_module_size[0], 
-                                       self.modules_orig_y[i]:self.modules_orig_y[i] + self.exp_module_size[1]] = data[i * self.exp_module_size[0]:(i + 1) *  self.exp_module_size[0], :]
-                    
-                    data = np.zeros((data_with_geom.shape[1],data_with_geom.shape[0]), dtype=data_with_geom.dtype)
-                    data = np.rot90(data_with_geom).copy()
-
-                if self.stripsel_module:
-                    data = convert_stripsel(data)
+#            if self.name == "preview":
+#                if self.expand_gaps :  ### True expansion (GAPS) is enabled, False expansion is disabled 
+#                    data = expand_image(data, self.geometry, self.gap_px_module, self.gap_px_chip, self.chips_module)
+#                
+#                if self.modules_orig_x != []:
+#                    for i in range(self.n_modules):
+#                        data_with_geom[self.modules_orig_x[i]:self.modules_orig_x[i] + self.exp_module_size[0], 
+#                                       self.modules_orig_y[i]:self.modules_orig_y[i] + self.exp_module_size[1]] = data[i * self.exp_module_size[0]:(i + 1) *  self.exp_module_size[0], :]
+#                    
+#                    data = np.zeros((data_with_geom.shape[1],data_with_geom.shape[0]), dtype=data_with_geom.dtype)
+#                    data = np.rot90(data_with_geom).copy()
+#
+#                if self.stripsel_module:
+#                    data = convert_stripsel(data)
 
             try:
                 
@@ -541,7 +541,10 @@ class ZMQSender(DataFlowNode):
                   "module_enabled": mod_enabled
                 }
 
-                self.send_array(self.skt, data, metadata=metadata, copy=True)
+                if metadata["is_good_frame"] == 0:
+                    self.log.warning("Bad frame detected.\n%s" % metadata)
+
+                self.send_array(self.skt, data, flags=zmq.NOBLOCK, metadata=metadata, copy=True)
                 
             except:
                 self.log.error("Error in sending array: %s" % sys.exc_info()[1])
