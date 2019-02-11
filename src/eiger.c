@@ -27,34 +27,31 @@ barebone_packet interpret_udp_packet (
 }
 
 void copy_data (
-  detector det, int line_number, int n_lines_per_packet, 
-  void* ringbuffer_slot_origin, void* packet_data, int bit_depth )
+  detector* det, rb_metadata* rb_meta, void* ringbuffer_slot_origin, void* packet_data, int line_number)
 {  
   int reverse;
   int reverse_factor;
 
   // Top submodule row.
-  if (det.submodule_idx[0] == 0) {
+  if (det->submodule_idx[0] == 0) {
       reverse = 1;
       reverse_factor = 0;
   // Bottom submodule row.
   } else {
       reverse = -1;
-      reverse_factor = det.submodule_size[0] - 1;
+      reverse_factor = det->submodule_size[0] - 1;
   }
 
-  uint32_t n_bytes_per_frame_line = (det.detector_size[1] * bit_depth) / 8;
-  uint32_t n_bytes_per_submodule_line = (det.submodule_size[1] * bit_depth) / 8;
   // Each packet line is made of 2 chip lines -> [CHIP1]<gap>[CHIP2]
-  uint32_t n_bytes_per_chip_line = n_bytes_per_submodule_line / 2;
-  uint32_t n_bytes_per_chip_gap = (det.gap_px_chips[1] * bit_depth) / 8;
+  uint32_t n_bytes_per_chip_line = rb_meta->n_bytes_per_submodule_line / 2;
+  uint32_t n_bytes_per_chip_gap = (det->gap_px_chips[1] * rb_meta->bit_depth) / 8;
 
   uint32_t dest_chip_offset = n_bytes_per_chip_line + n_bytes_per_chip_gap;
 
   // Packets are stream from the top to the bottom of the module.
   // module_line goes from 255..0
   uint32_t dest_submodule_line = line_number + n_lines_per_packet - 1;
-  uint32_t dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * n_bytes_per_frame_line;
+  uint32_t dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * rb_meta->n_bytes_per_frame_line;
 
   uint32_t source_offset = 0;
 
@@ -73,8 +70,8 @@ void copy_data (
       n_bytes_per_chip_line
     );
 
-    source_offset += n_bytes_per_submodule_line;
-    dest_line_offset -= reverse * n_bytes_per_frame_line;
+    source_offset += rb_meta->n_bytes_per_submodule_line;
+    dest_line_offset -= reverse * rb_meta->n_bytes_per_frame_line;
   }
 }
 

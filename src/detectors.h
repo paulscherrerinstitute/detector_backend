@@ -76,8 +76,8 @@ typedef struct _barebone_packet{
 // Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
 typedef barebone_packet (*interpret_udp_packet_function)(const char*, const int);
 
-// Signature: const char* udp_packet, const int received_packet_len
-typedef void (*copy_data_function)(detector, int, int, void*, void*, int);
+// Signature: detector* det, rb_metadata* rb_meta, void* ringbuffer_slot_origin, void* packet_data, int line_number
+typedef void (*copy_data_function)(detector*, rb_metadata*, void*, void*, int);
 
 typedef struct _detector_definition{
   size_t udp_packet_bytes;
