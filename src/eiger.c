@@ -27,10 +27,10 @@ barebone_packet interpret_udp_packet (
 }
 
 void calc_copy_data(detector det, rb_metadata rb_meta, int line_number, 
-  int* reverse;
-  int* reverse_factor;
-  uint32_t* n_bytes_per_chip_line
-  uint32_t* dest_chip_offset
+  int* reverse,
+  int* reverse_factor,
+  uint32_t* n_bytes_per_chip_line,
+  uint32_t* dest_chip_offset,
   uint32_t* dest_line_offset)
 {
   // Top submodule row.
