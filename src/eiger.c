@@ -78,7 +78,7 @@ void copy_data (
   }
 }
 
-detector_definition eiger_definition = {
+detector_definition det_definition = {
   .udp_packet_bytes = sizeof(eiger_packet),
   .data_bytes_per_packet = EIGER_DATA_BYTES_PER_PACKET
 };
