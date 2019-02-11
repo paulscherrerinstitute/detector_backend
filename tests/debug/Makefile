@@ -9,7 +9,13 @@ CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath=$(LIB
 CFLAGS+=-Wfatal-errors
 DEBUG_FLAGS=-g -O0 
 
-debug: debug_single_module.c
+build: debug_single_module.c
+	@if [ -z $(DETECTOR) ]; then echo "DETECTOR variable is not set"; exit 1; fi;	
+	
+	@echo "-------------------------------"
+	@echo "Building debug module for $(DETECTOR)"
+	@echo "-------------------------------"
+
 	$(CC) --std=c99 $(DEBUG_FLAGS) $(CFLAGS) -o $(LIBNAME) $? -lm -lringbuffer 
 
 perf: DEBUG_FLAGS+=-p
