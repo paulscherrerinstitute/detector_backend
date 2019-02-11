@@ -49,6 +49,16 @@ inline int get_n_packets_per_frame (detector det, size_t data_bytes_per_packet, 
   return n_pixels_in_frame / n_pixels_in_packet;
 }
 
+intline uint32_t get_n_bytes_per_frame_line(detector det, int bit_depth)
+{
+  return (det.detector_size[1] * bit_depth) / 8;
+}
+
+intline uint32_t get_n_bytes_per_submodule_line(detector det, int bit_depth)
+{
+  return (det.submodule_size[1] * bit_depth) / 8;
+}
+
 inline rb_metadata get_ringbuffer_metadata (
   int rb_writer_id, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_current_slot,  
   detector det, size_t data_bytes_per_packet, int bit_depth )
@@ -70,8 +80,25 @@ inline rb_metadata get_ringbuffer_metadata (
   metadata.n_packets_per_frame = get_n_packets_per_frame(det, data_bytes_per_packet, bit_depth);
   metadata.bit_depth = bit_depth;
 
+  metadata.n_bytes_per_frame_line = get_n_bytes_per_frame_line(det, bit_depth);
+  metadata.n_bytes_per_submodule_line = get_n_bytes_per_submodule_line(det, bit_depth);
+
   metadata.data_slot_origin = NULL;
   metadata.header_slot_origin = NULL;
 
   return metadata;
 }
+
+// Common
+
+
+// Eiger
+
+  // Each packet line is made of 2 chip lines -> [CHIP1]<gap>[CHIP2]
+  uint32_t n_bytes_per_chip_line = n_bytes_per_submodule_line / 2;
+  uint32_t n_bytes_per_chip_gap = (det.gap_px_chips[1] * bit_depth) / 8;
+
+  uint32_t dest_chip_offset = n_bytes_per_chip_line + n_bytes_per_chip_gap;
+
+// Jungfrau
+uint32_t submodule_height = det.submodule_size[0] - 1;

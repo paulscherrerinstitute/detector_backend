@@ -102,6 +102,9 @@ typedef struct _rb_metadata
   int n_lines_per_packet;
   int n_packets_per_frame;
   int bit_depth;
+
+  uint32_t n_bytes_per_frame_line;
+  uint32_t n_bytes_per_submodule_line;
 } rb_metadata;
 
 #endif
