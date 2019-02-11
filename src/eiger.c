@@ -26,32 +26,45 @@ barebone_packet interpret_udp_packet (
   return bpacket;
 }
 
+void calc_copy_data(detector det, rb_metadata rb_meta, line_number, 
+  int* reverse;
+  int* reverse_factor;
+  uint32_t* n_bytes_per_chip_line
+  uint32_t* dest_chip_offset
+  uint32_t* dest_line_offset)
+{
+  // Top submodule row.
+  if (det.submodule_idx[0] == 0) {
+      *reverse = 1;
+      *reverse_factor = 0;
+  // Bottom submodule row.
+  } else {
+      *reverse = -1;
+      *reverse_factor = det.submodule_size[0] - 1;
+  }
+
+  // Each packet line is made of 2 chip lines -> [CHIP1]<gap>[CHIP2]
+  *n_bytes_per_chip_line = rb_meta.n_bytes_per_submodule_line / 2;
+  uint32_t n_bytes_per_chip_gap = (det.gap_px_chips[1] * rb_meta.bit_depth) / 8;
+
+  *dest_chip_offset = *n_bytes_per_chip_line + n_bytes_per_chip_gap;
+
+  // Packets are stream from the top to the bottom of the module.
+  // module_line goes from 255..0
+  uint32_t dest_submodule_line = line_number + rb_meta.n_lines_per_packet - 1;
+  *dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * rb_meta.n_bytes_per_frame_line;
+}
+
 void copy_data (
   detector det, rb_metadata rb_meta, void* packet_data, int line_number)
 {  
   int reverse;
   int reverse_factor;
+  uint32_t n_bytes_per_chip_line
+  uint32_t dest_chip_offset
+  uint32_t dest_line_offset;
 
-  // Top submodule row.
-  if (det.submodule_idx[0] == 0) {
-      reverse = 1;
-      reverse_factor = 0;
-  // Bottom submodule row.
-  } else {
-      reverse = -1;
-      reverse_factor = det.submodule_size[0] - 1;
-  }
-
-  // Each packet line is made of 2 chip lines -> [CHIP1]<gap>[CHIP2]
-  uint32_t n_bytes_per_chip_line = rb_meta.n_bytes_per_submodule_line / 2;
-  uint32_t n_bytes_per_chip_gap = (det.gap_px_chips[1] * rb_meta.bit_depth) / 8;
-
-  uint32_t dest_chip_offset = n_bytes_per_chip_line + n_bytes_per_chip_gap;
-
-  // Packets are stream from the top to the bottom of the module.
-  // module_line goes from 255..0
-  uint32_t dest_submodule_line = line_number + rb_meta.n_lines_per_packet - 1;
-  uint32_t dest_line_offset = (reverse_factor + (reverse * dest_submodule_line)) * rb_meta.n_bytes_per_frame_line;
+  calc_copy_data(det, rb_meta, line_number, &reverse, &reverse_factor, &n_bytes_per_chip_line, &dest_chip_offset, &dest_line_offset)  
 
   uint32_t source_offset = 0;
 
