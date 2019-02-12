@@ -44,17 +44,16 @@ inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes,
 }
 
 inline void save_packet (
-  barebone_packet* bpacket, rb_metadata* rb_meta, 
-  counter* counters, detector* det, detector_definition* det_definition ) 
+  barebone_packet* bpacket, rb_metadata* rb_meta, counter* counters, detector* det, rb_header* header) 
 {
   
   if (!is_slot_ready_for_frame(bpacket->framenum, counters))
   {
-    commit_if_slot_dangling(counters, rb_meta);
+    commit_if_slot_dangling(counters, rb_meta, header);
     
     claim_next_slot(rb_meta);
 
-    initialize_rb_header(rb_meta);
+    initialize_rb_header(header, rb_meta, bpacket);
 
     initialize_counters_for_new_frame(counters, bpacket->framenum);
   }
@@ -66,7 +65,7 @@ inline void save_packet (
 
   copy_data(*det, *rb_meta, bpacket->data, line_number);
 
-  update_rb_header(rb_meta, bpacket, counters);
+  update_rb_header(header, bpacket);
 
   if(is_frame_complete(rb_meta->n_packets_per_frame, counters))
   {
@@ -75,6 +74,8 @@ inline void save_packet (
         rb_meta->mod_number, bpacket->packetnum, counters->current_frame_recv_packets, 
         rb_meta->n_packets_per_frame, bpacket->framenum, counters->current_frame);
     #endif
+
+    copy_rb_header(header, rb_meta, counters);
 
     commit_slot(rb_meta->rb_writer_id, rb_meta->rb_current_slot);
 
@@ -125,6 +126,8 @@ int put_data_in_rb (
   char udp_packet[det_definition.udp_packet_bytes];
   barebone_packet bpacket;
 
+  rb_header header;
+
   while (true)
   {
     bool is_packet_received = receive_packet (
@@ -133,7 +136,7 @@ int put_data_in_rb (
 
     if (is_packet_received) 
     {
-      save_packet(&bpacket, &rb_meta, &counters, &det, &det_definition);
+      save_packet(&bpacket, &rb_meta, &counters, &det, &header);
 
       // Reset timeout time.
       gettimeofday(&timeout_start_time, NULL);
@@ -141,7 +144,7 @@ int put_data_in_rb (
     else if (is_timeout_expired(timeout, timeout_start_time))
     {
       // If images are lost in the last frame.
-      commit_if_slot_dangling(&counters, &rb_meta);
+      commit_if_slot_dangling(&counters, &rb_meta, &header);
 
       break;
     }
