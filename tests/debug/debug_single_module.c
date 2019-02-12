@@ -14,8 +14,7 @@ char const RB_DBUFFER_FILENAME[] = "/dev/shm/rb/rb_image_data.dat";
 extern inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
   barebone_packet* bpacket, detector_definition* det_definition );
 extern inline void save_packet (
-  barebone_packet* bpacket, rb_metadata* rb_meta, 
-  counter* counters, detector* det, detector_definition* det_definition);
+  barebone_packet* bpacket, rb_metadata* rb_meta, counter* counters, detector* det, rb_header* header);
 extern int put_data_in_rb(
   int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
   uint32_t n_frames, float timeout, detector det);
@@ -43,10 +42,11 @@ extern inline void initialize_counters_for_new_frame (counter* counters, uint64_
 
 // utils_ringbuffer.c
 extern inline bool commit_slot (int rb_writer_id, int rb_current_slot);
-extern inline void commit_if_slot_dangling (counter* counters, rb_metadata* rb_meta);
+extern inline void commit_if_slot_dangling (counter* counters, rb_metadata* rb_meta, rb_header* header);
 extern inline void claim_next_slot(rb_metadata* rb_meta);
 extern inline void initialize_rb_header (rb_header* header, rb_metadata* rb_meta, barebone_packet* bpacket);
 extern inline void update_rb_header (rb_header* header, barebone_packet* bpacket);
+extern inline uint64_t copy_rb_header(rb_header* header, rb_metadata* rb_meta, counter *counters);
 
 int setup_udp_socket(int udp_port, int rcv_buffer)
 {

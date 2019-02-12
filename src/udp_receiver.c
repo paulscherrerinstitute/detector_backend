@@ -49,7 +49,7 @@ inline void save_packet (
   
   if (!is_slot_ready_for_frame(bpacket->framenum, counters))
   {
-    commit_if_slot_dangling(counters, rb_meta);
+    commit_if_slot_dangling(counters, rb_meta, header);
     
     claim_next_slot(rb_meta);
 
@@ -144,7 +144,7 @@ int put_data_in_rb (
     else if (is_timeout_expired(timeout, timeout_start_time))
     {
       // If images are lost in the last frame.
-      commit_if_slot_dangling(&counters, &rb_meta);
+      commit_if_slot_dangling(&counters, &rb_meta, &header);
 
       break;
     }

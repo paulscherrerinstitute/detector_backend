@@ -43,9 +43,9 @@ inline void update_rb_header (rb_header* header, barebone_packet* bpacket)
 inline uint64_t copy_rb_header(rb_header* header, rb_metadata* rb_meta, counter *counters)
 {
   uint64_t lost_packets = rb_meta->n_packets_per_frame - counters->current_frame_recv_packets;
-  header.framemetadata[1] = lost_packets;
+  header->framemetadata[1] = lost_packets;
 
-  memcpy(rb_meta->header_slot_origin, header, sizeof(rb_header))
+  memcpy(rb_meta->header_slot_origin, header, sizeof(rb_header));
 
   return lost_packets;
 }
@@ -64,12 +64,11 @@ inline bool commit_slot (int rb_writer_id, int rb_current_slot)
   }
 }
 
-inline void commit_if_slot_dangling (
-  counter* counters, rb_metadata* rb_meta)
+inline void commit_if_slot_dangling (counter* counters, rb_metadata* rb_meta, rb_header* header)
 {
   if (counters->current_frame != NO_CURRENT_FRAME)
   {
-    uint64_t lost_packets = copy_rb_header(rb_header* header, rb_meta, counters)
+    uint64_t lost_packets = copy_rb_header (header, rb_meta, counters);
     
     counters->total_lost_packets += lost_packets;
     counters->total_lost_frames++;
