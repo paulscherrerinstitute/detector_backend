@@ -81,6 +81,8 @@ inline void commit_if_slot_dangling (counter* counters, rb_metadata* rb_meta, rb
       printf("[commit_if_slot_dangling][%d] framenum: %lu lost_packets: %lu\n", 
         getpid(), counters->current_frame, lost_packets);
     #endif
+
+    counters->current_frame = NO_CURRENT_FRAME;
   }
 }
 
