@@ -1,5 +1,55 @@
 #include "detectors.h"
 
+inline void initialize_rb_header (rb_header* header, rb_metadata* rb_meta, barebone_packet* bpacket)
+{
+  uint64_t ones = ~((uint64_t)0);
+  
+  for(int i=0; i < 8; i++) 
+  {
+    header->framemetadata[i] = 0;
+  }
+
+  header->framemetadata[2] = 
+    ones >> (64 - rb_meta->n_packets_per_frame);
+  
+  header->framemetadata[3] = 0;
+  
+  if(rb_meta->n_packets_per_frame > 64)
+  {
+    header->framemetadata[3] = 
+      ones >> (128 - rb_meta->n_packets_per_frame);
+  }
+
+  header->framemetadata[0] = bpacket->framenum;
+  header->framemetadata[4] = (uint64_t) bpacket->bunchid;
+  header->framemetadata[5] = (uint64_t) bpacket->debug;
+  header->framemetadata[6] = (uint64_t) rb_meta->mod_number;
+  header->framemetadata[7] = (uint64_t) 1;
+}
+
+inline void update_rb_header (rb_header* header, barebone_packet* bpacket)
+{   
+  const uint64_t mask = 1;
+  if(bpacket->packetnum < 64)
+  {
+    header->framemetadata[2] &= ~(mask << bpacket->packetnum);
+  }
+  else
+  {
+    header->framemetadata[3] &= ~(mask << (bpacket->packetnum - 64));
+  }
+}
+
+inline uint64_t copy_rb_header(rb_header* header, rb_metadata* rb_meta, counter *counters)
+{
+  uint64_t lost_packets = rb_meta->n_packets_per_frame - counters->current_frame_recv_packets;
+  header.framemetadata[1] = lost_packets;
+
+  memcpy(rb_meta->header_slot_origin, header, sizeof(rb_header))
+
+  return lost_packets;
+}
+
 inline bool commit_slot (int rb_writer_id, int rb_current_slot)
 {
   if (rb_current_slot != -1)
@@ -19,17 +69,12 @@ inline void commit_if_slot_dangling (
 {
   if (counters->current_frame != NO_CURRENT_FRAME)
   {
-    commit_slot(rb_meta->rb_writer_id, rb_meta->rb_current_slot);
-
-    // Calculate and update lost packets - do_stats with recv_packets -1.
-    uint64_t lost_packets = 
-      rb_meta->n_packets_per_frame - (counters->current_frame_recv_packets - 1);
-
-    // Ringbuffer header field for number of lost packets in this frame.
-    rb_meta->header_slot_origin->framemetadata[1] = lost_packets;
+    uint64_t lost_packets = copy_rb_header(rb_header* header, rb_meta, counters)
     
     counters->total_lost_packets += lost_packets;
     counters->total_lost_frames++;
+
+    commit_slot(rb_meta->rb_writer_id, rb_meta->rb_current_slot);
 
     #ifdef DEBUG
       printf("[commit_if_slot_dangling][%d] framenum: %lu lost_packets: %lu\n", 
@@ -57,50 +102,4 @@ inline void claim_next_slot(rb_metadata* rb_meta)
     rb_meta->rb_hbuffer_id, rb_meta->rb_current_slot
   );
   rb_meta->header_slot_origin += rb_meta->mod_number;
-}
-
-inline void initialize_rb_header (rb_metadata* rb_meta)
-{
-  uint64_t ones = ~((uint64_t)0);
-  
-  for(int i=0; i < 8; i++) 
-  {
-    rb_meta->header_slot_origin->framemetadata[i] = 0;
-  } 
-
-  rb_meta->header_slot_origin->framemetadata[2] = 
-    ones >> (64 - rb_meta->n_packets_per_frame);
-  
-  rb_meta->header_slot_origin->framemetadata[3] = 0;
-  
-  if(rb_meta->n_packets_per_frame > 64)
-  {
-    rb_meta->header_slot_origin->framemetadata[3] = 
-      ones >> (128 - rb_meta->n_packets_per_frame);
-  }
-}
-
-inline void update_rb_header (
-  rb_metadata* rb_meta, barebone_packet* bpacket, counter *counters )
-{
-  rb_header* ph = rb_meta->header_slot_origin;
-
-  ph->framemetadata[0] = bpacket->framenum; // this could be avoided mayne
-  ph->framemetadata[1] = 
-    rb_meta->n_packets_per_frame - counters->current_frame_recv_packets;
-    
-  const uint64_t mask = 1;
-  if(bpacket->packetnum < 64)
-  {
-    ph->framemetadata[2] &= ~(mask << bpacket->packetnum);
-  }
-  else
-  {
-    ph->framemetadata[3] &= ~(mask << (bpacket->packetnum - 64));
-  }
-
-  ph->framemetadata[4] = (uint64_t) bpacket->bunchid;
-  ph->framemetadata[5] = (uint64_t) bpacket->debug;
-  ph->framemetadata[6] = (uint64_t) rb_meta->mod_number;
-  ph->framemetadata[7] = (uint64_t) 1;
 }

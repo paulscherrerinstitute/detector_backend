@@ -45,8 +45,8 @@ extern inline void initialize_counters_for_new_frame (counter* counters, uint64_
 extern inline bool commit_slot (int rb_writer_id, int rb_current_slot);
 extern inline void commit_if_slot_dangling (counter* counters, rb_metadata* rb_meta);
 extern inline void claim_next_slot(rb_metadata* rb_meta);
-extern inline void initialize_rb_header (rb_metadata* rb_meta);
-extern inline void update_rb_header (rb_metadata* rb_meta, barebone_packet* bpacket, counter *counters);
+extern inline void initialize_rb_header (rb_header* header, rb_metadata* rb_meta, barebone_packet* bpacket);
+extern inline void update_rb_header (rb_header* header, barebone_packet* bpacket);
 
 int setup_udp_socket(int udp_port, int rcv_buffer)
 {
