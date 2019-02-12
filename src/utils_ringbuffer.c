@@ -32,11 +32,13 @@ inline void update_rb_header (rb_header* header, barebone_packet* bpacket)
   const uint64_t mask = 1;
   if(bpacket->packetnum < 64)
   {
-    header->framemetadata[2] &= ~(mask << bpacket->packetnum);
+    header->framemetadata[2] ^= mask << bpacket->packetnum;
+    // header->framemetadata[2] &= ~(mask << bpacket->packetnum);
   }
   else
   {
-    header->framemetadata[3] &= ~(mask << (bpacket->packetnum - 64));
+    header->framemetadata[3] ^= mask << (bpacket->packetnum - 64);
+    // header->framemetadata[3] &= ~(mask << (bpacket->packetnum - 64));
   }
 }
 
