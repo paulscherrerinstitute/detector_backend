@@ -2,7 +2,6 @@ class BaseDetector(object):
     
     def __init__(self,
                  name,
-                 detector_size,
                  module_size,
                  submodule_size,
                  n_submodules,
@@ -11,7 +10,6 @@ class BaseDetector(object):
                  ):
 
         self.name = name
-        self.detector_size = detector_size
         self.module_size = module_size
         self.submodule_size = submodule_size
         self.n_submodules = n_submodules

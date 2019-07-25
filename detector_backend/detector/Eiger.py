@@ -3,13 +3,10 @@ from detector_backend.detector.base import BaseDetector
 
 class EigerDetector(BaseDetector):
 
-    def __init__(self,
-                 name,
-                 detector_size):
+    def __init__(self):
 
         super(EigerDetector, self).__init__(
-            name=name,
-            detector_size=detector_size,
+            name="Eiger",
             module_size=[512, 1024],
             submodule_size=[256, 512],
             n_submodules=4,
