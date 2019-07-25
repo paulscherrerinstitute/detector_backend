@@ -276,3 +276,6 @@ fabric.properties
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
 
+.idea/
+tests/debug/debug_single_module
+tests/debug/generate_module_eiger
