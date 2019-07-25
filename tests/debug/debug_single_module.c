@@ -65,7 +65,7 @@ int setup_udp_socket(int udp_port, int rcv_buffer)
 
     setsockopt(socket_fd, SOL_SOCKET, SO_RCVBUF, &rcv_buffer, sizeof(int));
 
-    if (bind(socket_fd, &server, sizeof(server)))
+    if (bind(socket_fd, (const struct  sockaddr *)&server, sizeof(server)))
     {
         printf("Cannot bind to socket.\n");
         exit(1);
