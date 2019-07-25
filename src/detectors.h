@@ -2,6 +2,7 @@
 #define DETECTORS_H
 
 #include <inttypes.h>
+#include <stdbool.h>
 
 #define PRINT_STATS_N_FRAMES_MODULO 100
 #define NO_CURRENT_FRAME 0

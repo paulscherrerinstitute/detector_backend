@@ -1,6 +1,10 @@
 #include <unistd.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "../../src/eiger.c"
 
@@ -22,7 +26,7 @@ int setup_udp_socket(int udp_port, int snd_buffer)
 
     setsockopt(socket_fd, SOL_SOCKET, SO_SNDBUF, &snd_buffer, sizeof(int));
 
-    if (connect(socket_fd, &server, sizeof(server)))
+    if (connect(socket_fd, (const struct sockaddr *) &server, sizeof(server)))
     {
         printf("Cannot connect to socket.\n");
         exit(1);
@@ -57,7 +61,7 @@ int main(int argc, char *argv[])
       udp_port, bit_depth, n_frames, sleep_time);
 
     eiger_packet packet;
-    memset(&eiger_packet, 0, sizeof(packet));
+    memset(&packet, 0, sizeof(packet));
 
     packet.metadata.exptime = 1;
     packet.metadata.bunchid = 2.0;
