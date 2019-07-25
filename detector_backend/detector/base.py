@@ -26,7 +26,7 @@ EIGER = BaseDetector(
 )
 
 
-class DetectorConfiguration(object):
+class DetectorConfig(object):
 
     def __init__(self,
                  detector,
