@@ -4,14 +4,14 @@ class BaseDetector(object):
                  name,
                  module_size,
                  submodule_size,
-                 n_submodules,
+                 n_submodules_per_module,
                  gap_px_chips,
                  gap_px_modules
                  ):
         self.name = name
         self.module_size = module_size
         self.submodule_size = submodule_size
-        self.n_submodules = n_submodules
+        self.n_submodules = n_submodules_per_module
         self.gap_px_chips = gap_px_chips
         self.gap_px_modules = gap_px_modules
 
@@ -20,7 +20,7 @@ EIGER = BaseDetector(
     name="Eiger",
     module_size=[512, 1024],
     submodule_size=[256, 512],
-    n_submodules=4,
+    n_submodules_per_module=4,
     gap_px_chips=[2, 2],
     gap_px_modules=[36, 8]
 )
@@ -55,5 +55,9 @@ class DetectorConfig(object):
 
         return detector_size
 
+    def get_receiver_ranks(self, offset=1):
 
+        n_active_submodules = self.geometry[0] * self.geometry[1] * self.detector.n_submodules_per_module
+        n_active_submodules -= len(self.ignored_modules)
 
+        return [x+offset for x in range(n_active_submodules)]
