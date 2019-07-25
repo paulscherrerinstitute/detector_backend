@@ -1,10 +1,10 @@
 
-RINGBUFFER=$(PWD)/../../../
+RINGBUFFER=$(PWD)/../../..
 
 CC=gcc
 
 LIBDIR=$(RINGBUFFER)/ringbuffer/ringbuffer/lib/
-CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath $(LIBDIR) -Wall -fno-inline
+CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath,$(LIBDIR) -Wall -fno-inline
 CFLAGS+=-Wfatal-errors
 DEBUG_FLAGS=-g -O0 
 
