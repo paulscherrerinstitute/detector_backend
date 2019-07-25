@@ -26,7 +26,7 @@
   #include "eiger.c"
 #endif
 
-inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
+bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
   barebone_packet* bpacket, detector_definition* det_definition )
 {
   const int received_data_len = get_udp_packet(sock, udp_packet, udp_packet_bytes);
@@ -43,7 +43,7 @@ inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes,
   return bpacket->is_valid;
 }
 
-inline void save_packet (
+void save_packet (
   barebone_packet* bpacket, rb_metadata* rb_meta, counter* counters, detector* det, rb_header* header) 
 {
   

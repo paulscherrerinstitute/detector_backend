@@ -11,9 +11,9 @@ char const RB_DBUFFER_FILENAME[] = "/dev/shm/rb/rb_image_data.dat";
 
 
 // udp_receiver.c
-extern inline bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
+extern bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
   barebone_packet* bpacket, detector_definition* det_definition );
-extern inline void save_packet (
+extern void save_packet (
   barebone_packet* bpacket, rb_metadata* rb_meta, counter* counters, detector* det, rb_header* header);
 extern int put_data_in_rb(
   int sock, int bit_depth, int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
