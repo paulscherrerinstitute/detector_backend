@@ -5,3 +5,8 @@ __pycache__
 *~
 *.log
 tests/*.npy
+
+tests/debug/debug_single_module
+tests/debug/debug_single_module.dSYM/
+tests/debug/generate_module_eiger
+tests/debug/generate_module_eiger.dSYM/
