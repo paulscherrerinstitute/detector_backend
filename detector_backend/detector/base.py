@@ -15,6 +15,7 @@ class BaseDetector(object):
         self.gap_px_chips = gap_px_chips
         self.gap_px_modules = gap_px_modules
 
+
 EIGER = BaseDetector(
     name="Eiger",
     module_size=[512, 1024],
@@ -32,6 +33,7 @@ class DetectorConfiguration(object):
                  name,
                  geometry,
                  ignored_modules=None):
+
         self.detector = detector
         self.name = name
         self.geometry = geometry
@@ -39,7 +41,19 @@ class DetectorConfiguration(object):
         self.detector_size = self.get_detector_size()
 
     def get_detector_size(self):
-        pass
+
+        module_size_wgaps = [self.module_size[0] + self.gap_chips[0],
+                             self.module_size[1] + (self.gap_chips[1] * 3)]
+
+        # Detector size including chip gaps.
+        detector_size = [module_size_wgaps[0] * self.geometry[0],
+                         module_size_wgaps[1] * self.geometry[1]]
+
+        # Detector size including module gaps.
+        detector_size = [(self.geometry[0] - 1) * self.gap_px_modules[0] + detector_size[0],
+                         (self.geometry[1] - 1) * self.gap_px_modules[1] + detector_size[1]]
+
+        return detector_size
 
 
 
