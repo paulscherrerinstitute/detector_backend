@@ -7,8 +7,6 @@ from detector_backend.module.zmq_sender import start_writer_sender, start_previe
 from detector_backend.rest.server import start_rest_api
 from detector_backend.utils_ringbuffer import RingBufferConfig
 
-ringbuffer_config = RingBufferConfig()
-
 eiger9m = DetectorConfig(
     detector=EIGER,
     name="Eiger9M",
@@ -39,21 +37,30 @@ elif current_process_rank in RECEIVER_RANKS:
     start_udp_receiver(udp_ip=udp_ips[current_process_rank],
                        udp_port=udp_ports[current_process_rank],
                        detector_config=eiger9m,
-                       ringbuffer_config=ringbuffer_config)
+                       ringbuffer_config=RingBufferConfig(
+                           process_id=current_process_rank,
+                           follower_ids=[SENDER_RANK, PREVIEW_RANK]
+                       ))
 
 elif current_process_rank == SENDER_RANK:
 
     start_writer_sender(bind_url="tcp://localhost:40000",
                         zmq_mode="PUSH",
                         detector_config=eiger9m,
-                        ringbuffer_config=ringbuffer_config)
+                        ringbuffer_config=RingBufferConfig(
+                            process_id=current_process_rank,
+                            follower_ids=RECEIVER_RANKS
+                        ))
 
 elif current_process_rank == PREVIEW_RANK:
 
-    start_preview_sender(bind_url="tcp://localhost:40000",
+    start_preview_sender(bind_url="tcp://localhost:50000",
                          zmq_mode="PUB",
                          detector_config=eiger9m,
-                         ringbuffer_config=ringbuffer_config)
+                         ringbuffer_config=RingBufferConfig(
+                             process_id=current_process_rank,
+                             follower_ids=RECEIVER_RANKS
+                         ))
 
 else:
     raise ValueError("Process with rank %d is not assigned to any module." % current_process_rank)
