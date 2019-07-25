@@ -39,10 +39,10 @@ inline void print_statistics (counter* counters, struct timeval* last_stats_prin
   float percentage_lost_packets = 100. * (float)counters->total_lost_packets / 
     (float)(counters->total_recv_packets);
 
-  // CPU | pid | framenum | frame_rate | tot_lost_packets | % lost packets |
+  // pid | framenum | frame_rate | tot_lost_packets | % lost packets |
   printf(
-    "| %02d | %05d | %06"PRIu64" | %05.2f | %06"PRIu64" | %04.1f |\n", 
-    sched_getcpu(), getpid(), counters->total_recv_frames, frame_rate, 
+    "%05d | %06"PRIu64" | %05.2f | %06"PRIu64" | %04.1f |\n", 
+    getpid(), counters->total_recv_frames, frame_rate, 
     counters->total_lost_packets, percentage_lost_packets
   );
 
