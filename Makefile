@@ -1,13 +1,10 @@
-
-RINGBUFFER=$(PWD)/..
-
 CC=gcc
 
+RINGBUFFER=..
 LIBNAME=libudpreceiver
 LIBDIR=$(RINGBUFFER)/ringbuffer/ringbuffer/lib/
-CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath=$(LIBDIR) -Wall
+CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath,$(LIBDIR) -Wall
 CFLAGS+=-Wfatal-errors
-
 
 build: src/udp_receiver.c
 	@if [ -z $(DETECTOR) ]; then echo "DETECTOR variable is not set"; exit 1; fi;	
