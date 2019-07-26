@@ -33,7 +33,7 @@ class DetectorDefinition(object):
                  ignored_modules=None):
 
         self.detector_model = detector_model
-        self.name = detector_name
+        self.detector_name = detector_name
 
         self.geometry = geometry
         self.bit_depth = bit_depth
