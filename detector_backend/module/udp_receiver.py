@@ -81,6 +81,8 @@ def get_c_det_def(detector_def, module_id, submodule_id):
     c_det_def.module_idx = as_ctypes(mod_indexes)
     c_det_def.submodule_idx = as_ctypes(array([int(submodule_id / 2), submodule_id % 2], dtype="int32", order='C'))
 
+    return c_det_def
+
 
 def start_udp_receiver(udp_ip, udp_port, detector_definition, ringbuffer, module_id, submodule_id):
     ringbuffer.init_buffer()
