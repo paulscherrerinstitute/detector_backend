@@ -171,10 +171,12 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
             raise RuntimeError(error_message)
 
 
-# def start_preview_sender(bind_url, zmq_mode, detector_def, ringbuffer):
-    # missing_packets = sum([metadata_struct.contents[i].framemetadata[1] for i in range(self.n_submodules)])
-    # if missing_packets != 0:
-    #     self.log.warning("Frame %d lost frames %d" % (metadata["frame"], missing_packets))
-    #     self.frames_with_missing_packets += 1
-    #     self.total_missing_packets += missing_packets
-    # pass
+def start_preview_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
+    pass
+
+# missing_packets = sum([metadata_struct.contents[i].framemetadata[1] for i in range(self.n_submodules)])
+# if missing_packets != 0:
+#     self.log.warning("Frame %d lost frames %d" % (metadata["frame"], missing_packets))
+#     self.frames_with_missing_packets += 1
+#     self.total_missing_packets += missing_packets
+# pass
