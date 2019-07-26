@@ -28,9 +28,7 @@ EIGER = DetectorModel(
 
 class DetectorDefinition(object):
 
-    def __init__(self, detector_name, detector_model,
-                 geometry, bit_depth,
-                 ignored_modules=None):
+    def __init__(self, detector_name, detector_model, geometry, bit_depth, ignored_modules=None):
 
         self.detector_model = detector_model
         self.detector_name = detector_name
@@ -52,9 +50,3 @@ class DetectorDefinition(object):
                               (self.geometry[1] - 1) * detector_model.gap_px_modules[1] + self.detector_size[1]]
 
         self.n_submodules_total = self.geometry[0] * self.geometry[1] * detector_model.n_submodules_per_module
-
-    def get_receiver_ranks(self, offset=1):
-        n_active_submodules = self.geometry[0] * self.geometry[1] * self.detector_model.n_submodules_per_module
-        n_active_submodules -= len(self.ignored_modules)
-
-        return [x + offset for x in range(n_active_submodules)]
