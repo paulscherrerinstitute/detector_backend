@@ -37,7 +37,7 @@ elif current_process_rank in RECEIVER_RANKS:
 
     start_udp_receiver(udp_ip=udp_ips[current_process_rank],
                        udp_port=udp_ports[current_process_rank],
-                       detector_definition=eiger9m,
+                       detector_def=eiger9m,
                        ringbuffer=RingBuffer(
                            process_id=current_process_rank,
                            follower_ids=[SENDER_RANK, PREVIEW_RANK],
@@ -49,9 +49,10 @@ elif current_process_rank in RECEIVER_RANKS:
 
 elif current_process_rank == SENDER_RANK:
 
-    start_writer_sender(bind_url="tcp://localhost:40000",
+    start_writer_sender(name="Writer Sender",
+                        bind_url="tcp://localhost:40000",
                         zmq_mode="PUSH",
-                        detector_config=eiger9m,
+                        detector_def=eiger9m,
                         ringbuffer=RingBuffer(
                             process_id=current_process_rank,
                             follower_ids=RECEIVER_RANKS,
@@ -60,9 +61,10 @@ elif current_process_rank == SENDER_RANK:
 
 elif current_process_rank == PREVIEW_RANK:
 
-    start_preview_sender(bind_url="tcp://localhost:50000",
+    start_preview_sender(name="Preview Sender",
+                         bind_url="tcp://localhost:50000",
                          zmq_mode="PUB",
-                         detector_config=eiger9m,
+                         detector_def=eiger9m,
                          ringbuffer=RingBuffer(
                              process_id=current_process_rank,
                              follower_ids=RECEIVER_RANKS,
