@@ -1,3 +1,6 @@
+from detector_backend import config
+
+
 class BaseDetector(object):
 
     def __init__(self,
@@ -32,32 +35,30 @@ class DetectorConfig(object):
                  detector,
                  name,
                  geometry,
+                 bit_depth,
                  ignored_modules=None):
 
         self.detector = detector
         self.name = name
         self.geometry = geometry
+        self.bit_depth = bit_depth
         self.ignored_modules = [] if ignored_modules is None else ignored_modules
-        self.detector_size = self.get_detector_size()
 
-    def get_detector_size(self):
-
-        module_size_wgaps = [self.module_size[0] + self.gap_chips[0],
-                             self.module_size[1] + (self.gap_chips[1] * 3)]
+        module_size_wgaps = [self.detector.module_size[0] + self.detector.gap_px_chips[0],
+                             self.detector.module_size[1] + (self.detector.gap_px_chips[1] * 3)]
 
         # Detector size including chip gaps.
-        detector_size = [module_size_wgaps[0] * self.geometry[0],
-                         module_size_wgaps[1] * self.geometry[1]]
+        self.detector_size = [module_size_wgaps[0] * self.geometry[0],
+                              module_size_wgaps[1] * self.geometry[1]]
 
         # Detector size including module gaps.
-        detector_size = [(self.geometry[0] - 1) * self.gap_px_modules[0] + detector_size[0],
-                         (self.geometry[1] - 1) * self.gap_px_modules[1] + detector_size[1]]
+        self.detector_size = [(self.geometry[0] - 1) * self.detector.gap_px_modules[0] + self.detector_size[0],
+                              (self.geometry[1] - 1) * self.detector.gap_px_modules[1] + self.detector_size[1]]
 
-        return detector_size
+        self.n_submodules_total = self.geometry[0] * self.geometry[1] * self.detector.n_submodules_per_module
 
     def get_receiver_ranks(self, offset=1):
-
         n_active_submodules = self.geometry[0] * self.geometry[1] * self.detector.n_submodules_per_module
         n_active_submodules -= len(self.ignored_modules)
 
-        return [x+offset for x in range(n_active_submodules)]
+        return [x + offset for x in range(n_active_submodules)]
