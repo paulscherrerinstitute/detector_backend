@@ -1,13 +1,13 @@
 from mpi4py import MPI
 
-from detector_backend.utils_detector import DetectorConfig, EIGER
+from detector_backend.utils_detector import DetectorDefinition, EIGER
 from detector_backend.get_ipports_fromcfg import get_ips_ports_fromcfg
 from detector_backend.module.udp_receiver import start_udp_receiver
 from detector_backend.module.zmq_sender import start_writer_sender, start_preview_sender
 from detector_backend.rest.server import start_rest_api
 from detector_backend.utils_ringbuffer import RingBuffer
 
-eiger9m = DetectorConfig(
+eiger9m = DetectorDefinition(
     detector=EIGER,
     name="Eiger9M",
     geometry=[6, 3],
