@@ -16,7 +16,7 @@ class RingBuffer(object):
     def __init__(self,
                  process_id,
                  follower_ids,
-                 detector,
+                 detector_config,
                  rb_folder=config.DEFAULT_RB_FOLDER,
                  rb_head_file=config.DEFAULT_RB_HEAD_FILE,
                  rb_image_head_file=config.DEFAULT_RB_IMAGE_HEAD_FILE,
@@ -24,7 +24,7 @@ class RingBuffer(object):
 
         self.process_id = process_id
         self.follower_ids = follower_ids
-        self.detector = detector
+        self.detector_config = detector_config
 
         self.rb_folder = rb_folder
         self.rb_head_file = rb_head_file
@@ -63,16 +63,18 @@ class RingBuffer(object):
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_image_data, self.rb_header_id, 0)
 
-        self.image_header_n_bytes = self.detector.n_submodules_total * config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES
+        self.image_header_n_bytes = self.detector_config.n_submodules_total * config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.image_header_n_bytes)
 
-        self.image_data_n_bytes = (self.detector.detector_size[0] *
-                                   self.detector.detector_size[1] * self.detector.bit_depth) / 8
+        self.image_data_n_bytes = (self.detector_config.detector_size[0] *
+                                   self.detector_config.detector_size[1] * self.detector_config.bit_depth) / 8
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, self.image_data_n_bytes)
 
         n_slots = rb.adjust_nslots(self.rb_header_id)
-        rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__('c_uint' + str(self.detector.bit_depth)))
+        buffer_slot_type_name = 'c_uint' + str(self.detector_config.bit_depth)
+        rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__(buffer_slot_type_name))
 
         _logger.info("RB %d slots: %d" % (self.rb_header_id, n_slots))
         _logger.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
         _logger.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+        _logger.info("RB buffer slot type name: %s" % buffer_slot_type_name)
