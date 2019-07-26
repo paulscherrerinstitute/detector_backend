@@ -53,7 +53,7 @@ class RingBuffer(object):
             MPI.COMM_WORLD.barrier()
 
         else:
-            MPI.COMM_WORLD.barrier().barrier()
+            MPI.COMM_WORLD.barrier()
 
             if not os.path.exists(self.rb_head_file):
                 raise RuntimeError("File %s not available " % self.rb_head_file)

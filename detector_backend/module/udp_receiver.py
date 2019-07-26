@@ -84,14 +84,15 @@ def get_c_det_def(detector_def, module_id, submodule_id):
     return c_det_def
 
 
-def start_udp_receiver(udp_ip, udp_port, detector_definition, ringbuffer, module_id, submodule_id):
+def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, submodule_id):
+
     ringbuffer.init_buffer()
 
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, UDP_RCVBUF_SIZE)
     udp_socket.bind((udp_ip, udp_port))
 
-    c_det_def = get_c_det_def(detector_definition, module_id, submodule_id)
+    c_det_def = get_c_det_def(detector_def, module_id, submodule_id)
 
     # Function signature
     # int sock, int bit_depth,
@@ -100,7 +101,7 @@ def start_udp_receiver(udp_ip, udp_port, detector_definition, ringbuffer, module
     udp_receive = get_udp_receive_function()
 
     udp_receive(
-        udp_socket.fileno(), detector_definition.bit_depth,
+        udp_socket.fileno(), detector_def.bit_depth,
         ringbuffer.rb_header_id, ringbuffer.rb_hbuffer_id, ringbuffer.rb_dbuffer_id, ringbuffer.rb_writer_id,
         -1, 1000, c_det_def
     )
