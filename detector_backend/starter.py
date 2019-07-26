@@ -3,7 +3,7 @@ from mpi4py import MPI
 from detector_backend.module.rest import start_rest_api
 from detector_backend.get_ipports_fromcfg import get_ips_ports_fromcfg
 from detector_backend.module.udp_receiver import start_udp_receiver
-from detector_backend.module.zmq_sender import start_writer_sender
+from detector_backend.module.zmq_sender import start_writer_sender, start_preview_sender
 from detector_backend.utils_ringbuffer import RingBuffer
 
 
@@ -57,16 +57,16 @@ def start_standard_setup(detector_definition, detector_config_filename):
                             ))
 
     elif current_process_rank == preview_rank:
-        pass
-        # start_preview_sender(name="Preview Sender",
-        #                      bind_url="tcp://localhost:50000",
-        #                      zmq_mode="PUB",
-        #                      detector_def=detector_definition,
-        #                      ringbuffer=RingBuffer(
-        #                          process_id=current_process_rank,
-        #                          follower_ids=RECEIVER_RANKS,
-        #                          detector_config=detector_definition
-        #                      ))
+
+        start_preview_sender(name="Preview Sender",
+                             bind_url="tcp://localhost:50000",
+                             zmq_mode="PUB",
+                             detector_def=detector_definition,
+                             ringbuffer=RingBuffer(
+                                 process_id=current_process_rank,
+                                 follower_ids=receiver_ranks,
+                                 detector_config=detector_definition
+                             ))
 
     else:
         raise ValueError("Process with rank %d is not assigned to any module." % current_process_rank)
