@@ -9,8 +9,8 @@ from detector_backend.module.zmq_sender import start_writer_sender
 from detector_backend.utils_ringbuffer import RingBuffer
 
 eiger9m = DetectorDefinition(
-    detector=EIGER,
-    name="Eiger9M",
+    detector_name="cSAXS Eiger 9m",
+    detector_model=EIGER,
     geometry=[6, 3],
     bit_depth=32
 )
