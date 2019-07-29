@@ -28,8 +28,8 @@ class RingBuffer(object):
 
         self.rb_folder = rb_folder
         self.rb_head_file = rb_head_file
-        self.rb_image_head = rb_image_head_file
-        self.rb_image_data = rb_image_data_file
+        self.rb_image_head_file = rb_image_head_file
+        self.rb_image_data_file = rb_image_data_file
 
         self.rb_header_id = None
         self.rb_reader_id = None
@@ -38,6 +38,9 @@ class RingBuffer(object):
 
         self.image_header_n_bytes = None
         self.image_data_n_bytes = None
+
+    # TODO: Create reader and create writer should be separated.
+    # Extract the method for creating the header file.
 
     def init_buffer(self, setup_header_file=False):
 
@@ -60,8 +63,8 @@ class RingBuffer(object):
 
         self.rb_header_id = rb.open_header_file(self.rb_head_file)
         self.rb_reader_id = rb.create_reader(self.rb_header_id, self.process_id, self.follower_ids)
-        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head, self.rb_header_id, 0)
-        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_image_data, self.rb_header_id, 0)
+        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head_file, self.rb_header_id, 0)
+        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_image_data_file, self.rb_header_id, 0)
 
         self.image_header_n_bytes = self.detector_config.n_submodules_total * config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.image_header_n_bytes)
