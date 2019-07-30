@@ -7,7 +7,7 @@ import zmq
 
 from time import time, sleep
 
-from detector_backend.mpi_utils import ConfigReceiver
+from detector_backend.mpi_config import MpiControlClient
 
 _logger = getLogger(__name__)
 
@@ -134,7 +134,7 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
     socket.bind(bind_url)
 
     zmq_sender = DetectorZMQSender(name, socket, ringbuffer, detector_def)
-    config_receiver = ConfigReceiver(ringbuffer)
+    control_client = MpiControlClient()
 
     mpi_ref_time = time()
 
@@ -142,8 +142,8 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
         if (time() - mpi_ref_time) > MPI_COMM_DELAY:
 
-            config = config_receiver.get_config()
-            if config is not None:
+            message = control_client.get_message()
+            if message is not None:
                 ringbuffer.reset()
                 _logger.info("[%s] Ringbuffer reset." % name)
 
