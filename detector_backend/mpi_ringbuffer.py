@@ -11,7 +11,7 @@ import ringbuffer as rb
 _logger = getLogger(__name__)
 
 
-class RingBufferMaster(object):
+class MpiRingBufferMaster(object):
 
     def __init__(self, rb_header_file=config.DEFAULT_RB_HEAD_FILE):
         self.rb_header_file = rb_header_file
@@ -50,7 +50,7 @@ class RingBufferMaster(object):
         MPI.COMM_WORLD.barrier()
 
 
-class RingBufferClient(object):
+class MpiRingBufferClient(object):
 
     def __init__(self,
                  process_id,
