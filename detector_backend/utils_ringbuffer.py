@@ -11,7 +11,46 @@ import ringbuffer as rb
 _logger = getLogger(__name__)
 
 
-class RingBuffer(object):
+class RingBufferMaster(object):
+
+    def __init__(self, rb_header_file=config.DEFAULT_RB_HEAD_FILE):
+        self.rb_header_file = rb_header_file
+        self.created = False
+
+        self.rb_header_id = None
+
+    def create_buffer(self):
+
+        if self.created:
+            raise RuntimeError("Cannot re-create active RB header.")
+
+        ret = rb.create_header_file(self.rb_header_file)
+
+        if not ret:
+            raise RuntimeError("Cannot create ringbuffer header file.")
+
+        # Allow all other processes to load the header.
+        MPI.COMM_WORLD.barrier()
+
+        self.rb_header_id = rb.open_header_file(self.rb_header_file)
+
+        self.created = True
+
+    def reset(self):
+
+        if not self.created:
+            raise RuntimeError("Cannot reset RB header before initializing it.")
+
+        # Wait for all processes to reset.
+        MPI.COMM_WORLD.barrier()
+
+        rb.reset_header(self.rb_header_id)
+
+        # Notify clients to init the RB.
+        MPI.COMM_WORLD.barrier()
+
+
+class RingBufferClient(object):
 
     def __init__(self,
                  process_id,
@@ -27,7 +66,7 @@ class RingBuffer(object):
         self.detector_config = detector_config
 
         self.rb_folder = rb_folder
-        self.rb_head_file = rb_head_file
+        self.rb_header_file = rb_head_file
         self.rb_image_head_file = rb_image_head_file
         self.rb_image_data_file = rb_image_data_file
 
@@ -39,29 +78,24 @@ class RingBuffer(object):
         self.image_header_n_bytes = None
         self.image_data_n_bytes = None
 
-    # TODO: Create reader and create writer should be separated.
-    # Extract the method for creating the header file.
+        self.initialized = False
 
-    def init_buffer(self, setup_header_file=False):
+    def init_buffer(self):
 
-        if self.rb_header_id is not None:
-            raise ValueError("Ring buffer already initialized. Cannot call init_buffer twice.")
+        if self.initialized:
+            raise RuntimeError("RB already initialized.")
 
-        if setup_header_file:
-            ret = rb.create_header_file(self.rb_head_file)
+        # Wait for ringbuffer master to create the header file.
+        MPI.COMM_WORLD.barrier()
 
-            if not ret:
-                raise RuntimeError("Ring buffer files do not exist!")
+        if not os.path.exists(self.rb_header_file):
+            raise RuntimeError("RB header file %s not available " % self.rb_header_file)
 
-            MPI.COMM_WORLD.barrier()
+        self._configure_buffer()
 
-        else:
-            MPI.COMM_WORLD.barrier()
+    def _configure_buffer(self):
 
-            if not os.path.exists(self.rb_head_file):
-                raise RuntimeError("File %s not available " % self.rb_head_file)
-
-        self.rb_header_id = rb.open_header_file(self.rb_head_file)
+        self.rb_header_id = rb.open_header_file(self.rb_header_file)
         self.rb_reader_id = rb.create_reader(self.rb_header_id, self.process_id, self.follower_ids)
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_image_data_file, self.rb_header_id, 0)
@@ -81,3 +115,18 @@ class RingBuffer(object):
         _logger.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
         _logger.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
         _logger.info("RB buffer slot type name: %s" % buffer_slot_type_name)
+
+    def reset(self):
+
+        if not self.initialized:
+            raise RuntimeError("Cannot reset RB before initializing it.")
+
+        rb.reset()
+
+        # Signal to master to re-init the header.
+        MPI.COMM_WORLD.barrier()
+
+        # Wait for the master to re-init the header.
+        MPI.COMM_WORLD.barrier()
+
+        self._configure_buffer()
