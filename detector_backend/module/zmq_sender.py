@@ -140,18 +140,12 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
     while True:
 
-        curr_time = time()
-        if (curr_time - mpi_ref_time) > MPI_COMM_DELAY:
+        if (time() - mpi_ref_time) > MPI_COMM_DELAY:
 
-            # config = config_receiver.get_config()
-            #
-            # if config is not None:
-            #
-            #     zmq_sender.reset()
-            #     config_receiver.wait_for_others()
-            #
-            #     rb.reset()
-            #     config_receiver.complete_config()
+            config = config_receiver.get_config()
+            if config is not None:
+                ringbuffer.reset()
+                _logger.info("[%s] Ringbuffer reset." % name)
 
             mpi_ref_time = time()
 
@@ -173,10 +167,3 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
 def start_preview_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
     pass
-
-# missing_packets = sum([metadata_struct.contents[i].framemetadata[1] for i in range(self.n_submodules)])
-# if missing_packets != 0:
-#     self.log.warning("Frame %d lost frames %d" % (metadata["frame"], missing_packets))
-#     self.frames_with_missing_packets += 1
-#     self.total_missing_packets += missing_packets
-# pass
