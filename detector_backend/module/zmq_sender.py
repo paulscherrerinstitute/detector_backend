@@ -7,7 +7,7 @@ import zmq
 
 from time import time, sleep
 
-from detector_backend.mpi_config import MpiControlClient
+from detector_backend.mpi_control import MpiControlClient
 
 _logger = getLogger(__name__)
 

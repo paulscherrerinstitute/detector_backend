@@ -1,6 +1,6 @@
 from mpi4py import MPI
 
-from detector_backend.module.rest import start_rest_api
+from detector_backend.module.rest_api import start_rest_api
 from detector_backend.get_ipports_fromcfg import get_ips_ports_fromcfg
 from detector_backend.module.udp_receiver import start_udp_receiver
 from detector_backend.module.zmq_sender import start_writer_sender, start_preview_sender
