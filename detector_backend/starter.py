@@ -4,6 +4,7 @@ from detector_backend.module.rest_api import start_rest_api
 from detector_backend.get_ipports_fromcfg import get_ips_ports_fromcfg
 from detector_backend.module.udp_receiver import start_udp_receiver
 from detector_backend.module.zmq_sender import start_writer_sender, start_preview_sender
+from detector_backend.mpi_control import MpiControlMaster
 from detector_backend.mpi_ringbuffer import MpiRingBufferMaster, MpiRingBufferClient
 
 
@@ -28,7 +29,9 @@ def start_standard_setup(detector_definition, detector_config_filename):
 
     # The last rank is always the REST api.
     if current_process_rank == rest_rank:
-        start_rest_api(host="0.0.0.0", port=8080, ringbuffer=MpiRingBufferMaster())
+        start_rest_api(rest_host="0.0.0.0", rest_port=8080,
+                       ringbuffer=MpiRingBufferMaster(),
+                       control_master=MpiControlMaster())
 
     elif current_process_rank in receiver_ranks:
 
