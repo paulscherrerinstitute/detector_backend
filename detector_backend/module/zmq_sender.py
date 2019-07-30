@@ -143,6 +143,7 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
         if (time() - mpi_ref_time) > MPI_COMM_DELAY:
 
             message = control_client.get_message()
+            # TODO: Currently the only message is a reset message.
             if message is not None:
                 ringbuffer.reset()
                 _logger.info("[%s] Ringbuffer reset." % name)
