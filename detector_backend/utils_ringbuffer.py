@@ -36,7 +36,7 @@ class RingBufferMaster(object):
 
         self.created = True
 
-    def reset(self):
+    def reset_header(self):
 
         if not self.created:
             raise RuntimeError("Cannot reset RB header before initializing it.")
