@@ -56,7 +56,6 @@ class MpiRingBufferClient(object):
                  process_id,
                  follower_ids,
                  detector_config,
-                 rb_folder=config.DEFAULT_RB_FOLDER,
                  rb_head_file=config.DEFAULT_RB_HEAD_FILE,
                  rb_image_head_file=config.DEFAULT_RB_IMAGE_HEAD_FILE,
                  rb_image_data_file=config.DEFAULT_RB_IMAGE_DATA_FILE):
@@ -65,7 +64,6 @@ class MpiRingBufferClient(object):
         self.follower_ids = follower_ids
         self.detector_config = detector_config
 
-        self.rb_folder = rb_folder
         self.rb_header_file = rb_head_file
         self.rb_image_head_file = rb_image_head_file
         self.rb_image_data_file = rb_image_data_file
