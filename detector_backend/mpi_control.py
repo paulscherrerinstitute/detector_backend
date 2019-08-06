@@ -27,7 +27,7 @@ class MpiControlMaster(object):
         self.communicator = MPI.COMM_WORLD
         self.master_process_rank = self.communicator.size-1
 
-        if self.communicator.rank == self.master_process_rank:
+        if self.communicator.rank != self.master_process_rank:
             raise ValueError("The config master must be instantiated on the "
                              "master process with rank %d." % self.master_process_rank)
 
