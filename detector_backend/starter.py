@@ -1,5 +1,3 @@
-import logging
-
 from mpi4py import MPI
 
 from detector_backend.module.rest_api import start_rest_api
@@ -8,11 +6,8 @@ from detector_backend.module.zmq_sender import start_writer_sender, start_previe
 from detector_backend.mpi_control import MpiControlMaster
 from detector_backend.mpi_ringbuffer import MpiRingBufferMaster, MpiRingBufferClient
 
-_logger = logging.getLogger(__file__)
-
 
 def start_standard_setup(detector_definition, udp_ip_and_port):
-
     current_process_rank = MPI.COMM_WORLD.rank
     total_processes = MPI.COMM_WORLD.size
 
@@ -29,7 +24,10 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
     total_expected_processes = len(receiver_ranks) + 3
 
     if total_processes != total_expected_processes:
-        raise ValueError("Expected %d total processes, but got %d. Fix mpi-run call.")
+        raise ValueError("Expected %d total processes, but got %d. "
+                         "Use 'mpiexec -n %d -m mpi4py [start_script]' call." % (total_expected_processes,
+                                                                                 total_processes,
+                                                                                 total_expected_processes))
 
     # The last rank is always the REST api.
     if current_process_rank == rest_rank:
@@ -38,8 +36,6 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
                        control_master=MpiControlMaster())
 
     elif current_process_rank in receiver_ranks:
-
-        _logger.info()
 
         start_udp_receiver(udp_ip=udp_ip_and_port[current_process_rank][0],
                            udp_port=udp_ip_and_port[current_process_rank][1],
