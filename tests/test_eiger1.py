@@ -1,5 +1,15 @@
+import logging
+
 from detector_backend.starter import start_standard_setup
 from detector_backend.detectors import DetectorDefinition, EIGER
+
+
+default_logging_level = logging.WARNING
+logging.basicConfig(level=default_logging_level)
+
+logging.getLogger("rest_api").setLevel(logging.DEBUG)
+logging.getLogger("udp_receiver").setLevel(logging.DEBUG)
+logging.getLogger("zmq_sender").setLevel(logging.DEBUG)
 
 eiger1m = DetectorDefinition(
     detector_name="cSAXS Eiger 9m",
