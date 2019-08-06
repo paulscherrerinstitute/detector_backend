@@ -1,22 +1,26 @@
+import logging
+
 from mpi4py import MPI
 
 from detector_backend.module.rest_api import start_rest_api
-from detector_backend.get_ipports_fromcfg import get_ips_ports_fromcfg
 from detector_backend.module.udp_receiver import start_udp_receiver
 from detector_backend.module.zmq_sender import start_writer_sender, start_preview_sender
 from detector_backend.mpi_control import MpiControlMaster
 from detector_backend.mpi_ringbuffer import MpiRingBufferMaster, MpiRingBufferClient
 
+_logger = logging.getLogger(__file__)
 
-def start_standard_setup(detector_definition, detector_config_filename):
+
+def start_standard_setup(detector_definition, udp_ip_and_port):
 
     current_process_rank = MPI.COMM_WORLD.rank
     total_processes = MPI.COMM_WORLD.size
 
-    udp_ips, udp_ports = get_ips_ports_fromcfg(detector_config_filename)
-
-    # All UDP receiving ranks, writer sender, preview sender, REST Api.
     receiver_ranks = list(range(detector_definition.n_submodules_total))
+    if len(receiver_ranks) != len(udp_ip_and_port):
+        raise ValueError("Got %d n_submodule_total from the detector_definition but %d udp_ip_and_port values." %
+                         (len(receiver_ranks), len(udp_ip_and_port)))
+
     sender_rank = receiver_ranks[-1] + 1
     preview_rank = sender_rank + 1
     rest_rank = preview_rank + 1
@@ -35,8 +39,10 @@ def start_standard_setup(detector_definition, detector_config_filename):
 
     elif current_process_rank in receiver_ranks:
 
-        start_udp_receiver(udp_ip=udp_ips[current_process_rank],
-                           udp_port=udp_ports[current_process_rank],
+        _logger.info()
+
+        start_udp_receiver(udp_ip=udp_ip_and_port[current_process_rank][0],
+                           udp_port=udp_ip_and_port[current_process_rank][1],
                            detector_def=detector_definition,
                            ringbuffer=MpiRingBufferClient(
                                process_id=current_process_rank,
