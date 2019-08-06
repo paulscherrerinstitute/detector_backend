@@ -91,7 +91,7 @@ def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, su
 
     ringbuffer.init_buffer()
 
-    _logger.debug("Ringbuffer initialized.")
+    _logger.debug("[%d] Ringbuffer initialized." % udp_port)
 
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, UDP_RCVBUF_SIZE)
@@ -105,10 +105,15 @@ def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, su
     # uint32_t n_frames, float timeout, detector_definition det
     udp_receive = get_udp_receive_function()
 
-    _logger.debug("Starting udp_receive function.")
+    while True:
 
-    udp_receive(
-        udp_socket.fileno(), detector_def.bit_depth,
-        ringbuffer.rb_header_id, ringbuffer.rb_hbuffer_id, ringbuffer.rb_dbuffer_id, ringbuffer.rb_writer_id,
-        -1, 1000, c_det_def
-    )
+        _logger.debug("[%d] Starting udp_receive function." % udp_port)
+
+        udp_receive(
+            udp_socket.fileno(), detector_def.bit_depth,
+            ringbuffer.rb_header_id, ringbuffer.rb_hbuffer_id, ringbuffer.rb_dbuffer_id, ringbuffer.rb_writer_id,
+            -1, 1000, c_det_def
+        )
+
+        ringbuffer.reset()
+        _logger.info("[%d] Ringbuffer reset." % udp_port)
