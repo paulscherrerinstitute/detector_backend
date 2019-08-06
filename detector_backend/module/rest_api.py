@@ -5,7 +5,7 @@ import bottle
 
 ENDPOINT_RESET = "/reset"
 
-_logger = getLogger(__name__)
+_logger = getLogger("rest_api")
 
 
 def register_rest_interface(app, manager):

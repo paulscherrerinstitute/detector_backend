@@ -10,7 +10,7 @@ import sys
 
 from copy import copy
 
-_logger = getLogger(__name__)
+_logger = getLogger("udp_receiver")
 
 UDP_RCVBUF_SIZE = 10000 * 1024 * 1024
 
@@ -86,7 +86,12 @@ def get_c_det_def(detector_def, module_id, submodule_id):
 
 def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, submodule_id):
 
+    _logger.info("Starting udp_receiver with udp_ip='%s', udp_port=%d, module_id=%d, submodule_id=%d" %
+                 (udp_ip, udp_port, module_id, submodule_id))
+
     ringbuffer.init_buffer()
+
+    _logger.debug("Ringbuffer initialized.")
 
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, UDP_RCVBUF_SIZE)
@@ -99,6 +104,8 @@ def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, su
     # int rb_current_slot, int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id,
     # uint32_t n_frames, float timeout, detector_definition det
     udp_receive = get_udp_receive_function()
+
+    _logger.debug("Starting udp_receive function.")
 
     udp_receive(
         udp_socket.fileno(), detector_def.bit_depth,

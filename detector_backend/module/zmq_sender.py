@@ -9,7 +9,7 @@ from time import time, sleep
 
 from detector_backend.mpi_control import MpiControlClient
 
-_logger = getLogger(__name__)
+_logger = getLogger("zmq_sender")
 
 RB_RETRY_DELAY = 0.01
 MPI_COMM_DELAY = 0.10
@@ -125,7 +125,8 @@ class DetectorZMQSender(object):
 
 def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
-    _logger.info("Starting writer name %s with bind_url %s and zmq_mode %s." % (name, bind_url, zmq_mode))
+    _logger.info("Starting writer with name='%s', bind_url='%s', zmq_mode='%s'" %
+                 (name, bind_url, zmq_mode))
 
     ringbuffer.init_buffer()
 
