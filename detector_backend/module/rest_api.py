@@ -42,14 +42,15 @@ class Manager(object):
 
 def start_rest_api(rest_host, rest_port, ringbuffer, control_master):
     manager = Manager(ringbuffer, control_master)
-
     ringbuffer.create_buffer()
 
     app = bottle.Bottle()
     register_rest_interface(app, manager)
 
     try:
-        _logger.info("Starting rest API on port %s." % rest_port)
+        _logger.info("Starting rest API on rest_host=%s, rest_port=%s." % (rest_host,rest_port))
         bottle.run(app=app, host=rest_host, port=rest_port)
-    finally:
+    except KeyboardInterrupt:
         pass
+    except:
+        _logger.exception("Rest Api terminated with exception.")
