@@ -1,4 +1,4 @@
-CC=mpicc
+CC=gcc
 
 RINGBUFFER=..
 LIBNAME=libudpreceiver
