@@ -26,7 +26,7 @@ class MpiRingBufferMaster(object):
         if self.created:
             raise RuntimeError("Cannot re-create active RB header.")
 
-        _logger_master.debug("Creating header file %s" % self.rb_header_file)
+        _logger_master.debug("Creating header file %s", self.rb_header_file)
         ret = rb.create_header_file(self.rb_header_file)
 
         if not ret:
@@ -98,7 +98,7 @@ class MpiRingBufferClient(object):
         if self.initialized:
             raise RuntimeError("RB already initialized.")
 
-        _logger_client.debug("[%d] Waiting for master to create header file." % self.process_id)
+        _logger_client.debug("[%d] Waiting for master to create header file.", self.process_id)
 
         # Wait for ringbuffer master to create the header file.
         MPI.COMM_WORLD.barrier()
@@ -127,13 +127,15 @@ class MpiRingBufferClient(object):
         buffer_slot_type_name = 'c_uint' + str(self.detector_config.bit_depth)
         rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__(buffer_slot_type_name))
 
-        _logger_client.debug("[%d] RB %d slots: %d" % (self.process_id, self.rb_header_id, n_slots))
-        _logger_client.debug("[%d] RB header stride: %d" % (self.process_id,
-                                                            rb.get_buffer_stride_in_byte(self.rb_hbuffer_id),))
-        _logger_client.debug("[%d] RB data stride: %d" % (self.process_id,
-                                                          rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)))
+        _logger_client.debug("[%d] RB %d slots: %d", self.process_id, self.rb_header_id, n_slots)
+        _logger_client.debug("[%d] RB header stride: %d",
+                             self.process_id, rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
+        _logger_client.debug("[%d] RB data stride: %d",
+                             self.process_id, rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
 
-        _logger_client.debug("[%d] RB buffer slot type name: %s" % (self.process_id, buffer_slot_type_name))
+        _logger_client.debug("[%d] RB buffer slot type name: %s", self.process_id, buffer_slot_type_name)
+
+        self.initialized = True
 
     def reset(self):
 
