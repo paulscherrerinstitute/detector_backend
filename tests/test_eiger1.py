@@ -12,6 +12,8 @@ logging.basicConfig(level=default_logging_level)
 # logging.getLogger("zmq_sender").setLevel(logging.DEBUG)
 # logging.getLogger("mpi_ringbuffer_master").setLevel(logging.DEBUG)
 # logging.getLogger("mpi_ringbuffer_client").setLevel(logging.DEBUG)
+# logging.getLogger("mpi_control_master").setLevel(logging.DEBUG)
+# logging.getLogger("mpi_control_client").setLevel(logging.DEBUG)
 
 eiger1m = DetectorDefinition(
     detector_name="Test Eiger 1M",
