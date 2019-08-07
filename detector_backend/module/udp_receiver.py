@@ -10,6 +10,8 @@ import sys
 
 from copy import copy
 
+from detector_backend.mpi_control import MpiControlClient
+
 _logger = getLogger("udp_receiver")
 
 UDP_RCVBUF_SIZE = 10000 * 1024 * 1024
@@ -105,6 +107,8 @@ def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, su
     # uint32_t n_frames, float timeout, detector_definition det
     udp_receive = get_udp_receive_function()
 
+    control_client = MpiControlClient()
+
     while True:
 
         _logger.debug("[%d] Starting udp_receive function." % udp_port)
@@ -114,6 +118,11 @@ def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, su
             ringbuffer.rb_header_id, ringbuffer.rb_hbuffer_id, ringbuffer.rb_dbuffer_id, ringbuffer.rb_writer_id,
             -1, 1000, c_det_def
         )
+
+        if control_client.is_message_ready():
+            control_client.get_message()
+            ringbuffer.reset()
+            _logger.info("[%s] Ringbuffer reset." % udp_port)
 
         ringbuffer.reset()
         _logger.info("[%d] Ringbuffer reset." % udp_port)
