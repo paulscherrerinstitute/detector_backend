@@ -52,7 +52,7 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
     elif current_process_rank == sender_rank:
 
         start_writer_sender(name="Writer Sender",
-                            bind_url="tcp://localhost:40000",
+                            bind_url="tcp://127.0.0.1:40000",
                             zmq_mode="PUSH",
                             detector_def=detector_definition,
                             ringbuffer=MpiRingBufferClient(
@@ -64,7 +64,7 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
     elif current_process_rank == preview_rank:
 
         start_preview_sender(name="Preview Sender",
-                             bind_url="tcp://localhost:50000",
+                             bind_url="tcp://127.0.0.1:50000",
                              zmq_mode="PUB",
                              detector_def=detector_definition,
                              ringbuffer=MpiRingBufferClient(
