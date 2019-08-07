@@ -1,9 +1,9 @@
-CC=gcc
+CC=mpicc
 
 RINGBUFFER=..
 LIBNAME=libudpreceiver
 LIBDIR=$(RINGBUFFER)/ringbuffer/ringbuffer/lib/
-CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath,$(LIBDIR) -Wall
+CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -I${CONDA_PREFIX}/include -L$(LIBDIR)  -lringbuffer -Wl,-rpath,$(LIBDIR) -Wall
 CFLAGS+=-Wfatal-errors
 
 build: src/udp_receiver.c
