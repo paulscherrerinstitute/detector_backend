@@ -99,12 +99,6 @@ int put_data_in_rb (
     return -1;
   }
 
-  if ((strcmp(det.detector_name, "EIGER") != 0) && (strcmp(det.detector_name, "JUNGFRAU") != 0))
-  {
-    printf("[put_data_in_rb][%d] Please setup detector_name to EIGER or JUNGFRAU.\n", getpid());
-    return -1;
-  }
-
   rb_metadata rb_meta = get_ringbuffer_metadata (
     rb_writer_id, rb_header_id, rb_hbuffer_id, rb_dbuffer_id, rb_current_slot, 
     det, det_definition.data_bytes_per_packet, bit_depth );
