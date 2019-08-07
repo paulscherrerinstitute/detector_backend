@@ -7,12 +7,12 @@ import zmq
 
 from time import time, sleep
 
+from detector_backend.config import MPI_COMM_DELAY
 from detector_backend.mpi_control import MpiControlClient
 
 _logger = getLogger("zmq_sender")
 
 RB_RETRY_DELAY = 0.01
-MPI_COMM_DELAY = 0.10
 ZMQ_IO_THREADS = 4
 
 
