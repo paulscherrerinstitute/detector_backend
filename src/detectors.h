@@ -19,7 +19,6 @@ typedef struct Counter{
 } counter;
 
 typedef struct _detector{
-    char detector_name[10];
     uint8_t submodule_n;
     int32_t detector_size[2]; 
     int32_t module_size[2]; 
