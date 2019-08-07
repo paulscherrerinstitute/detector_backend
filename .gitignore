@@ -279,3 +279,4 @@ fabric.properties
 .idea/
 tests/debug/debug_single_module
 tests/debug/generate_module_eiger
+tests/rb_header.dat
