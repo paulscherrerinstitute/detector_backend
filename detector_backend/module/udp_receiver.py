@@ -14,12 +14,11 @@ from detector_backend.mpi_control import MpiControlClient
 
 _logger = getLogger("udp_receiver")
 
-UDP_RCVBUF_SIZE = 10000 * 1024 * 1024
+UDP_RCVBUF_SIZE = 1 * 1024 * 1024
 
 
 class CDetDef(ctypes.Structure):
     _fields_ = [
-        ('detector_name', 10 * ctypes.c_char),
         ('submodule_n', ctypes.c_uint8),
         ('detector_size', 2 * ctypes.c_int),
         ('module_size', 2 * ctypes.c_int),
@@ -35,7 +34,7 @@ class CDetDef(ctypes.Structure):
 
 
 def get_udp_receive_function():
-    expected_library_location = os.path.dirname(os.path.realpath(__file__)) + "/../libudpreceiver.so"
+    expected_library_location = os.path.dirname(os.path.realpath(__file__)) + "/../../libudpreceiver.so"
 
     try:
         _mod = ctypes.cdll.LoadLibrary(expected_library_location)
@@ -57,28 +56,27 @@ def get_udp_receive_function():
 
 def get_c_det_def(detector_def, module_id, submodule_id):
     c_det_def = CDetDef()
-    c_det_def.detector_name = detector_def.detector_name
 
     detector_model = detector_def.detector_model
 
-    c_det_def.submodule_n = detector_model.n_submodules
+    c_det_def.submodule_n = detector_model.n_submodules_per_module
     c_det_def.detector_size = as_ctypes(array(detector_def.detector_size, dtype="int32", order='C'))
 
-    c_det_def.module_size = as_ctypes(array(detector_def.module_size, dtype="int32", order='C'))
-    c_det_def.submodule_size = as_ctypes(array(detector_def.submodule_size, dtype="int32", order='C'))
+    c_det_def.module_size = as_ctypes(array(detector_model.module_size, dtype="int32", order='C'))
+    c_det_def.submodule_size = as_ctypes(array(detector_model.submodule_size, dtype="int32", order='C'))
 
-    c_det_def.gap_px_chips = copy(as_ctypes(array(detector_def.gap_px_chips, dtype="uint16", order="C")))
-    c_det_def.gap_px_modules = copy(as_ctypes(array(detector_def.gap_px_modules, dtype="uint16", order="C")))
+    c_det_def.gap_px_chips = copy(as_ctypes(array(detector_model.gap_px_chips, dtype="uint16", order="C")))
+    c_det_def.gap_px_modules = copy(as_ctypes(array(detector_model.gap_px_modules, dtype="uint16", order="C")))
 
     # FIXME: change to row and columnwise option
     # Column-first numeration
     if detector_model == "EIGER":
-        mod_indexes = array([module_id % detector_model.geometry[0],
-                             int(module_id / detector_model.geometry[0])], dtype="int32", order='C')
+        mod_indexes = array([module_id % detector_def.geometry[0],
+                             int(module_id / detector_def.geometry[0])], dtype="int32", order='C')
     # Row-first numeration
     else:
-        mod_indexes = array([int(module_id / detector_model.geometry[1]),
-                             module_id % detector_model.geometry[1]], dtype="int32", order='C')
+        mod_indexes = array([int(module_id / detector_def.geometry[1]),
+                             module_id % detector_def.geometry[1]], dtype="int32", order='C')
 
     c_det_def.module_idx = as_ctypes(mod_indexes)
     c_det_def.submodule_idx = as_ctypes(array([int(submodule_id / 2), submodule_id % 2], dtype="int32", order='C'))
@@ -96,7 +94,7 @@ def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, su
     _logger.debug("[%d] Ringbuffer initialized." % udp_port)
 
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, UDP_RCVBUF_SIZE)
+    udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 128)
     udp_socket.bind((udp_ip, udp_port))
 
     c_det_def = get_c_det_def(detector_def, module_id, submodule_id)
@@ -114,8 +112,8 @@ def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, su
         _logger.debug("[%d] Starting udp_receive function." % udp_port)
 
         udp_receive(
-            udp_socket.fileno(), detector_def.bit_depth,
-            ringbuffer.rb_header_id, ringbuffer.rb_hbuffer_id, ringbuffer.rb_dbuffer_id, ringbuffer.rb_writer_id,
+            udp_socket.fileno(), detector_def.bit_depth, -1,
+            ringbuffer.rb_header_id, ringbuffer.rb_hbuffer_id, ringbuffer.rb_dbuffer_id, ringbuffer.process_id,
             -1, 1000, c_det_def
         )
 
