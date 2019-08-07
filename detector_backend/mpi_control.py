@@ -20,7 +20,8 @@ class MpiControlClient(object):
         return self.communicator.iprobe(source=self.master_process_rank)
 
     def get_message(self):
-
+        _logger_client.debug("[%d] Receiving message from master_process_rank=%d.",
+                             self.communicator.rank, self.master_process_rank)
         received_message = self.communicator.recv(source=self.master_process_rank)
 
         return received_message
@@ -34,8 +35,8 @@ class MpiControlMaster(object):
         # Master process rank is the last rank. All other all clients.
         self.client_ranks = list(range(self.master_process_rank))
 
-        _logger_master.info("Starting control master with master_process_rank=%d and client_ranks=%s" %
-                            (self.master_process_rank, self.client_ranks))
+        _logger_master.info("Starting control master with master_process_rank=%d and client_ranks=%s",
+                            self.master_process_rank, self.client_ranks)
 
         if self.communicator.rank != self.master_process_rank:
             raise ValueError("The config master must be instantiated on the "
@@ -43,7 +44,7 @@ class MpiControlMaster(object):
 
     def send_message(self, message):
 
-        _logger_master.info("Sending %s to all clients." % message)
+        _logger_master.info("Sending %s to all clients.", message)
 
         requests = []
 
