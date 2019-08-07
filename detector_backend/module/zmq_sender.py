@@ -168,4 +168,5 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
 
 def start_preview_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
+    # TODO: Implement real preview sender.
     start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer)
