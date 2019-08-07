@@ -7,8 +7,8 @@ from mpi4py import MPI
 from detector_backend import config
 import ringbuffer as rb
 
-
-_logger = getLogger(__name__)
+_logger_master = getLogger("mpi_ringbuffer_master")
+_logger_client = getLogger("mpi_ringbuffer_client")
 
 
 class MpiRingBufferMaster(object):
@@ -21,13 +21,18 @@ class MpiRingBufferMaster(object):
 
     def create_buffer(self):
 
+        _logger_master.info("Creating ringbuffer header.")
+
         if self.created:
             raise RuntimeError("Cannot re-create active RB header.")
 
+        _logger_master.debug("Creating header file %s" % self.rb_header_file)
         ret = rb.create_header_file(self.rb_header_file)
 
         if not ret:
             raise RuntimeError("Cannot create ringbuffer header file.")
+
+        _logger_master.debug("Signal to other processes to use the buffer.")
 
         # Allow all other processes to load the header.
         MPI.COMM_WORLD.barrier()
@@ -36,18 +41,28 @@ class MpiRingBufferMaster(object):
 
         self.created = True
 
+        _logger_master.info("Ringbuffer header created.")
+
     def reset_header(self):
+
+        _logger_master.info("Resetting ringbuffer header.")
 
         if not self.created:
             raise RuntimeError("Cannot reset RB header before initializing it.")
+
+        _logger_master.debug("Waiting for clients to reset the library.")
 
         # Wait for all processes to reset.
         MPI.COMM_WORLD.barrier()
 
         rb.reset_header(self.rb_header_id)
 
+        _logger_master.debug("Signal to clients that the header is reset.")
+
         # Notify clients to init the RB.
         MPI.COMM_WORLD.barrier()
+
+        _logger_master.info("Ringbuffer Header reset completed.")
 
 
 class MpiRingBufferClient(object):
@@ -83,6 +98,8 @@ class MpiRingBufferClient(object):
         if self.initialized:
             raise RuntimeError("RB already initialized.")
 
+        _logger_client.debug("[%d] Waiting for master to create header file." % self.process_id)
+
         # Wait for ringbuffer master to create the header file.
         MPI.COMM_WORLD.barrier()
 
@@ -98,21 +115,25 @@ class MpiRingBufferClient(object):
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_image_data_file, self.rb_header_id, 0)
 
-        self.image_header_n_bytes = self.detector_config.n_submodules_total * config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES
+        self.image_header_n_bytes = int(self.detector_config.n_submodules_total *
+                                        config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES)
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.image_header_n_bytes)
 
-        self.image_data_n_bytes = (self.detector_config.detector_size[0] *
-                                   self.detector_config.detector_size[1] * self.detector_config.bit_depth) / 8
+        self.image_data_n_bytes = int((self.detector_config.detector_size[0] *
+                                       self.detector_config.detector_size[1] * self.detector_config.bit_depth) / 8)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, self.image_data_n_bytes)
 
         n_slots = rb.adjust_nslots(self.rb_header_id)
         buffer_slot_type_name = 'c_uint' + str(self.detector_config.bit_depth)
         rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__(buffer_slot_type_name))
 
-        _logger.info("RB %d slots: %d" % (self.rb_header_id, n_slots))
-        _logger.info("RB header stride: %d" % rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
-        _logger.info("RB data stride: %d" % rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
-        _logger.info("RB buffer slot type name: %s" % buffer_slot_type_name)
+        _logger_client.debug("[%d] RB %d slots: %d" % (self.process_id, self.rb_header_id, n_slots))
+        _logger_client.debug("[%d] RB header stride: %d" % (self.process_id,
+                                                            rb.get_buffer_stride_in_byte(self.rb_hbuffer_id),))
+        _logger_client.debug("[%d] RB data stride: %d" % (self.process_id,
+                                                          rb.get_buffer_stride_in_byte(self.rb_dbuffer_id)))
+
+        _logger_client.debug("[%d] RB buffer slot type name: %s" % (self.process_id, buffer_slot_type_name))
 
     def reset(self):
 
