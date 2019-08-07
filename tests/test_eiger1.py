@@ -7,12 +7,14 @@ from detector_backend.detectors import DetectorDefinition, EIGER
 default_logging_level = logging.WARNING
 logging.basicConfig(level=default_logging_level)
 
-logging.getLogger("rest_api").setLevel(logging.DEBUG)
-logging.getLogger("udp_receiver").setLevel(logging.DEBUG)
-logging.getLogger("zmq_sender").setLevel(logging.DEBUG)
+# logging.getLogger("rest_api").setLevel(logging.DEBUG)
+# logging.getLogger("udp_receiver").setLevel(logging.DEBUG)
+# logging.getLogger("zmq_sender").setLevel(logging.DEBUG)
+# logging.getLogger("mpi_ringbuffer_master").setLevel(logging.DEBUG)
+# logging.getLogger("mpi_ringbuffer_client").setLevel(logging.DEBUG)
 
 eiger1m = DetectorDefinition(
-    detector_name="cSAXS Eiger 9m",
+    detector_name="Test Eiger 1M",
     detector_model=EIGER,
     geometry=[1, 1],
     bit_depth=16
