@@ -12,11 +12,11 @@ class MpiControlClient(object):
                              "the master process with rank %d." % self.master_process_rank)
 
     def is_message_ready(self):
-        return self.communicator.iprobe(int_source=self.master_process_rank)
+        return self.communicator.iprobe(source=self.master_process_rank)
 
     def get_message(self):
 
-        received_message = self.communicator.recv(int_source=self.master_process_rank)
+        received_message = self.communicator.recv(source=self.master_process_rank)
 
         return received_message
 
