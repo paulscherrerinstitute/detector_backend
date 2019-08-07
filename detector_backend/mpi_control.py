@@ -11,10 +11,10 @@ class MpiControlClient(object):
             raise ValueError("The config client cannot be instantiated on "
                              "the master process with rank %d." % self.master_process_rank)
 
-    def get_message(self):
+    def is_message_ready(self):
+        return self.communicator.iprobe(int_source=self.master_process_rank)
 
-        if not self.communicator.iprobe(int_source=self.master_process_rank):
-            return None
+    def get_message(self):
 
         received_message = self.communicator.recv(int_source=self.master_process_rank)
 
