@@ -42,12 +42,13 @@ inline void update_rb_header (rb_header* header, barebone_packet* bpacket)
   }
 }
 
-inline uint64_t copy_rb_header(rb_header* header, rb_metadata* rb_meta, counter *counters)
+inline uint64_t copy_rb_header(
+    rb_header* header, rb_state* rb_current_state, counter *counters, int n_packets_per_frame)
 {
-  uint64_t lost_packets = rb_meta->n_packets_per_frame - counters->current_frame_recv_packets;
+  uint64_t lost_packets = n_packets_per_frame - counters->current_frame_recv_packets;
   header->framemetadata[1] = lost_packets;
 
-  memcpy(rb_meta->header_slot_origin, header, sizeof(rb_header));
+  memcpy(rb_current_state->header_slot_origin, header, sizeof(rb_header));
 
   return lost_packets;
 }
@@ -66,16 +67,17 @@ inline bool commit_slot (int rb_writer_id, int rb_current_slot)
   }
 }
 
-inline void commit_if_slot_dangling (counter* counters, rb_metadata* rb_meta, rb_header* header)
+inline void commit_if_slot_dangling (
+    counter* counters, rb_metadata* rb_meta, rb_header* header, rb_state* rb_current_state)
 {
   if (counters->current_frame != NO_CURRENT_FRAME)
   {
-    uint64_t lost_packets = copy_rb_header (header, rb_meta, counters);
+    uint64_t lost_packets = copy_rb_header(header, rb_current_state, counters, rb_meta->n_packets_per_frame);
     
     counters->total_lost_packets += lost_packets;
     counters->total_lost_frames++;
 
-    commit_slot(rb_meta->rb_writer_id, rb_meta->rb_current_slot);
+    commit_slot(rb_meta->rb_writer_id, rb_current_state->rb_current_slot);
 
     #ifdef DEBUG
       printf("[commit_if_slot_dangling][%d] framenum: %lu lost_packets: %lu\n", 
@@ -86,23 +88,23 @@ inline void commit_if_slot_dangling (counter* counters, rb_metadata* rb_meta, rb
   }
 }
 
-inline void claim_next_slot(rb_metadata* rb_meta)
+inline void claim_next_slot(rb_metadata* rb_meta, rb_state* rb_current_state)
 {
-  rb_meta->rb_current_slot = rb_claim_next_slot (rb_meta->rb_writer_id );
-  while(rb_meta->rb_current_slot == -1)
+  rb_current_state->rb_current_slot = rb_claim_next_slot(rb_meta->rb_writer_id);
+  while(rb_current_state->rb_current_slot == -1)
   {
-    rb_meta->rb_current_slot = rb_claim_next_slot(rb_meta->rb_writer_id );
+    rb_current_state->rb_current_slot = rb_claim_next_slot(rb_meta->rb_writer_id);
   }
 
-  rb_meta->data_slot_origin = (char *) rb_get_buffer_slot (
-    rb_meta->rb_dbuffer_id, rb_meta->rb_current_slot 
+  rb_current_state->data_slot_origin = (char *) rb_get_buffer_slot (
+    rb_meta->rb_dbuffer_id, rb_current_state->rb_current_slot
   );
 
   // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
-  rb_meta->data_slot_origin += (rb_meta->mod_origin * rb_meta->bit_depth) / 8;
+  rb_current_state->data_slot_origin += (rb_meta->mod_origin * rb_meta->bit_depth) / 8;
   
-  rb_meta->header_slot_origin = (rb_header *) rb_get_buffer_slot (
-    rb_meta->rb_hbuffer_id, rb_meta->rb_current_slot
+  rb_current_state->header_slot_origin = (rb_header *) rb_get_buffer_slot (
+    rb_meta->rb_hbuffer_id, rb_current_state->rb_current_slot
   );
-  rb_meta->header_slot_origin += rb_meta->mod_number;
+  rb_current_state->header_slot_origin += rb_meta->mod_number;
 }

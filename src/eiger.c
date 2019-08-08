@@ -27,7 +27,7 @@ barebone_packet interpret_udp_packet (
 }
 
 void copy_data (
-  detector det, rb_metadata rb_meta, void* packet_data, int line_number)
+  detector det, rb_metadata rb_meta, rb_state rb_current_state, void* packet_data, int line_number)
 {  
   int reverse;
   int reverse_factor;
@@ -59,13 +59,13 @@ void copy_data (
   {
     // Copy each chip line individually, to allow a gap of n_bytes_per_chip_gap in the destination memory.
     memcpy (
-      (char*)(rb_meta.data_slot_origin) + dest_line_offset, 
+      (char*)(rb_current_state.data_slot_origin) + dest_line_offset,
       (char*)packet_data + source_offset, 
       n_bytes_per_chip_line
     );
 
     memcpy (
-      (char*)(rb_meta.data_slot_origin) + dest_line_offset + dest_chip_offset,
+      (char*)(rb_current_state.data_slot_origin) + dest_line_offset + dest_chip_offset,
       (char*)packet_data + source_offset + n_bytes_per_chip_line, 
       n_bytes_per_chip_line
     );

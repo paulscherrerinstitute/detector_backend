@@ -26,7 +26,7 @@
 #endif
 
 bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
-  barebone_packet* bpacket, detector_definition* det_definition )
+  barebone_packet* bpacket, detector* det_definition )
 {
   const int received_data_len = get_udp_packet(sock, udp_packet, udp_packet_bytes);
 
@@ -43,14 +43,15 @@ bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes,
 }
 
 void save_packet (
-  barebone_packet* bpacket, rb_metadata* rb_meta, counter* counters, detector* det, rb_header* header) 
+  barebone_packet* bpacket, rb_metadata* rb_meta, counter* counters,
+  detector* det, rb_header* header, rb_state* rb_current_state)
 {
   
   if (!is_slot_ready_for_frame(bpacket->framenum, counters))
   {
-    commit_if_slot_dangling(counters, rb_meta, header);
+    commit_if_slot_dangling(counters, rb_meta, header, rb_current_state);
     
-    claim_next_slot(rb_meta);
+    claim_next_slot(rb_meta, rb_current_state);
 
     initialize_rb_header(header, rb_meta, bpacket);
 
@@ -62,7 +63,7 @@ void save_packet (
 
   int line_number = get_packet_line_number(rb_meta, bpacket->packetnum);  
 
-  copy_data(*det, *rb_meta, bpacket->data, line_number);
+  copy_data(*det, *rb_meta, *rb_current_state, bpacket->data, line_number);
 
   update_rb_header(header, bpacket);
 
@@ -74,9 +75,9 @@ void save_packet (
         rb_meta->n_packets_per_frame, bpacket->framenum, counters->current_frame);
     #endif
 
-    copy_rb_header(header, rb_meta, counters);
+    copy_rb_header(header, rb_current_state, counters, rb_meta->n_packets_per_frame);
 
-    commit_slot(rb_meta->rb_writer_id, rb_meta->rb_current_slot);
+    commit_slot(rb_meta->rb_writer_id, rb_current_state->rb_current_slot);
 
     counters->current_frame = NO_CURRENT_FRAME;
     counters->total_recv_frames++;
@@ -99,11 +100,14 @@ int put_data_in_rb (int sock, rb_metadata rb_meta, detector det, uint32_t n_fram
   struct timeval last_stats_print_time;
   gettimeofday(&last_stats_print_time, NULL);
 
-  counter counters = {NO_CURRENT_FRAME, 0, 0, 0, 0, 0};
+
   char udp_packet[det_definition.udp_packet_bytes];
   barebone_packet bpacket;
 
   rb_header header;
+
+  rb_state rb_current_state = {-1, NULL, NULL};
+  counter counters = {NO_CURRENT_FRAME, 0, 0, 0, 0, 0};
 
   while (true)
   {
@@ -113,7 +117,7 @@ int put_data_in_rb (int sock, rb_metadata rb_meta, detector det, uint32_t n_fram
 
     if (is_packet_received) 
     {
-      save_packet(&bpacket, &rb_meta, &counters, &det, &header);
+      save_packet(&bpacket, &rb_meta, &counters, &det, &header, &rb_current_state);
 
       // Reset timeout time.
       gettimeofday(&timeout_start_time, NULL);
@@ -121,7 +125,7 @@ int put_data_in_rb (int sock, rb_metadata rb_meta, detector det, uint32_t n_fram
     else if (is_timeout_expired(timeout, timeout_start_time))
     {
       // If images are lost in the last frame.
-      commit_if_slot_dangling(&counters, &rb_meta, &header);
+      commit_if_slot_dangling(&counters, &rb_meta, &header, &rb_current_state);
 
       break;
     }
