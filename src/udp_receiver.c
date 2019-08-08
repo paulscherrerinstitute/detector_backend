@@ -88,16 +88,7 @@ int put_data_in_rb (
   int sock, int bit_depth, int rb_current_slot, 
   int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
   uint32_t n_frames, float timeout, detector det) {
-  /*!
-    Main routine to be called from python. Infinite loop with timeout calling for socket receive and putting data in memory, 
-    checking that all packets are acquired.
-   */
-  
-  if (bit_depth != 16 && bit_depth != 32) 
-  {
-    printf("[put_data_in_rb][%d] Please setup bit_depth to 16 or 32.\n", getpid());
-    return -1;
-  }
+
 
   rb_metadata rb_meta = get_ringbuffer_metadata (
     rb_writer_id, rb_header_id, rb_hbuffer_id, rb_dbuffer_id, rb_current_slot, 
