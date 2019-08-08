@@ -74,8 +74,3 @@ void copy_data (
     dest_line_offset -= reverse * rb_meta.n_bytes_per_frame_line;
   }
 }
-
-detector_definition det_definition = {
-  .udp_packet_bytes = sizeof(eiger_packet),
-  .data_bytes_per_packet = EIGER_DATA_BYTES_PER_PACKET
-};

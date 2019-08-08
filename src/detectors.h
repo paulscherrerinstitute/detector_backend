@@ -73,11 +73,6 @@ typedef struct _barebone_packet{
   bool is_valid;
 } barebone_packet;
 
-typedef struct _detector_definition{
-  size_t udp_packet_bytes;
-  size_t data_bytes_per_packet;
-} detector_definition;
-
 typedef struct _rb_metadata
 {
   int rb_writer_id;
@@ -87,7 +82,6 @@ typedef struct _rb_metadata
   int rb_dbuffer_id;
 
   int rb_current_slot;
-
   char* data_slot_origin;
   rb_header* header_slot_origin;
 

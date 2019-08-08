@@ -55,8 +55,3 @@ void copy_data (
     dest_submodule_line--;
   }
 }
-
-detector_definition det_definition = {
-  .udp_packet_bytes = sizeof(jungfrau_packet),
-  .data_bytes_per_packet = JUNGFRAU_DATA_BYTES_PER_PACKET
-};
