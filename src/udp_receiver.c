@@ -13,7 +13,6 @@
 #include <sched.h>
 
 #include "detectors.h"
-#include "utils_metadata.c"
 #include "utils_ringbuffer.c"
 #include "utils_receiver.c"
 
