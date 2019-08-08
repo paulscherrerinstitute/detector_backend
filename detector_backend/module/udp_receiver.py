@@ -13,7 +13,8 @@ from copy import copy
 from detector_backend import config
 from detector_backend.mpi_control import MpiControlClient
 from detector_backend.utils_detectors import get_n_bytes_per_submodule_line, get_n_bytes_per_frame_line, \
-    get_n_packets_per_frame, get_n_lines_per_packet, get_module_coordinates, get_submodule_coordinates
+    get_n_packets_per_frame, get_n_lines_per_packet, get_module_coordinates, get_submodule_coordinates, \
+    get_current_module_index, get_current_module_offset_in_pixels
 
 _logger = getLogger("udp_receiver")
 
@@ -92,7 +93,7 @@ def get_c_det_def(detector_def, module_id, submodule_id):
     return c_det_def
 
 
-def get_c_rb_metadata(detector_def, ringbuffer):
+def get_c_rb_metadata(detector_def, ringbuffer, module_id, submodule_id):
     c_rb_meta = CRbMetadata()
 
     c_rb_meta.rb_writer_id = ringbuffer.process_id
@@ -101,8 +102,8 @@ def get_c_rb_metadata(detector_def, ringbuffer):
     c_rb_meta.rb_hbuffer_id = ringbuffer.rb_hbuffer_id
     c_rb_meta.rb_dbuffer_id = ringbuffer.rb_dbuffer_id
 
-    c_rb_meta.mod_origin = get_current_module_offset_in_pixels(detector_def)
-    c_rb_meta.mod_number = get_current_module_index(detector_def)
+    c_rb_meta.mod_origin = get_current_module_offset_in_pixels(detector_def, module_id, submodule_id)
+    c_rb_meta.mod_number = get_current_module_index(detector_def, module_id, submodule_id)
 
     c_rb_meta.n_lines_per_packet = get_n_lines_per_packet(detector_def)
     c_rb_meta.n_packets_per_frame = get_n_packets_per_frame(detector_def)
@@ -128,7 +129,7 @@ def start_udp_receiver(udp_ip, udp_port, detector_def, ringbuffer, module_id, su
     udp_socket.bind((udp_ip, udp_port))
 
     c_det_def = get_c_det_def(detector_def, module_id, submodule_id)
-    c_rb_meta = get_c_rb_metadata(detector_def, ringbuffer)
+    c_rb_meta = get_c_rb_metadata(detector_def, ringbuffer, module_id, submodule_id)
 
     # Function signature
     # int sock, int bit_depth,
