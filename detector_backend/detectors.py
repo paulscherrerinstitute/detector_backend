@@ -5,15 +5,26 @@ class DetectorModel(object):
                  module_size,
                  submodule_size,
                  n_submodules_per_module,
+                 bytes_per_packet,
+                 bytes_data_per_packet,
                  gap_px_chips,
-                 gap_px_modules
+                 gap_px_modules,
+                 column_first_indexing,
                  ):
         self.model_name = model_name
+
         self.module_size = module_size
         self.submodule_size = submodule_size
+
         self.n_submodules_per_module = n_submodules_per_module
+
+        self.bytes_per_packet = bytes_per_packet
+        self.bytes_data_per_packet = bytes_data_per_packet
+
         self.gap_px_chips = gap_px_chips
         self.gap_px_modules = gap_px_modules
+
+        self.column_first_indexing = column_first_indexing
 
 
 EIGER = DetectorModel(
@@ -21,8 +32,11 @@ EIGER = DetectorModel(
     module_size=[512, 1024],
     submodule_size=[256, 512],
     n_submodules_per_module=4,
+    bytes_per_packet=4144,
+    bytes_data_per_packet=4096,
     gap_px_chips=[2, 2],
-    gap_px_modules=[36, 8]
+    gap_px_modules=[36, 8],
+    column_first_indexing=True
 )
 
 
