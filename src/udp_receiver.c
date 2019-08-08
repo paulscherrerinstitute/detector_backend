@@ -84,15 +84,8 @@ void save_packet (
   }
 }
 
-int put_data_in_rb (
-  int sock, int bit_depth, int rb_current_slot, 
-  int rb_header_id, int rb_hbuffer_id, int rb_dbuffer_id, int rb_writer_id, 
-  uint32_t n_frames, float timeout, detector det) {
-
-
-  rb_metadata rb_meta = get_ringbuffer_metadata (
-    rb_writer_id, rb_header_id, rb_hbuffer_id, rb_dbuffer_id, rb_current_slot, 
-    det, det_definition.data_bytes_per_packet, bit_depth );
+int put_data_in_rb (int sock, rb_metadata rb_meta, detector det, uint32_t n_frames, float timeout)
+{
 
   struct timeval udp_socket_timeout;
   udp_socket_timeout.tv_sec = 0;
