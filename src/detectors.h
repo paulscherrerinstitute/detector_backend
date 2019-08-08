@@ -63,7 +63,7 @@ typedef struct _detector_common_packet{
 } detector_common_packet;
 
 // the essential info needed for a packet
-typedef struct _barebone_packet{
+typedef struct _barebone_packet {
   char* data;
   int data_len;
   uint32_t packetnum;
@@ -73,17 +73,12 @@ typedef struct _barebone_packet{
   bool is_valid;
 } barebone_packet;
 
-typedef struct _rb_metadata
-{
+typedef struct _rb_metadata {
   int rb_writer_id;
   int rb_header_id;
 
   int rb_hbuffer_id;
   int rb_dbuffer_id;
-
-  int rb_current_slot;
-  char* data_slot_origin;
-  rb_header* header_slot_origin;
 
   uint32_t mod_origin;
   int mod_number;
@@ -94,6 +89,12 @@ typedef struct _rb_metadata
   uint32_t n_bytes_per_frame_line;
   uint32_t n_bytes_per_submodule_line;
 } rb_metadata;
+
+typedef struct _rb_state {
+  int rb_current_slot;
+  char* data_slot_origin;
+  rb_header* header_slot_origin;
+} rb_state;
 
 // Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
 typedef barebone_packet (*interpret_udp_packet_function)(const char*, const int);
