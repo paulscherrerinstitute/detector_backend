@@ -42,7 +42,7 @@ EIGER = DetectorModel(
 
 class DetectorDefinition(object):
 
-    def __init__(self, detector_name, detector_model, geometry, bit_depth, ignored_modules=None):
+    def __init__(self, detector_name, detector_model: DetectorModel, geometry, bit_depth, ignored_modules=None):
 
         self.detector_model = detector_model
         self.detector_name = detector_name
