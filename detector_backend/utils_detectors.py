@@ -46,6 +46,7 @@ def get_current_module_index(detector_def: DetectorDefinition, module_id, submod
 
     # numbering inside the detector, growing over the x-axis
     mod_number = submodule_id + submodule_n * (module_idx[1] + module_idx[0] * detector_size[1] / module_size[1])
+    mod_number = int(mod_number)
 
     return mod_number
 
