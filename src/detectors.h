@@ -27,6 +27,8 @@ typedef struct _detector{
     int32_t submodule_idx[2];
     uint16_t gap_px_chips[2];
     uint16_t gap_px_modules[2];
+    uint32_t bytes_per_packet;
+    uint32_t bytes_data_per_packet;
 } detector;
 
 typedef struct _rb_header{

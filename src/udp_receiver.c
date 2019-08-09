@@ -26,7 +26,7 @@
 #endif
 
 bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes, 
-  barebone_packet* bpacket, detector* det_definition )
+  barebone_packet* bpacket)
 {
   const int received_data_len = get_udp_packet(sock, udp_packet, udp_packet_bytes);
 
@@ -101,7 +101,7 @@ int put_data_in_rb (int sock, rb_metadata rb_meta, detector det, uint32_t n_fram
   gettimeofday(&last_stats_print_time, NULL);
 
 
-  char udp_packet[det_definition.udp_packet_bytes];
+  char udp_packet[det.bytes_per_packet];
   barebone_packet bpacket;
 
   rb_header header;
@@ -112,7 +112,7 @@ int put_data_in_rb (int sock, rb_metadata rb_meta, detector det, uint32_t n_fram
   while (true)
   {
     bool is_packet_received = receive_packet (
-      sock, (char*)&udp_packet, det_definition.udp_packet_bytes, &bpacket, &det_definition
+      sock, (char*)&udp_packet, det.bytes_per_packet, &bpacket
     );
 
     if (is_packet_received) 
