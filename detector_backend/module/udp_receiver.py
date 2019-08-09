@@ -31,10 +31,9 @@ class CDetDef(ctypes.Structure):
         ('submodule_idx', 2 * ctypes.c_int),
         ('gap_px_chips', 2 * ctypes.c_uint16),
         ('gap_px_modules', 2 * ctypes.c_uint16),
+        ('gap_px_modules', 2 * ctypes.c_uint16),
+        ('gap_px_modules', 2 * ctypes.c_uint16),
     ]
-
-    gap_px_chips = [0, 0]
-    gap_px_modules = [0, 0]
 
 
 class CRbMetadata(ctypes.Structure):
