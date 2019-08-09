@@ -16,7 +16,7 @@ inline int get_udp_packet (int socket_fd, char* buffer, size_t buffer_len)
   return recv(socket_fd, buffer, buffer_len, 0);
 }
 
-inline bool is_slot_ready_for_frame (uint64_t frame_number, counter *counters)
+inline bool is_rb_slot_ready_for_packet (uint64_t frame_number, counter *counters)
 {
   return counters->current_frame == frame_number;
 }
