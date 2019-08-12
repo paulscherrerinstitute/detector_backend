@@ -88,12 +88,12 @@ inline void commit_if_slot_dangling (
   }
 }
 
-inline void claim_next_slot(rb_metadata* rb_meta, rb_state* rb_current_state)
+inline bool claim_next_slot(rb_metadata* rb_meta, rb_state* rb_current_state)
 {
   rb_current_state->rb_current_slot = rb_claim_next_slot(rb_meta->rb_writer_id);
-  while(rb_current_state->rb_current_slot == -1)
+  if(rb_current_state->rb_current_slot == -1)
   {
-    rb_current_state->rb_current_slot = rb_claim_next_slot(rb_meta->rb_writer_id);
+    return false;
   }
 
   rb_current_state->data_slot_origin = (char *) rb_get_buffer_slot (
@@ -107,4 +107,6 @@ inline void claim_next_slot(rb_metadata* rb_meta, rb_state* rb_current_state)
     rb_meta->rb_hbuffer_id, rb_current_state->rb_current_slot
   );
   rb_current_state->header_slot_origin += rb_meta->mod_number;
+
+  return true;
 }

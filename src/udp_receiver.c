@@ -52,7 +52,7 @@ void save_packet (
   long dest_offset = bpacket->packetnum * det->bytes_data_per_packet;
 
   memcpy(
-      (char*) (rb_meta.data_slot_origin) + dest_offset,
+      (char*) rb_current_state->data_slot_origin + dest_offset,
       (char*) bpacket->data,
       det->bytes_data_per_packet
   );
@@ -95,15 +95,18 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector det, float timeout)
       continue;
     }
 
-    if (!is_rb_slot_ready_for_packet(bpacket->framenum, counters))
+    if (!is_rb_slot_ready_for_packet(bpacket.framenum, &counters))
     {
       // If we lost packets at the end of the frame, it was not committed.
       commit_if_slot_dangling(&counters, &rb_meta, &header, &rb_current_state);
 
-      claim_next_slot(&rb_meta, &rb_current_state);
+      if(!claim_next_slot(&rb_meta, &rb_current_state))
+      {
+        printf("Cannot get next slot, RB full. Exit.");
+      }
 
       initialize_rb_header(&header, &rb_meta, &bpacket);
-      initialize_counters_for_new_frame(&counters, bpacket->framenum);
+      initialize_counters_for_new_frame(&counters, bpacket.framenum);
     }
 
     save_packet(&bpacket, &rb_meta, &counters, &det, &header, &rb_current_state);
@@ -116,12 +119,12 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector det, float timeout)
           rb_meta.n_packets_per_frame, bpacket.framenum, counters.current_frame);
       #endif
 
-      copy_rb_header(header, rb_current_state, counters, rb_meta->n_packets_per_frame);
+      copy_rb_header(&header, &rb_current_state, &counters, rb_meta.n_packets_per_frame);
 
-      commit_slot(rb_meta->rb_writer_id, rb_current_state->rb_current_slot);
+      commit_slot(rb_meta.rb_writer_id, rb_current_state.rb_current_slot);
 
-      counters->current_frame = NO_CURRENT_FRAME;
-      counters->total_recv_frames++;
+      counters.current_frame = NO_CURRENT_FRAME;
+      counters.total_recv_frames++;
     }
 
     gettimeofday(&timeout_start_time, NULL);
