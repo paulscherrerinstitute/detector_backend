@@ -3,7 +3,7 @@ from mpi4py import MPI
 from detector_backend.module.rest_api import start_rest_api
 from detector_backend.module.udp_receiver import start_udp_receiver
 from detector_backend.module.zmq_sender import start_writer_sender, start_preview_sender
-from detector_backend.mpi_control import MpiControlMaster
+from detector_backend.mpi_control import MpiControlMaster, MpiControlClient
 from detector_backend.mpi_ringbuffer import MpiRingBufferMaster, MpiRingBufferClient
 
 
@@ -40,13 +40,14 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
         start_udp_receiver(udp_ip=udp_ip_and_port[current_process_rank][0],
                            udp_port=udp_ip_and_port[current_process_rank][1],
                            detector_def=detector_definition,
+                           module_id=current_process_rank // 4,
+                           submodule_id=current_process_rank % 4,
                            ringbuffer=MpiRingBufferClient(
                                process_id=current_process_rank,
                                follower_ids=[sender_rank, preview_rank],
                                detector_config=detector_definition
                            ),
-                           module_id=current_process_rank // 4,
-                           submodule_id=current_process_rank % 4
+                           control_client=MpiControlClient()
                            )
 
     elif current_process_rank == sender_rank:
