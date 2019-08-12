@@ -45,7 +45,8 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
                            ringbuffer=MpiRingBufferClient(
                                process_id=current_process_rank,
                                follower_ids=[sender_rank, preview_rank],
-                               detector_config=detector_definition
+                               detector_config=detector_definition,
+                               as_reader=False
                            ),
                            control_client=MpiControlClient()
                            )

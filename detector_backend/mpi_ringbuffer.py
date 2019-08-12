@@ -71,6 +71,7 @@ class MpiRingBufferClient(object):
                  process_id,
                  follower_ids,
                  detector_config,
+                 as_reader=True,
                  rb_head_file=config.DEFAULT_RB_HEAD_FILE,
                  rb_image_head_file=config.DEFAULT_RB_IMAGE_HEAD_FILE,
                  rb_image_data_file=config.DEFAULT_RB_IMAGE_DATA_FILE):
@@ -78,13 +79,14 @@ class MpiRingBufferClient(object):
         self.process_id = process_id
         self.follower_ids = follower_ids
         self.detector_config = detector_config
+        self.as_reader = as_reader
 
         self.rb_header_file = rb_head_file
         self.rb_image_head_file = rb_image_head_file
         self.rb_image_data_file = rb_image_data_file
 
         self.rb_header_id = None
-        self.rb_reader_id = None
+        self.rb_consumer_id = None
         self.rb_hbuffer_id = None
         self.rb_dbuffer_id = None
 
@@ -111,7 +113,12 @@ class MpiRingBufferClient(object):
     def _configure_buffer(self):
 
         self.rb_header_id = rb.open_header_file(self.rb_header_file)
-        self.rb_reader_id = rb.create_reader(self.rb_header_id, self.process_id, self.follower_ids)
+
+        if self.as_reader:
+            self.rb_consumer_id = rb.create_reader(self.rb_header_id, self.process_id, self.follower_ids)
+        else:
+            self.rb_consumer_id = rb.create_writer(self.rb_header_id, self.process_id, self.follower_ids)
+
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_image_data_file, self.rb_header_id, 0)
 

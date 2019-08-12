@@ -11,7 +11,6 @@ import sys
 from copy import copy
 
 from detector_backend import config
-from detector_backend.mpi_control import MpiControlClient
 from detector_backend.utils_detectors import get_n_bytes_per_submodule_line, get_n_bytes_per_frame_line, \
     get_n_packets_per_frame, get_n_lines_per_packet, get_module_coordinates, get_submodule_coordinates, \
     get_current_module_index, get_current_module_offset_in_pixels
@@ -99,7 +98,7 @@ def get_c_det_def(detector_def, module_id, submodule_id):
 def get_c_rb_metadata(detector_def, ringbuffer, module_id, submodule_id):
     c_rb_meta = CRbMetadata()
 
-    c_rb_meta.rb_writer_id = ringbuffer.process_id
+    c_rb_meta.rb_writer_id = ringbuffer.rb_consumer_id
     c_rb_meta.rb_header_id = ringbuffer.rb_header_id
 
     c_rb_meta.rb_hbuffer_id = ringbuffer.rb_hbuffer_id
