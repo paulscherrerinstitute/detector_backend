@@ -103,6 +103,7 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector det, float timeout)
       if(!claim_next_slot(&rb_meta, &rb_current_state))
       {
         printf("Cannot get next slot, RB full. Exit.");
+        exit(-1);
       }
 
       initialize_rb_header(&header, &rb_meta, &bpacket);
