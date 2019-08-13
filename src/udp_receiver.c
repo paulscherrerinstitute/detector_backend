@@ -44,18 +44,17 @@ bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes,
 
 void save_packet (
   barebone_packet* bpacket, rb_metadata* rb_meta, counter* counters,
-  detector_submodule* det_submodule, rb_header* header, rb_state* rb_current_state)
+  uint32_t bytes_data_per_packet, rb_header* header, rb_state* rb_current_state)
 {
   counters->current_frame_recv_packets++;
   counters->total_recv_packets++;
 
-  long submodule_offset = det_submodule->submodule_data_slot_offset;
-  long packet_offset = bpacket->packetnum * det_submodule->bytes_data_per_packet;
+  long packet_offset = bpacket->packetnum * bytes_data_per_packet;
 
   memcpy(
-      (char*) rb_current_state->data_slot_origin + submodule_offset + packet_offset,
+      (char*) rb_current_state->data_slot_origin + packet_offset,
       (char*) bpacket->data,
-      det_submodule->bytes_data_per_packet
+      bytes_data_per_packet
   );
 
   update_rb_header(header, bpacket);
@@ -90,7 +89,7 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submo
     {
       if (is_timeout_expired(timeout, timeout_start_time))
       {
-        commit_if_slot_dangling(&counters, &rb_meta, &header, &rb_current_state);
+        commit_if_slot_dangling(&counters, &rb_meta, &header, &rb_current_state, det_submodule.n_packets_per_frame);
         return;
       }
       continue;
@@ -99,7 +98,7 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submo
     if (!is_rb_slot_ready_for_packet(bpacket.framenum, &counters))
     {
       // If we lost packets at the end of the frame, it was not committed.
-      commit_if_slot_dangling(&counters, &rb_meta, &header, &rb_current_state);
+      commit_if_slot_dangling(&counters, &rb_meta, &header, &rb_current_state, det_submodule.n_packets_per_frame);
 
       if(!claim_next_slot(&rb_meta, &rb_current_state))
       {
@@ -107,11 +106,15 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submo
         exit(-1);
       }
 
+      // Adjust ringbuffer pointers offset for this submodule.
+      rb_current_state.header_slot_origin += det_submodule.submodule_index;
+      rb_current_state.data_slot_origin += det_submodule.submodule_data_slot_offset;
+
       initialize_rb_header(&header, det_submodule.n_packets_per_frame, det_submodule.submodule_index, &bpacket);
       initialize_counters_for_new_frame(&counters, bpacket.framenum);
     }
 
-    save_packet(&bpacket, &rb_meta, &counters, &det_submodule, &header, &rb_current_state);
+    save_packet(&bpacket, &rb_meta, &counters, det_submodule.bytes_data_per_packet, &header, &rb_current_state);
 
     if(is_frame_complete(det_submodule.n_packets_per_frame, &counters))
     {
