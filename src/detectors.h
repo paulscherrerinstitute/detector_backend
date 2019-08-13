@@ -33,8 +33,8 @@ typedef struct _detector{
 
 typedef struct _detector_submodule{
     uint16_t submodule_index;
-
     uint16_t n_packets_per_frame;
+
     uint32_t bytes_per_packet;
     uint32_t bytes_data_per_packet;
 
