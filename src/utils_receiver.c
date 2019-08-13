@@ -26,13 +26,6 @@ inline bool is_frame_complete (int n_packets_per_frame, counter* counters)
   return counters->current_frame_recv_packets == n_packets_per_frame;
 }
 
-inline int get_packet_line_number(rb_metadata* rb_meta, uint32_t packet_number)
-{
-  // assuming packetnum sequence is 0..N-1
-  return rb_meta->n_lines_per_packet * 
-    (rb_meta->n_packets_per_frame - packet_number - 1);
-}
-
 inline bool is_acquisition_completed(uint32_t n_frames, counter* counters)
 {
   uint64_t total_frames = counters->total_recv_frames + counters->total_lost_frames;
