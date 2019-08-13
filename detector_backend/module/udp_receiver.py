@@ -3,10 +3,7 @@ from logging import getLogger
 import ctypes
 
 import socket
-from numpy.ctypeslib import as_ctypes
-from numpy import array
 import os
-import sys
 
 from detector_backend import config
 from detector_backend.utils_detectors import get_n_packets_per_frame
@@ -52,7 +49,6 @@ def get_udp_receive_function():
 
     except:
         _logger.error("Could not load udp receiver shared library from %s." % expected_library_location)
-        sys.exit(-1)
 
 
 def get_c_det_submodule(detector_def, submodule_index):

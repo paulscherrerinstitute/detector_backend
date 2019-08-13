@@ -60,12 +60,12 @@ void save_packet (
   update_rb_header(header, bpacket);
 }
 
-void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submodule, float timeout)
+void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submodule, float mpi_timeout)
 {
 
   struct timeval udp_socket_timeout;
   udp_socket_timeout.tv_sec = 0;
-  udp_socket_timeout.tv_usec = 50;
+  udp_socket_timeout.tv_usec = 100;
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&udp_socket_timeout, sizeof(struct timeval));
 
   struct timeval timeout_start_time;
@@ -73,9 +73,7 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submo
 
   char udp_packet[det_submodule.bytes_per_packet];
   barebone_packet bpacket;
-
   rb_header header;
-
   rb_state rb_current_state = {-1, NULL, NULL};
   counter counters = {NO_CURRENT_FRAME, 0, 0, 0, 0, 0};
 
@@ -87,7 +85,7 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submo
 
     if (!is_packet_received)
     {
-      if (is_timeout_expired(timeout, timeout_start_time))
+      if (is_timeout_expired(mpi_timeout, timeout_start_time))
       {
         commit_if_slot_dangling(&counters, &rb_meta, &header, &rb_current_state, det_submodule.n_packets_per_frame);
         return;
