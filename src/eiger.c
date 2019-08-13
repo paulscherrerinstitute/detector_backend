@@ -11,7 +11,7 @@ typedef struct _eiger_packet {
   char data[EIGER_DATA_BYTES_PER_PACKET];
 } eiger_packet;
 
-barebone_packet interpret_udp_packet (
+barebone_packet interpret_udp_packet_eiger (
   const char* udp_packet, const int received_packet_len ) 
 {
   eiger_packet* packet = (eiger_packet*) udp_packet;
@@ -26,7 +26,7 @@ barebone_packet interpret_udp_packet (
   return bpacket;
 }
 
-void copy_data (
+void copy_data_eiger (
   detector det, rb_metadata rb_meta, rb_state rb_current_state, void* packet_data, int line_number)
 {  
 //  int reverse;

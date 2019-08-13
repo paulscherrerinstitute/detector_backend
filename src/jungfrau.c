@@ -14,7 +14,7 @@ typedef struct _jungfrau_packet{
 } jungfrau_packet;
 #pragma pack(pop)
 
-barebone_packet interpret_udp_packet (
+barebone_packet interpret_udp_packet_jungfrau (
   const char* udp_packet, const int received_packet_len )
 {
   jungfrau_packet* packet = (jungfrau_packet*) udp_packet;
@@ -31,7 +31,7 @@ barebone_packet interpret_udp_packet (
   return bpacket;
 }
 
-void copy_data (
+void copy_data_jungfrau (
   detector det, rb_metadata rb_meta, rb_state rb_current_state, void* packet_data, int line_number)
 {
 //  // -1 to convert from 1 based submodule height to 0 based array indexing.
