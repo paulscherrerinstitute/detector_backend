@@ -70,7 +70,7 @@ class CEigerPacket(ctypes.Structure):
     ]
 
 
-def generate_submodule_eiger_packets(bit_depth, n_frames):
+def generate_submodule_eiger_packets(bit_depth, n_frames, debug=0):
 
     total_frame_bytes = (256 * 512 * bit_depth) // 8
     n_packets = total_frame_bytes // CEigerPacket.N_BYTES_DATA
@@ -84,6 +84,7 @@ def generate_submodule_eiger_packets(bit_depth, n_frames):
 
             c_eiger_packet.framenum = framenum + 1
             c_eiger_packet.packetnum = packetnum
+            c_eiger_packet.debug = debug
 
             data.fill(packetnum)
             c_eiger_packet.data = data.tobytes()
