@@ -22,7 +22,7 @@ class MockRingBufferMaster(MpiRingBufferMaster):
         self.rb_header_id = rb.open_header_file(self.rb_header_file)
 
     def reset_header(self):
-        pass
+        rb.reset_header(self.rb_header_id)
 
 
 class MockRingBufferClient(MpiRingBufferClient):
