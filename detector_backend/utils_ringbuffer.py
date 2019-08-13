@@ -2,6 +2,8 @@ import ctypes
 import logging
 import subprocess
 
+import numpy as np
+
 from detector_backend import config
 
 _logger = logging.getLogger("utils_ringbuffer")
@@ -62,3 +64,8 @@ def get_frame_metadata(metadata_pointer, n_submodules):
     metadata["framenum_diff"] = [metadata["frame"] - i for i in metadata["framenums"]]
 
     return metadata
+
+
+def get_frame_data(data_pointer, frame_size):
+    data = np.ctypeslib.as_array(data_pointer, shape=frame_size)
+    return data

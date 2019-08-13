@@ -8,7 +8,7 @@ from time import time, sleep
 
 from detector_backend.config import MPI_COMM_DELAY
 from detector_backend.mpi_control import MpiControlClient
-from detector_backend.utils_ringbuffer import get_frame_metadata
+from detector_backend.utils_ringbuffer import get_frame_metadata, get_frame_data
 
 _logger = getLogger("zmq_sender")
 
@@ -44,10 +44,6 @@ class DetectorZMQSender(object):
         self.socket.send_json(metadata, flags | zmq.SNDMORE)
         return self.socket.send(data, flags, copy=copy, track=track)
 
-    def get_frame_data(self, data_pointer):
-        data = np.ctypeslib.as_array(data_pointer, shape=self.detector_def.detector_size)
-        return data
-
     def read_data(self, rb_current_slot):
 
         try:
@@ -55,7 +51,7 @@ class DetectorZMQSender(object):
             metadata = get_frame_metadata(metadata_pointer, self.n_submodules)
 
             data_pointer = rb.get_buffer_slot(self.ringbuffer.rb_dbuffer_id, rb_current_slot)
-            data = self.get_frame_data(data_pointer)
+            data = get_frame_data(data_pointer, self.detector_def.detector_size)
 
             frame_number = metadata["frame"]
             pulse_id = metadata["pulse_id"]
