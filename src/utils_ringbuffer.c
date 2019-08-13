@@ -1,6 +1,9 @@
 #include "detectors.h"
 
-inline void initialize_rb_header (rb_header* header, rb_metadata* rb_meta, barebone_packet* bpacket)
+inline void initialize_rb_header (rb_header* header,
+                                  int n_packets_per_frame,
+                                  uint16_t submodule_index,
+                                  barebone_packet* bpacket)
 {
   uint64_t ones = ~((uint64_t)0);
   
@@ -10,20 +13,20 @@ inline void initialize_rb_header (rb_header* header, rb_metadata* rb_meta, bareb
   }
 
   header->framemetadata[2] = 
-    ones >> (64 - rb_meta->n_packets_per_frame);
+    ones >> (64 - n_packets_per_frame);
   
   header->framemetadata[3] = 0;
   
-  if(rb_meta->n_packets_per_frame > 64)
+  if(n_packets_per_frame > 64)
   {
     header->framemetadata[3] = 
-      ones >> (128 - rb_meta->n_packets_per_frame);
+      ones >> (128 - n_packets_per_frame);
   }
 
   header->framemetadata[0] = bpacket->framenum;
   header->framemetadata[4] = (uint64_t) bpacket->bunchid;
   header->framemetadata[5] = (uint64_t) bpacket->debug;
-  header->framemetadata[6] = (uint64_t) rb_meta->mod_number;
+  header->framemetadata[6] = (uint64_t) submodule_index;
   header->framemetadata[7] = (uint64_t) 1;
 }
 
