@@ -5,7 +5,7 @@ import ringbuffer as rb
 
 from detector_backend.detectors import DetectorDefinition, EIGER
 from detector_backend.module.udp_receiver import start_udp_receiver
-from detector_backend.utils_ringbuffer import create_rb_files
+from detector_backend.utils_ringbuffer import create_rb_files, get_frame_metadata
 from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_stream, generate_submodule_eiger_packets,\
     MockRingBufferMaster, cleanup_rb_files
 
@@ -160,6 +160,21 @@ class UdpReceiverTests(unittest.TestCase):
         self.assertNotEqual(rb_current_slot, -1, "No frames found in ringbuffer.")
 
         self.assertListEqual(list(rb.get_header_info(0).committed_slots[:2]), [n_frames, n_frames])
+
+        for i in range(n_frames):
+            self.assertEqual(i, rb_current_slot)
+
+            metadata_pointer = rb.get_buffer_slot(ringbuffer_client.rb_hbuffer_id, rb_current_slot)
+            metadata = get_frame_metadata(metadata_pointer, len(udp_ip))
+            print(rb_current_slot)
+            print(metadata)
+
+            # data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
+
+            self.assertTrue(rb.commit_slot(ringbuffer_client.rb_consumer_id, rb_current_slot))
+            rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
+
+        self.assertEqual(-1, rb.claim_next_slot(ringbuffer_client.rb_consumer_id))
 
 
 if __name__ == "__main__":
