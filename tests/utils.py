@@ -1,9 +1,11 @@
 import ctypes
+import os
 import socket
 
 import numpy
 
 import ringbuffer as rb
+from detector_backend import config
 
 from detector_backend.mpi_ringbuffer import MpiRingBufferClient, MpiRingBufferMaster
 
@@ -97,3 +99,14 @@ def generate_udp_stream(udp_ip, udp_port, message_generator):
         udp_socket.sendto(message, (udp_ip, udp_port))
 
     udp_socket.close()
+
+
+def cleanup_rb_files():
+    if os.path.isfile(config.DEFAULT_RB_HEAD_FILE):
+        os.remove(config.DEFAULT_RB_HEAD_FILE)
+
+    if os.path.isfile(config.DEFAULT_RB_IMAGE_HEAD_FILE):
+        os.remove(config.DEFAULT_RB_IMAGE_HEAD_FILE)
+
+    if os.path.isfile(config.DEFAULT_RB_IMAGE_DATA_FILE):
+        os.remove(config.DEFAULT_RB_IMAGE_DATA_FILE)

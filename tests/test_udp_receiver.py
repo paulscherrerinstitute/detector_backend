@@ -8,7 +8,7 @@ from detector_backend import config
 from detector_backend.detectors import DetectorDefinition, EIGER
 from detector_backend.module.udp_receiver import start_udp_receiver
 from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_stream, generate_submodule_eiger_packets, \
-    MockRingBufferMaster
+    MockRingBufferMaster, cleanup_rb_files
 
 
 class UdpReceiverTests(unittest.TestCase):
@@ -27,14 +27,7 @@ class UdpReceiverTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.isfile(config.DEFAULT_RB_HEAD_FILE):
-            os.remove(config.DEFAULT_RB_HEAD_FILE)
-
-        if os.path.isfile(config.DEFAULT_RB_IMAGE_HEAD_FILE):
-            os.remove(config.DEFAULT_RB_IMAGE_HEAD_FILE)
-
-        if os.path.isfile(config.DEFAULT_RB_IMAGE_DATA_FILE):
-            os.remove(config.DEFAULT_RB_IMAGE_DATA_FILE)
+        cleanup_rb_files()
 
     def test_single_receiver(self):
         udp_ip = "127.0.0.1"
