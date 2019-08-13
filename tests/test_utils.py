@@ -40,3 +40,19 @@ class UtilsTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "Could not create file"):
             create_rb_files(n_slots, n_head_slot_bytes, n_data_slot_bytes)
+
+    def test_overwrite(self):
+        n_slots = 10
+        n_head_slot_bytes = 64
+        n_data_slot_bytes = 4096
+
+        create_rb_files(n_slots, n_head_slot_bytes, n_data_slot_bytes)
+
+        self.assertEqual(os.path.getsize(config.DEFAULT_RB_IMAGE_HEAD_FILE), n_slots * n_head_slot_bytes)
+        self.assertEqual(os.path.getsize(config.DEFAULT_RB_IMAGE_DATA_FILE), n_slots * n_data_slot_bytes)
+
+        n_slots = 5
+        create_rb_files(n_slots, n_head_slot_bytes, n_data_slot_bytes)
+
+        self.assertEqual(os.path.getsize(config.DEFAULT_RB_IMAGE_HEAD_FILE), n_slots * n_head_slot_bytes)
+        self.assertEqual(os.path.getsize(config.DEFAULT_RB_IMAGE_DATA_FILE), n_slots * n_data_slot_bytes)
