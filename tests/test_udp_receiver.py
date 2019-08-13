@@ -1,13 +1,12 @@
-import os
 import unittest
 from multiprocessing import Process
 from time import sleep
 import ringbuffer as rb
-from detector_backend import config
 
 from detector_backend.detectors import DetectorDefinition, EIGER
 from detector_backend.module.udp_receiver import start_udp_receiver
-from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_stream, generate_submodule_eiger_packets, \
+from detector_backend.utils_ringbuffer import create_rb_files
+from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_stream, generate_submodule_eiger_packets,\
     MockRingBufferMaster, cleanup_rb_files
 
 
@@ -23,7 +22,7 @@ class UdpReceiverTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        pass
+        create_rb_files(10, 64, 2*512*256)
 
     @classmethod
     def tearDownClass(cls):
