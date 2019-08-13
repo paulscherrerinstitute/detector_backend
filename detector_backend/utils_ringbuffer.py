@@ -1,3 +1,4 @@
+import ctypes
 import logging
 import subprocess
 
@@ -16,8 +17,6 @@ def create_rb_files(n_slots,
         _logger.debug("Creating file %s with block_size %d and n_blocks %n",
                       output_file, block_size, n_blocks)
 
-        # TODO: Check if file of correct size already exists.s
-
         cmd = ["dd", "if=/dev/zero", "of=%s" % output_file, "bs=%d" % block_size, "count=%d" % n_blocks]
 
         process = subprocess.Popen(cmd)
@@ -31,3 +30,35 @@ def create_rb_files(n_slots,
     create_file(image_data_file, n_data_slot_bytes, n_slots)
 
     _logger.info("Ringbuffer files %s and %s created.", image_head_file, image_data_file)
+
+
+class CRingBufferImageHeaderData(ctypes.Structure):
+    _fields_ = [("framemetadata", ctypes.c_uint64 * 8), ]
+
+
+def get_frame_metadata(metadata_pointer, n_submodules):
+    rb_image_header_pointer = CRingBufferImageHeaderData * n_submodules
+
+    metadata_struct = ctypes.cast(metadata_pointer, ctypes.POINTER(rb_image_header_pointer))
+
+    metadata = {
+        "framenums": [metadata_struct.contents[i].framemetadata[0] for i in range(n_submodules)],
+        "missing_packets_1": [metadata_struct.contents[i].framemetadata[2] for i in range(n_submodules)],
+        "missing_packets_2": [metadata_struct.contents[i].framemetadata[3] for i in range(n_submodules)],
+        "pulse_ids": [metadata_struct.contents[i].framemetadata[4] for i in range(n_submodules)],
+        "daq_recs": [metadata_struct.contents[i].framemetadata[5] for i in range(n_submodules)],
+        "module_number": [metadata_struct.contents[i].framemetadata[6] for i in range(n_submodules)],
+        "module_enabled": [metadata_struct.contents[i].framemetadata[7] for i in range(n_submodules)]
+    }
+
+    metadata["frame"] = metadata["framenums"][0]
+    metadata["daq_rec"] = metadata["daq_recs"][0]
+    metadata["pulse_id"] = metadata["pulse_ids"][0]
+
+    missing_packets = sum([metadata_struct.contents[i].framemetadata[1] for i in range(n_submodules)])
+
+    metadata["is_good_frame"] = int(len(set(metadata["framenums"])) == 1 and missing_packets == 0)
+    metadata["pulse_id_diff"] = [metadata["pulse_id"] - i for i in metadata["pulse_ids"]]
+    metadata["framenum_diff"] = [metadata["frame"] - i for i in metadata["framenums"]]
+
+    return metadata

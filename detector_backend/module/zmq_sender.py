@@ -1,7 +1,6 @@
 from logging import getLogger
 import ringbuffer as rb
 
-import ctypes
 import numpy as np
 import zmq
 
@@ -9,15 +8,12 @@ from time import time, sleep
 
 from detector_backend.config import MPI_COMM_DELAY
 from detector_backend.mpi_control import MpiControlClient
+from detector_backend.utils_ringbuffer import get_frame_metadata
 
 _logger = getLogger("zmq_sender")
 
 RB_RETRY_DELAY = 0.01
 ZMQ_IO_THREADS = 4
-
-
-class CRingBufferImageHeaderData(ctypes.Structure):
-    _fields_ = [("framemetadata", ctypes.c_uint64 * 8), ]
 
 
 class DetectorZMQSender(object):
@@ -31,7 +27,6 @@ class DetectorZMQSender(object):
         self.reset_frame_number = reset_frame_number
 
         self.n_submodules = detector_def.n_submodules_total
-        self.rb_image_header_pointer = CRingBufferImageHeaderData * self.n_submodules
 
         self.first_received_frame_number = 0
 
@@ -53,36 +48,11 @@ class DetectorZMQSender(object):
         data = np.ctypeslib.as_array(data_pointer, shape=self.detector_def.detector_size)
         return data
 
-    def get_frame_metadata(self, metadata_pointer):
-        metadata_struct = ctypes.cast(metadata_pointer, ctypes.POINTER(self.rb_image_header_pointer))
-
-        metadata = {
-            "framenums": [metadata_struct.contents[i].framemetadata[0] for i in range(self.n_submodules)],
-            "missing_packets_1": [metadata_struct.contents[i].framemetadata[2] for i in range(self.n_submodules)],
-            "missing_packets_2": [metadata_struct.contents[i].framemetadata[3] for i in range(self.n_submodules)],
-            "pulse_ids": [metadata_struct.contents[i].framemetadata[4] for i in range(self.n_submodules)],
-            "daq_recs": [metadata_struct.contents[i].framemetadata[5] for i in range(self.n_submodules)],
-            "module_number": [metadata_struct.contents[i].framemetadata[6] for i in range(self.n_submodules)],
-            "module_enabled": [metadata_struct.contents[i].framemetadata[7] for i in range(self.n_submodules)]
-        }
-
-        metadata["frame"] = metadata["framenums"][0]
-        metadata["daq_rec"] = metadata["daq_recs"][0]
-        metadata["pulse_id"] = metadata["pulse_ids"][0]
-
-        missing_packets = sum([metadata_struct.contents[i].framemetadata[1] for i in range(self.n_submodules)])
-
-        metadata["is_good_frame"] = int(len(set(metadata["framenums"])) == 1 and missing_packets == 0)
-        metadata["pulse_id_diff"] = [metadata["pulse_id"] - i for i in metadata["pulse_ids"]]
-        metadata["framenum_diff"] = [metadata["frame"] - i for i in metadata["framenums"]]
-
-        return metadata
-
     def read_data(self, rb_current_slot):
 
         try:
             metadata_pointer = rb.get_buffer_slot(self.ringbuffer.rb_hbuffer_id, rb_current_slot)
-            metadata = self.get_frame_metadata(metadata_pointer)
+            metadata = get_frame_metadata(metadata_pointer, self.n_submodules)
 
             data_pointer = rb.get_buffer_slot(self.ringbuffer.rb_dbuffer_id, rb_current_slot)
             data = self.get_frame_data(data_pointer)
