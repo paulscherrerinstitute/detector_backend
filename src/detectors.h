@@ -92,15 +92,6 @@ typedef struct _rb_metadata {
 
   int rb_hbuffer_id;
   int rb_dbuffer_id;
-
-  uint32_t mod_origin;
-  int mod_number;
-  int n_lines_per_packet;
-  int n_packets_per_frame;
-  int bit_depth;
-
-  uint32_t n_bytes_per_frame_line;
-  uint32_t n_bytes_per_submodule_line;
 } rb_metadata;
 
 typedef struct _rb_state {
