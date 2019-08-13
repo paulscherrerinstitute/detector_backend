@@ -40,8 +40,7 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
         start_udp_receiver(udp_ip=udp_ip_and_port[current_process_rank][0],
                            udp_port=udp_ip_and_port[current_process_rank][1],
                            detector_def=detector_definition,
-                           module_id=current_process_rank // 4,
-                           submodule_id=current_process_rank % 4,
+                           submodule_id=current_process_rank,
                            ringbuffer=MpiRingBufferClient(
                                process_id=current_process_rank,
                                follower_ids=[sender_rank, preview_rank],
