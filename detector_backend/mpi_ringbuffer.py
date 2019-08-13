@@ -105,12 +105,18 @@ class MpiRingBufferClient(object):
         # Wait for ringbuffer master to create the header file.
         MPI.COMM_WORLD.barrier()
 
-        if not os.path.exists(self.rb_header_file):
-            raise RuntimeError("RB header file %s not available " % self.rb_header_file)
-
         self._configure_buffer()
 
     def _configure_buffer(self):
+
+        if not os.path.exists(self.rb_header_file):
+            raise RuntimeError("RB header file %s not available " % self.rb_header_file)
+
+        if not os.path.isfile(self.rb_image_head_file):
+            raise RuntimeError("No image header file %s" % self.rb_image_data_file)
+
+        if not os.path.isfile(self.rb_image_data_file):
+            raise RuntimeError("No image data file %s" % self.rb_image_data_file)
 
         self.rb_header_id = rb.open_header_file(self.rb_header_file)
 
