@@ -80,7 +80,7 @@ def get_c_det_submodule(detector_def, submodule_id):
         array(detector_model.bytes_data_per_packet, dtype="uint32", order='C'))
 
     c_det_submodule.submodule_data_slot_offset = \
-        c_det_submodule.submodule_index * c_det_submodule.bytes_data_per_packet
+        c_det_submodule.submodule_index * c_det_submodule.bytes_data_per_packet * c_det_submodule.n_packets_per_frame
 
     return c_det_submodule
 
