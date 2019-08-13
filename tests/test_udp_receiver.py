@@ -66,8 +66,7 @@ class UdpReceiverTests(unittest.TestCase):
             start_udp_receiver(udp_ip=udp_ip,
                                udp_port=udp_port,
                                detector_def=test_eiger,
-                               module_id=2,
-                               submodule_id=0,
+                               submodule_index=0,
                                ringbuffer=ringbuffer_client_udp,
                                control_client=test_control_client)
 
@@ -90,3 +89,7 @@ class UdpReceiverTests(unittest.TestCase):
         self.assertNotEqual(rb_current_slot, -1, "No frames found in ringbuffer.")
 
         self.assertEqual(list(rb.get_header_info(0).committed_slots)[udp_receiver_rank], n_frames)
+
+
+if __name__ == "__main__":
+    unittest.main()
