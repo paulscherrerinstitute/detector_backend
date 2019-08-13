@@ -31,17 +31,16 @@ inline void initialize_rb_header (rb_header* header,
 }
 
 inline void update_rb_header (rb_header* header, barebone_packet* bpacket)
-{   
+{
   const uint64_t mask = 1;
+
   if(bpacket->packetnum < 64)
   {
     header->framemetadata[2] ^= mask << bpacket->packetnum;
-    // header->framemetadata[2] &= ~(mask << bpacket->packetnum);
   }
   else
   {
     header->framemetadata[3] ^= mask << (bpacket->packetnum - 64);
-    // header->framemetadata[3] &= ~(mask << (bpacket->packetnum - 64));
   }
 }
 
@@ -83,7 +82,7 @@ inline void commit_if_slot_dangling (
     commit_slot(rb_meta->rb_writer_id, rb_current_state->rb_current_slot);
 
     #ifdef DEBUG
-      printf("[commit_if_slot_dangling][%d] framenum: %lu lost_packets: %lu\n", 
+      printf("[commit_if_slot_dangling][%d] framenum: %"PRIu64" lost_packets: %"PRIu64"\n",
         getpid(), counters->current_frame, lost_packets);
     #endif
 

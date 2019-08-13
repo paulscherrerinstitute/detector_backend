@@ -34,7 +34,7 @@ bool receive_packet (int sock, char* udp_packet, size_t udp_packet_bytes,
 
   #ifdef DEBUG
     if(received_data_len > 0){
-      printf("[receive_packet][%d] nbytes %ld framenum: %lu packetnum: %i\n",
+      printf("[receive_packet][%d] nbytes %d framenum: %"PRIu64" packetnum: %"PRIu32"\n",
         getpid(), bpacket->data_len, bpacket->framenum, bpacket->packetnum);
     }
   #endif
@@ -100,7 +100,7 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submo
 
       if(!claim_next_slot(&rb_meta, &rb_current_state))
       {
-        printf("Cannot get next slot, RB full. Exit.");
+        printf("[put_data_in_rb][%"PRIu16"] Cannot get next slot, RB full. Exit.", det_submodule.submodule_index);
         exit(-1);
       }
 
@@ -117,9 +117,10 @@ void put_data_in_rb (int sock, rb_metadata rb_meta, detector_submodule det_submo
     if(is_frame_complete(det_submodule.n_packets_per_frame, &counters))
     {
       #ifdef DEBUG
-        printf("[save_packet][mod_number %d] Frame complete, got packet %d  #%d of %d frame %lu / %lu\n",
-          rb_meta.mod_number, bpacket.packetnum, counters.current_frame_recv_packets,
-          rb_meta.n_packets_per_frame, bpacket.framenum, counters.current_frame);
+        printf("[put_data_in_rb][%"PRIu16"] Frame complete,"
+               " got packet %"PRIu32" %"PRIu64" of %"PRIu16" frame %"PRIu64" / %"PRIu64"\n",
+          det_submodule.submodule_index, bpacket.packetnum, counters.current_frame_recv_packets,
+          det_submodule.n_packets_per_frame, bpacket.framenum, counters.current_frame);
       #endif
 
       copy_rb_header(&header, &rb_current_state, &counters, det_submodule.n_packets_per_frame);
