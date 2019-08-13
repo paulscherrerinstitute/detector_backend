@@ -26,29 +26,6 @@ inline bool is_frame_complete (int n_packets_per_frame, counter* counters)
   return counters->current_frame_recv_packets == n_packets_per_frame;
 }
 
-inline void print_statistics (counter* counters, struct timeval* last_stats_print_time)
-{
-  struct timeval current_time;
-  gettimeofday(&current_time, NULL);
-
-  double elapsed_seconds = (current_time.tv_sec - last_stats_print_time->tv_sec) + 
-    ((long)(current_time.tv_usec) - (long)(last_stats_print_time->tv_usec)) / 1e6;
-
-  double frame_rate = (double) PRINT_STATS_N_FRAMES_MODULO / elapsed_seconds;
-
-  float percentage_lost_packets = 100. * (float)counters->total_lost_packets / 
-    (float)(counters->total_recv_packets);
-
-  // pid | framenum | frame_rate | tot_lost_packets | % lost packets |
-  printf(
-    "%05d | %06"PRIu64" | %05.2f | %06"PRIu64" | %04.1f |\n", 
-    getpid(), counters->total_recv_frames, frame_rate, 
-    counters->total_lost_packets, percentage_lost_packets
-  );
-
-  gettimeofday(last_stats_print_time, NULL);
-}
-
 inline int get_packet_line_number(rb_metadata* rb_meta, uint32_t packet_number)
 {
   // assuming packetnum sequence is 0..N-1
