@@ -71,11 +71,11 @@ inline bool commit_slot (int rb_writer_id, int rb_current_slot)
 }
 
 inline void commit_if_slot_dangling (
-    counter* counters, rb_metadata* rb_meta, rb_header* header, rb_state* rb_current_state)
+    counter* counters, rb_metadata* rb_meta, rb_header* header, rb_state* rb_current_state, int n_packets_per_frame)
 {
   if (counters->current_frame != NO_CURRENT_FRAME)
   {
-    uint64_t lost_packets = copy_rb_header(header, rb_current_state, counters, rb_meta->n_packets_per_frame);
+    uint64_t lost_packets = copy_rb_header(header, rb_current_state, counters, n_packets_per_frame);
     
     counters->total_lost_packets += lost_packets;
     counters->total_lost_frames++;
@@ -102,14 +102,10 @@ inline bool claim_next_slot(rb_metadata* rb_meta, rb_state* rb_current_state)
   rb_current_state->data_slot_origin = (char *) rb_get_buffer_slot (
     rb_meta->rb_dbuffer_id, rb_current_state->rb_current_slot
   );
-
-  // Bytes offset in current buffer slot = mod_number * (bytes/pixel)
-  rb_current_state->data_slot_origin += (rb_meta->mod_origin * rb_meta->bit_depth) / 8;
   
   rb_current_state->header_slot_origin = (rb_header *) rb_get_buffer_slot (
     rb_meta->rb_hbuffer_id, rb_current_state->rb_current_slot
   );
-  rb_current_state->header_slot_origin += rb_meta->mod_number;
 
   return true;
 }
