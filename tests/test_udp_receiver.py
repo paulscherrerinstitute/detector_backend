@@ -5,7 +5,7 @@ import ringbuffer as rb
 
 from detector_backend.detectors import DetectorDefinition, EIGER
 from detector_backend.module.udp_receiver import start_udp_receiver
-from detector_backend.utils_ringbuffer import create_rb_files, get_frame_metadata
+from detector_backend.utils_ringbuffer import create_rb_files, get_frame_metadata, get_frame_data
 from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_stream, generate_submodule_eiger_packets,\
     MockRingBufferMaster, cleanup_rb_files
 
@@ -24,7 +24,7 @@ class UdpReceiverTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        create_rb_files(10, 64, 2*512*256)
+        create_rb_files(100, 64, 2*512*256)
 
     @classmethod
     def tearDownClass(cls):
@@ -94,9 +94,9 @@ class UdpReceiverTests(unittest.TestCase):
 
     def test_multi_module_placement(self):
         udp_ip = "127.0.0.1"
-        udp_port = [12001, 12002]
+        udp_port = [12001, 12002, 12003, 12004]
         bit_depth = 16
-        udp_receiver_ranks = [0, 1]
+        udp_receiver_ranks = [0, 1, 2, 3]
         n_frames = 10
 
         test_eiger = DetectorDefinition(
@@ -111,7 +111,7 @@ class UdpReceiverTests(unittest.TestCase):
         ringbuffer_master = MockRingBufferMaster()
         ringbuffer_master.create_buffer()
 
-        ringbuffer_client = MockRingBufferClient(process_id=2,
+        ringbuffer_client = MockRingBufferClient(process_id=4,
                                                  follower_ids=udp_receiver_ranks,
                                                  detector_config=test_eiger,
                                                  as_reader=True)
@@ -120,7 +120,7 @@ class UdpReceiverTests(unittest.TestCase):
         def start_receiver(process_id, process_udp_port):
             ringbuffer_client_udp = MockRingBufferClient(
                 process_id=process_id,
-                follower_ids=[],
+                follower_ids=[4],
                 detector_config=test_eiger,
                 as_reader=False
             )
@@ -140,18 +140,40 @@ class UdpReceiverTests(unittest.TestCase):
         self.receive_process.append(Process(target=start_receiver, args=(1, udp_port[1])))
         self.receive_process[-1].start()
 
+        self.receive_process.append(Process(target=start_receiver, args=(2, udp_port[2])))
+        self.receive_process[-1].start()
+
+        self.receive_process.append(Process(target=start_receiver, args=(3, udp_port[3])))
+        self.receive_process[-1].start()
+
         rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
         self.assertEqual(rb_current_slot, -1, "You should not be able to get this RB slice yet.")
 
         sleep(0.2)
 
+        # Receiver 0
         generate_udp_stream(udp_ip, udp_port[0],
                             message_generator=generate_submodule_eiger_packets(bit_depth, n_frames))
 
         rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
         self.assertEqual(rb_current_slot, -1, "You should not be able to get this RB slice yet.")
 
+        # Receiver 1
         generate_udp_stream(udp_ip, udp_port[1],
+                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames))
+
+        rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
+        self.assertEqual(rb_current_slot, -1, "You should not be able to get this RB slice yet.")
+
+        # Receiver 2
+        generate_udp_stream(udp_ip, udp_port[2],
+                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames))
+
+        rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
+        self.assertEqual(rb_current_slot, -1, "You should not be able to get this RB slice yet.")
+
+        # Receiver 3
+        generate_udp_stream(udp_ip, udp_port[3],
                             message_generator=generate_submodule_eiger_packets(bit_depth, n_frames))
 
         sleep(0.2)
@@ -165,11 +187,24 @@ class UdpReceiverTests(unittest.TestCase):
             self.assertEqual(i, rb_current_slot)
 
             metadata_pointer = rb.get_buffer_slot(ringbuffer_client.rb_hbuffer_id, rb_current_slot)
-            metadata = get_frame_metadata(metadata_pointer, len(udp_ip))
-            print(rb_current_slot)
-            print(metadata)
+            metadata = get_frame_metadata(metadata_pointer, len(udp_port))
 
-            # data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
+            self.assertListEqual(metadata["framenums"], [i+1] * len(udp_port))
+            self.assertListEqual(metadata["missing_packets_1"], [0] * len(udp_port))
+            self.assertListEqual(metadata["missing_packets_2"], [0] * len(udp_port))
+            self.assertListEqual(metadata["pulse_ids"], [0] * len(udp_port))
+            self.assertListEqual(metadata["daq_recs"], [0] * len(udp_port))
+            self.assertListEqual(metadata["module_number"], list(range(len(udp_port))))
+            self.assertListEqual(metadata["module_enabled"], [1] * len(udp_port))
+            self.assertEqual(metadata["frame"], i+1)
+            self.assertEqual(metadata["daq_rec"], 0)
+            self.assertEqual(metadata["pulse_id"], 0)
+            self.assertEqual(metadata["is_good_frame"], 1)
+            self.assertListEqual(metadata["pulse_id_diff"], [0] * len(udp_port))
+            self.assertListEqual(metadata["framenum_diff"], [0] * len(udp_port))
+
+            data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
+            data = get_frame_data(data_pointer, [])
 
             self.assertTrue(rb.commit_slot(ringbuffer_client.rb_consumer_id, rb_current_slot))
             rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
