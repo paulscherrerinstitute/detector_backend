@@ -204,7 +204,7 @@ class UdpReceiverTests(unittest.TestCase):
             self.assertListEqual(metadata["framenum_diff"], [0] * len(udp_port))
 
             data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
-            data = get_frame_data(data_pointer, [])
+            data = get_frame_data(data_pointer)
 
             self.assertTrue(rb.commit_slot(ringbuffer_client.rb_consumer_id, rb_current_slot))
             rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
