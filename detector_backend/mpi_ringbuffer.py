@@ -70,7 +70,9 @@ class MpiRingBufferClient(object):
     def __init__(self,
                  process_id,
                  follower_ids,
-                 detector_config,
+                 image_header_n_bytes,
+                 image_data_n_bytes,
+                 bit_depth,
                  as_reader=True,
                  rb_head_file=config.DEFAULT_RB_HEAD_FILE,
                  rb_image_head_file=config.DEFAULT_RB_IMAGE_HEAD_FILE,
@@ -78,7 +80,9 @@ class MpiRingBufferClient(object):
 
         self.process_id = process_id
         self.follower_ids = follower_ids
-        self.detector_config = detector_config
+        self.image_header_n_bytes = image_header_n_bytes
+        self.image_data_n_bytes = image_data_n_bytes
+        self.bit_depth = bit_depth
         self.as_reader = as_reader
 
         self.rb_header_file = rb_head_file
@@ -89,9 +93,6 @@ class MpiRingBufferClient(object):
         self.rb_consumer_id = None
         self.rb_hbuffer_id = None
         self.rb_dbuffer_id = None
-
-        self.image_header_n_bytes = None
-        self.image_data_n_bytes = None
 
         self.initialized = False
 
@@ -128,16 +129,11 @@ class MpiRingBufferClient(object):
         self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head_file, self.rb_header_id, 0)
         self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_image_data_file, self.rb_header_id, 0)
 
-        self.image_header_n_bytes = int(self.detector_config.n_submodules_total *
-                                        config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES)
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.image_header_n_bytes)
-
-        self.image_data_n_bytes = int((self.detector_config.detector_size[0] *
-                                       self.detector_config.detector_size[1] * self.detector_config.bit_depth) / 8)
         rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, self.image_data_n_bytes)
 
         n_slots = rb.adjust_nslots(self.rb_header_id)
-        buffer_slot_type_name = 'c_uint' + str(self.detector_config.bit_depth)
+        buffer_slot_type_name = 'c_uint' + str(self.bit_depth)
         rb.set_buffer_slot_dtype(dtype=ctypes.__getattribute__(buffer_slot_type_name))
 
         _logger_client.debug("[%d] RB %d slots: %d", self.process_id, self.rb_header_id, n_slots)
