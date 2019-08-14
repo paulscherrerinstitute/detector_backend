@@ -44,13 +44,13 @@ def get_frame_metadata(metadata_pointer, n_submodules):
     metadata_struct = ctypes.cast(metadata_pointer, ctypes.POINTER(rb_image_header_pointer))
 
     metadata = {
-        "framenums": [metadata_struct.contents[i].framemetadata[0] for i in range(n_submodules)],
-        "missing_packets_1": [metadata_struct.contents[i].framemetadata[2] for i in range(n_submodules)],
-        "missing_packets_2": [metadata_struct.contents[i].framemetadata[3] for i in range(n_submodules)],
-        "pulse_ids": [metadata_struct.contents[i].framemetadata[4] for i in range(n_submodules)],
-        "daq_recs": [metadata_struct.contents[i].framemetadata[5] for i in range(n_submodules)],
-        "module_number": [metadata_struct.contents[i].framemetadata[6] for i in range(n_submodules)],
-        "module_enabled": [metadata_struct.contents[i].framemetadata[7] for i in range(n_submodules)]
+        "framenums": [x.framemetadata[0] for x in metadata_struct.contents],
+        "missing_packets_1": [x.framemetadata[2] for x in metadata_struct.contents],
+        "missing_packets_2": [x.framemetadata[3] for x in metadata_struct.contents],
+        "pulse_ids": [x.framemetadata[4] for x in metadata_struct.contents],
+        "daq_recs": [x.framemetadata[5] for x in metadata_struct.contents],
+        "module_number": [x.framemetadata[6] for x in metadata_struct.contents],
+        "module_enabled": [x.framemetadata[7] for x in metadata_struct.contents],
     }
 
     metadata["frame"] = metadata["framenums"][0]
