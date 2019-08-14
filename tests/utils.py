@@ -83,6 +83,7 @@ def generate_submodule_eiger_packets(bit_depth, n_frames, debug=0):
             c_eiger_packet = CEigerPacket()
 
             c_eiger_packet.framenum = framenum + 1
+            c_eiger_packet.bunchid = framenum
             c_eiger_packet.packetnum = packetnum
             c_eiger_packet.debug = debug
 
