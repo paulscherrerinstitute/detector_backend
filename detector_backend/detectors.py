@@ -74,5 +74,5 @@ class DetectorDefinition(object):
 
         self.image_data_n_bytes = (self.detector_size[0] * self.detector_size[1] * self.bit_depth) // 8
 
-        self.n_submodules_total = self.geometry[0] * self.geometry[1] * detector_model.n_submodules_per_modulei
+        self.n_submodules_total = self.geometry[0] * self.geometry[1] * detector_model.n_submodules_per_module
         self.image_header_n_bytes = config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES * self.n_submodules_total
