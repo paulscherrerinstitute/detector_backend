@@ -6,7 +6,7 @@ import ringbuffer as rb
 from detector_backend.detectors import DetectorDefinition, EIGER
 from detector_backend.module.udp_receiver import start_udp_receiver
 from detector_backend.utils_ringbuffer import create_rb_files, get_frame_metadata, get_frame_data
-from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_stream, generate_submodule_eiger_packets,\
+from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_stream, generate_submodule_eiger_packets, \
     MockRingBufferMaster, cleanup_rb_files
 
 
@@ -25,7 +25,7 @@ class UdpReceiverTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        create_rb_files(100, 64, 2*512*256)
+        create_rb_files(100, 64, 2 * 512 * 256)
 
     @classmethod
     def tearDownClass(cls):
@@ -50,12 +50,14 @@ class UdpReceiverTests(unittest.TestCase):
         ringbuffer_master = MockRingBufferMaster()
         ringbuffer_master.create_buffer()
 
-        ringbuffer_client = MockRingBufferClient(process_id=0,
-                                                 follower_ids=[udp_receiver_rank],
-                                                 image_header_n_bytes=test_eiger.image_header_n_bytes,
-                                                 image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
-                                                 bit_depth=test_eiger.bit_depth,
-                                                 as_reader=True)
+        ringbuffer_client = MockRingBufferClient(
+            process_id=0,
+            follower_ids=[udp_receiver_rank],
+            image_header_n_bytes=test_eiger.image_header_n_bytes,
+            image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+            bit_depth=test_eiger.bit_depth,
+            as_reader=True
+        )
         ringbuffer_client.init_buffer()
 
         def start_receiver():
@@ -116,12 +118,14 @@ class UdpReceiverTests(unittest.TestCase):
         ringbuffer_master = MockRingBufferMaster()
         ringbuffer_master.create_buffer()
 
-        ringbuffer_client = MockRingBufferClient(process_id=4,
-                                                 follower_ids=udp_receiver_ranks,
-                                                 image_header_n_bytes=test_eiger.image_header_n_bytes,
-                                                 image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
-                                                 bit_depth=test_eiger.bit_depth,
-                                                 as_reader=True)
+        ringbuffer_client = MockRingBufferClient(
+            process_id=4,
+            follower_ids=udp_receiver_ranks,
+            image_header_n_bytes=test_eiger.image_header_n_bytes,
+            image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+            bit_depth=test_eiger.bit_depth,
+            as_reader=True
+        )
         ringbuffer_client.init_buffer()
 
         def start_receiver(process_id, process_udp_port):
@@ -198,14 +202,14 @@ class UdpReceiverTests(unittest.TestCase):
             metadata_pointer = rb.get_buffer_slot(ringbuffer_client.rb_hbuffer_id, rb_current_slot)
             metadata = get_frame_metadata(metadata_pointer, len(udp_port))
 
-            self.assertListEqual(metadata["framenums"], [i+1] * len(udp_port))
+            self.assertListEqual(metadata["framenums"], [i + 1] * len(udp_port))
             self.assertListEqual(metadata["missing_packets_1"], [0] * len(udp_port))
             self.assertListEqual(metadata["missing_packets_2"], [0] * len(udp_port))
             self.assertListEqual(metadata["pulse_ids"], [0] * len(udp_port))
             self.assertListEqual(metadata["daq_recs"], [0] * len(udp_port))
             self.assertListEqual(metadata["module_number"], list(range(len(udp_port))))
             self.assertListEqual(metadata["module_enabled"], [1] * len(udp_port))
-            self.assertEqual(metadata["frame"], i+1)
+            self.assertEqual(metadata["frame"], i + 1)
             self.assertEqual(metadata["daq_rec"], 0)
             self.assertEqual(metadata["pulse_id"], 0)
             self.assertEqual(metadata["is_good_frame"], 1)
@@ -215,7 +219,7 @@ class UdpReceiverTests(unittest.TestCase):
             n_pixels = test_eiger.detector_size_raw[0] * test_eiger.detector_size_raw[1]
             data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
             data = get_frame_data(data_pointer, [n_pixels])
-            self.assertEqual(int(data.sum()/(i+1)), n_pixels, "Data transfered error in frame %d." % i)
+            self.assertEqual(int(data.sum() / (i + 1)), n_pixels, "Data transfered error in frame %d." % i)
 
             self.assertTrue(rb.commit_slot(ringbuffer_client.rb_consumer_id, rb_current_slot))
             rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
