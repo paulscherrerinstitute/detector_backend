@@ -66,6 +66,6 @@ def get_frame_metadata(metadata_pointer, n_submodules):
     return metadata
 
 
-def get_frame_data(data_pointer):
-    data = np.ctypeslib.as_array(data_pointer)
+def get_frame_data(data_pointer, frame_size):
+    data = np.ctypeslib.as_array(data_pointer, shape=frame_size)
     return data
