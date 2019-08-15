@@ -13,6 +13,7 @@ from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_st
 class UdpReceiverTests(unittest.TestCase):
 
     def setUp(self):
+        rb.reset()
         self.receive_process = []
 
     def tearDown(self):
@@ -214,7 +215,7 @@ class UdpReceiverTests(unittest.TestCase):
             n_pixels = test_eiger.detector_size_raw[0] * test_eiger.detector_size_raw[1]
             data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
             data = get_frame_data(data_pointer, [n_pixels])
-            self.assertEqual(int(data.sum()/(i+1)), 2048, "Data transfered error in frame %d." % i)
+            self.assertEqual(int(data.sum()/(i+1)), n_pixels, "Data transfered error in frame %d." % i)
 
             self.assertTrue(rb.commit_slot(ringbuffer_client.rb_consumer_id, rb_current_slot))
             rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
