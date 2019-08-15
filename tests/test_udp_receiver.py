@@ -51,7 +51,9 @@ class UdpReceiverTests(unittest.TestCase):
 
         ringbuffer_client = MockRingBufferClient(process_id=0,
                                                  follower_ids=[udp_receiver_rank],
-                                                 detector_config=test_eiger,
+                                                 image_header_n_bytes=test_eiger.image_header_n_bytes,
+                                                 image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+                                                 bit_depth=test_eiger.bit_depth,
                                                  as_reader=True)
         ringbuffer_client.init_buffer()
 
@@ -59,7 +61,9 @@ class UdpReceiverTests(unittest.TestCase):
             ringbuffer_client_udp = MockRingBufferClient(
                 process_id=udp_receiver_rank,
                 follower_ids=[],
-                detector_config=test_eiger,
+                image_header_n_bytes=test_eiger.image_header_n_bytes,
+                image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+                bit_depth=test_eiger.bit_depth,
                 as_reader=False
             )
 
@@ -113,7 +117,9 @@ class UdpReceiverTests(unittest.TestCase):
 
         ringbuffer_client = MockRingBufferClient(process_id=4,
                                                  follower_ids=udp_receiver_ranks,
-                                                 detector_config=test_eiger,
+                                                 image_header_n_bytes=test_eiger.image_header_n_bytes,
+                                                 image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+                                                 bit_depth=test_eiger.bit_depth,
                                                  as_reader=True)
         ringbuffer_client.init_buffer()
 
@@ -121,7 +127,9 @@ class UdpReceiverTests(unittest.TestCase):
             ringbuffer_client_udp = MockRingBufferClient(
                 process_id=process_id,
                 follower_ids=[4],
-                detector_config=test_eiger,
+                image_header_n_bytes=test_eiger.image_header_n_bytes,
+                image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+                bit_depth=test_eiger.bit_depth,
                 as_reader=False
             )
 
@@ -203,8 +211,10 @@ class UdpReceiverTests(unittest.TestCase):
             self.assertListEqual(metadata["pulse_id_diff"], [0] * len(udp_port))
             self.assertListEqual(metadata["framenum_diff"], [0] * len(udp_port))
 
+            n_pixels = test_eiger.detector_size_raw[0] * test_eiger.detector_size_raw[1]
             data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
-            data = get_frame_data(data_pointer)
+            data = get_frame_data(data_pointer, [n_pixels])
+            self.assertEqual(int(data.sum()/(i+1)), 2048, "Data transfered error in frame %d." % i)
 
             self.assertTrue(rb.commit_slot(ringbuffer_client.rb_consumer_id, rb_current_slot))
             rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
