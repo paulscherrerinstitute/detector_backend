@@ -1,7 +1,6 @@
 from logging import getLogger
 import ringbuffer as rb
 
-import numpy as np
 import zmq
 
 from time import time, sleep
