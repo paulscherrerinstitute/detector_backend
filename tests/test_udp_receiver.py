@@ -5,6 +5,7 @@ import ringbuffer as rb
 
 from detector_backend.detectors import DetectorDefinition, EIGER
 from detector_backend.module.udp_receiver import start_udp_receiver
+from detector_backend.utils_detectors import get_n_lines_per_packet, get_n_packets_per_frame
 from detector_backend.utils_ringbuffer import create_rb_files, get_frame_metadata, get_frame_data
 from tests.utils import MockRingBufferClient, MockControlClient, generate_udp_stream, generate_submodule_eiger_packets, \
     MockRingBufferMaster, cleanup_rb_files
@@ -166,28 +167,28 @@ class UdpReceiverTests(unittest.TestCase):
 
         # Receiver 0
         generate_udp_stream(udp_ip, udp_port[0],
-                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames))
+                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames, 0))
 
         rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
         self.assertEqual(rb_current_slot, -1, "You should not be able to get this RB slice yet.")
 
         # Receiver 1
         generate_udp_stream(udp_ip, udp_port[1],
-                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames))
+                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames, 1))
 
         rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
         self.assertEqual(rb_current_slot, -1, "You should not be able to get this RB slice yet.")
 
         # Receiver 2
         generate_udp_stream(udp_ip, udp_port[2],
-                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames))
+                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames, 2))
 
         rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
         self.assertEqual(rb_current_slot, -1, "You should not be able to get this RB slice yet.")
 
         # Receiver 3
         generate_udp_stream(udp_ip, udp_port[3],
-                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames))
+                            message_generator=generate_submodule_eiger_packets(bit_depth, n_frames, 3))
 
         sleep(0.2)
 
@@ -216,10 +217,30 @@ class UdpReceiverTests(unittest.TestCase):
             self.assertListEqual(metadata["pulse_id_diff"], [0] * len(udp_port))
             self.assertListEqual(metadata["framenum_diff"], [0] * len(udp_port))
 
-            n_pixels = test_eiger.detector_size_raw[0] * test_eiger.detector_size_raw[1]
             data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
-            data = get_frame_data(data_pointer, [n_pixels])
-            self.assertEqual(int(data.sum() / (i + 1)), n_pixels, "Data transfered error in frame %d." % i)
+
+            data_shape = [test_eiger.n_submodules_total] + test_eiger.detector_model.submodule_size
+            data = get_frame_data(data_pointer, data_shape)
+
+            n_lines_per_packet = get_n_lines_per_packet(test_eiger)
+            n_packets_per_frame = get_n_packets_per_frame(test_eiger)
+
+            for submodule_index in range(test_eiger.n_submodules_total):
+                for packet_index in range(n_packets_per_frame):
+                    packet_line_offset = n_lines_per_packet * packet_index
+                    submodule_data = data[submodule_index][packet_line_offset:packet_line_offset+n_lines_per_packet]
+
+                    submodule_indexes = submodule_data // 1000
+                    self.assertEqual(submodule_indexes.min(), submodule_index)
+                    self.assertEqual(submodule_indexes.max(), submodule_index)
+
+                    packet_indexes = (submodule_data % 1000) // 10
+                    self.assertEqual(packet_indexes.min(), packet_index)
+                    self.assertEqual(packet_indexes.max(), packet_index)
+
+                    frame_indexes = submodule_data % 10
+                    self.assertEqual(frame_indexes.min(), i)
+                    self.assertEqual(frame_indexes.max(), i)
 
             self.assertTrue(rb.commit_slot(ringbuffer_client.rb_consumer_id, rb_current_slot))
             rb_current_slot = rb.claim_next_slot(ringbuffer_client.rb_consumer_id)
