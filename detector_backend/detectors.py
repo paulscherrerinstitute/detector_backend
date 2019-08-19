@@ -30,19 +30,6 @@ class DetectorModel(object):
         self.column_first_indexing = column_first_indexing
 
 
-EIGER = DetectorModel(
-    model_name="Eiger PSI",
-    module_size=[512, 1024],
-    submodule_size=[256, 512],
-    n_submodules_per_module=4,
-    bytes_per_packet=4144,
-    bytes_data_per_packet=4096,
-    gap_px_chips=[2, 2],
-    gap_px_modules=[36, 8],
-    column_first_indexing=True
-)
-
-
 class DetectorDefinition(object):
 
     def __init__(self, detector_name, detector_model: DetectorModel, geometry, bit_depth, ignored_modules=None):
@@ -76,3 +63,29 @@ class DetectorDefinition(object):
 
         self.n_submodules_total = self.geometry[0] * self.geometry[1] * detector_model.n_submodules_per_module
         self.image_header_n_bytes = config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES * self.n_submodules_total
+
+
+EIGER = DetectorModel(
+    model_name="Eiger PSI",
+    module_size=[512, 1024],
+    submodule_size=[256, 512],
+    n_submodules_per_module=4,
+    bytes_per_packet=4144,
+    bytes_data_per_packet=4096,
+    gap_px_chips=[2, 2],
+    gap_px_modules=[36, 8],
+    column_first_indexing=True
+)
+
+
+JUNGFRAU = DetectorModel(
+    model_name="Jungfrau",
+    module_size=[512, 1024],
+    submodule_size=[512, 1024],
+    n_submodules_per_module=1,
+    bytes_per_packet=8246,
+    bytes_data_per_packet=8192,
+    gap_px_chips=[0, 0],
+    gap_px_modules=[0, 0],
+    column_first_indexing=False
+)
