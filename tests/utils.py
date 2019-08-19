@@ -6,8 +6,10 @@ import numpy
 
 import ringbuffer as rb
 from detector_backend import config
+from detector_backend.detectors import EIGER
 
 from detector_backend.mpi_ringbuffer import MpiRingBufferClient, MpiRingBufferMaster
+from detector_backend.utils_detectors import CEigerUdpPacket
 
 
 class MockRingBufferMaster(MpiRingBufferMaster):
@@ -43,49 +45,22 @@ class MockControlClient(object):
         pass
 
 
-class CEigerPacket(ctypes.Structure):
-
-    N_BYTES_DATA = 4096
-
-    _fields_ = [
-        ('framenum', ctypes.c_uint64),
-        ('exptime', ctypes.c_uint32),
-        ('packetnum', ctypes.c_uint32),
-
-        ('bunchid', ctypes.c_double),
-        ('timestamp', ctypes.c_uint64),
-
-        ('moduleID', ctypes.c_uint16),
-        ('xCoord', ctypes.c_uint16),
-        ('yCoord', ctypes.c_uint16),
-        ('zCoord', ctypes.c_uint16),
-
-        ('debug', ctypes.c_uint32),
-        ('roundRobin', ctypes.c_uint16),
-
-        ('detectortype', ctypes.c_uint8),
-        ('headerVersion', ctypes.c_uint8),
-
-        ('data', N_BYTES_DATA * ctypes.c_uint8)
-    ]
-
-
 def generate_submodule_eiger_packets(bit_depth, n_frames, submodule_id=0):
 
     total_frame_bytes = (256 * 512 * bit_depth) // 8
-    n_packets = total_frame_bytes // CEigerPacket.N_BYTES_DATA
-    n_pixels_per_packet = (CEigerPacket.N_BYTES_DATA * 8) // bit_depth
+    n_packets = total_frame_bytes // EIGER.bytes_data_per_packet
+    n_pixels_per_packet = (EIGER.bytes_data_per_packet * 8) // bit_depth
 
     data = numpy.zeros(shape=[n_pixels_per_packet], dtype="uint" + str(bit_depth))
 
     for framenum in range(n_frames):
         for packetnum in range(n_packets):
-            c_eiger_packet = CEigerPacket()
+            c_eiger_packet = CEigerUdpPacket()
 
-            c_eiger_packet.framenum = framenum + 1
-            c_eiger_packet.bunchid = framenum
-            c_eiger_packet.packetnum = packetnum
-            c_eiger_packet.debug = submodule_id
+            c_eiger_packet.detector_common_packet.framenum = framenum + 1
+            c_eiger_packet.detector_common_packet.bunchid = framenum
+            c_eiger_packet.detector_common_packet.packetnum = packetnum
+            c_eiger_packet.detector_common_packet.debug = submodule_id
 
             data.fill(submodule_id*1000 + packetnum*10 + framenum)
             ctypes.memmove(c_eiger_packet.data, data.ctypes.data, data.nbytes)

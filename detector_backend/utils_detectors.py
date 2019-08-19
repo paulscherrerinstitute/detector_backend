@@ -1,5 +1,44 @@
+import ctypes
+
 from numpy import array
-from detector_backend.detectors import DetectorDefinition
+from detector_backend.detectors import DetectorDefinition, JUNGFRAU, EIGER
+
+
+class CDetectorCommonPackage(ctypes.Structure):
+    _fields_ = [
+        ('framenum', ctypes.c_uint64),
+        ('exptime', ctypes.c_uint32),
+        ('packetnum', ctypes.c_uint32),
+
+        ('bunchid', ctypes.c_double),
+        ('timestamp', ctypes.c_uint64),
+
+        ('moduleID', ctypes.c_uint16),
+        ('xCoord', ctypes.c_uint16),
+        ('yCoord', ctypes.c_uint16),
+        ('zCoord', ctypes.c_uint16),
+
+        ('debug', ctypes.c_uint32),
+        ('roundRobin', ctypes.c_uint16),
+        ('detectortype', ctypes.c_uint8),
+        ('headerVersion', ctypes.c_uint8)
+    ]
+
+
+class CJungfrauUdpPacket(ctypes.Structure):
+    _pack_ = 2
+    _fields_ = [
+        ('emptyheader', 6 * ctypes.c_char),
+        ('detector_common_packet', CDetectorCommonPackage),
+        ('data', JUNGFRAU.bytes_data_per_packet * ctypes.c_uint8),
+    ]
+
+
+class CEigerUdpPacket(ctypes.Structure):
+    _fields_ = [
+        ('detector_common_packet', CDetectorCommonPackage),
+        ('data', EIGER.bytes_data_per_packet * ctypes.c_uint8),
+    ]
 
 
 def get_current_module_offset_in_pixels(detector_def: DetectorDefinition, module_id, submodule_id):
