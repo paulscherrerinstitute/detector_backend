@@ -8,3 +8,4 @@ IMAGE_HEADER_SUBMODULE_SIZE_BYTES = 64
 
 # Delay between chacks to know if MPI has a next message.
 MPI_COMM_DELAY = 0.10
+RB_RETRY_DELAY = 0.01

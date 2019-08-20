@@ -5,13 +5,13 @@ import zmq
 
 from time import time, sleep
 
+from detector_backend import config
 from detector_backend.config import MPI_COMM_DELAY
 from detector_backend.mpi_control import MpiControlClient
 from detector_backend.utils_ringbuffer import get_frame_metadata, get_frame_data
 
 _logger = getLogger("zmq_sender")
 
-RB_RETRY_DELAY = 0.01
 ZMQ_IO_THREADS = 4
 
 
@@ -118,7 +118,7 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
         rb_current_slot = rb.claim_next_slot(ringbuffer.rb_reader_id)
         if rb_current_slot == -1:
-            sleep(RB_RETRY_DELAY)
+            sleep(config.RB_RETRY_DELAY)
             continue
 
         metadata, data = zmq_sender.read_data(rb_current_slot)
