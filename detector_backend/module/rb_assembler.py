@@ -24,17 +24,17 @@ class ImageAssembler(object):
         _logger.info("Creating assembler_index=%d out of n_total_assemblers=%d"
                      % (self.assembler_index, self.n_total_assemblers))
 
-        if self.detector_def.image_data_n_bytes % self.n_total_assemblers != 0:
+        if self.detector_def.detector_size[0] % self.n_total_assemblers != 0:
             raise ValueError("Wrong number of assemblers. "
-                             "Assembled image of image_data_n_bytes=%s is not divisible by n_total_assemblers=%s"
-                             % (self.detector_def.image_data_n_bytes, self.n_total_assemblers))
+                             "Assembled image of height=%d is not divisible by n_total_assemblers=%s"
+                             % (self.detector_def.detector_size[0], self.n_total_assemblers))
 
-        n_bytes_per_assembler = self.detector_def.image_data_n_bytes // self.n_total_assemblers
-        self.buffer_pointer = ctypes.cast(ctypes.create_string_buffer(n_bytes_per_assembler),
+        self.n_bytes_buffer_size = self.detector_def.image_data_n_bytes // self.n_total_assemblers
+        self.buffer_pointer = ctypes.cast(ctypes.create_string_buffer(self.n_bytes_buffer_size),
                                           ctypes.POINTER(ctypes.c_char))
 
-        _logger.debug("Allocated assembler buffer n_bytes_per_assembler=%d (image_data_n_bytes=%d)"
-                      % (n_bytes_per_assembler, self.detector_def.image_data_n_bytes))
+        _logger.debug("Allocated assembler buffer n_bytes_buffer_size=%d (image_data_n_bytes=%d)"
+                      % (self.n_bytes_buffer_size, self.detector_def.image_data_n_bytes))
 
     @staticmethod
     def get_image_assembler_function():
