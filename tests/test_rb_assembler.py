@@ -29,8 +29,9 @@ class RbAssemblerTests(unittest.TestCase):
 
         n_assemblers = 4
         image_assember = ImageAssembler(jf_test_det, 0, n_assemblers)
-        self.assertEqual(image_assember.n_bytes_buffer_size * n_assemblers, jf_test_det.image_data_n_bytes,
-                         "All assemblers combined should give the complete image.")
+        self.assertEqual(image_assember.n_moves * n_assemblers,
+                         jf_test_det.raw_image_data_n_bytes / jf_test_det.submodule_line_n_bytes,
+                         "All assemblers combined should combine the entire image.")
 
 
 if __name__ == "__main__":
