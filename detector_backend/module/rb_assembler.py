@@ -10,6 +10,7 @@ from detector_backend import config
 from detector_backend.config import MPI_COMM_DELAY
 from detector_backend.detectors import DetectorDefinition
 from detector_backend.mpi_control import MpiControlClient
+from detector_backend.mpi_ringbuffer import MpiRingBufferClient
 from detector_backend.utils_ringbuffer import get_frame_metadata, get_frame_data
 
 _logger = getLogger("rb_assembler")
@@ -28,13 +29,6 @@ class ImageAssembler(object):
             raise ValueError("Wrong number of assemblers. "
                              "Assembled image of height=%d is not divisible by n_total_assemblers=%s"
                              % (self.detector_def.detector_size[0], self.n_total_assemblers))
-
-        self.n_bytes_buffer_size = self.detector_def.image_data_n_bytes // self.n_total_assemblers
-        self.buffer_pointer = ctypes.cast(ctypes.create_string_buffer(self.n_bytes_buffer_size),
-                                          ctypes.POINTER(ctypes.c_char))
-
-        _logger.debug("Allocated assembler buffer n_bytes_buffer_size=%d (image_data_n_bytes=%d)"
-                      % (self.n_bytes_buffer_size, self.detector_def.image_data_n_bytes))
 
     @staticmethod
     def get_image_assembler_function():
@@ -66,7 +60,8 @@ def read_frame(detector_def: DetectorDefinition, metadata_pointer, data_pointer)
     return data, metadata
 
 
-def start_rb_assembler(name, detector_def: DetectorDefinition, ringbuffer, assembler_index, n_total_assemblers):
+def start_rb_assembler(name, detector_def: DetectorDefinition, ringbuffer: MpiRingBufferClient,
+                       assembler_index, n_total_assemblers):
 
     _logger.info("Starting assembler with name='%s'." % name)
 
@@ -84,7 +79,6 @@ def start_rb_assembler(name, detector_def: DetectorDefinition, ringbuffer, assem
     # char* source_root, char* destination_root, size_t* dest_move_offsets, uint32_t n_moves, size_t n_bytes_per_move
     assemble_image = image_assembler.get_image_assembler_function()
 
-    buffer_pointer = image_assembler.buffer_pointer
     dest_move_offsets = image_assembler.get_move_offsets()
     n_moves = image_assembler.n_moves
     n_bytes_per_move = image_assembler.n_bytes_per_move
@@ -101,16 +95,17 @@ def start_rb_assembler(name, detector_def: DetectorDefinition, ringbuffer, assem
 
             mpi_ref_time = time()
 
-        rb_current_slot = rb.claim_next_slot(ringbuffer.rb_reader_id)
+        rb_current_slot = rb.claim_next_slot(ringbuffer.rb_consumer_id)
         if rb_current_slot == -1:
             sleep(config.RB_RETRY_DELAY)
             continue
 
-        data_pointer = rb.get_buffer_slot(ringbuffer.rb_dbuffer_id, rb_current_slot)
+        raw_data_pointer = rb.get_buffer_slot(ringbuffer.rb_raw_dbuffer_id, rb_current_slot)
+        assembled_data_pointer = rb.get_buffer_slot(ringbuffer.rb_assembled_dbuffer_id, rb_current_slot)
 
-        assemble_image(data_pointer, buffer_pointer, dest_move_offsets, n_moves, n_bytes_per_move)
+        assemble_image(raw_data_pointer, assembled_data_pointer, dest_move_offsets, n_moves, n_bytes_per_move)
 
-        if not rb.commit_slot(ringbuffer.rb_reader_id, rb_current_slot):
+        if not rb.commit_slot(ringbuffer.rb_consumer_id, rb_current_slot):
             error_message = "[%s] Cannot commit rb slot %d." % (name, rb_current_slot)
             _logger.error(error_message)
 
