@@ -12,7 +12,7 @@ class RingbufferTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        create_rb_files(100, 64, 2 * 512 * 256)
+        create_rb_files(100, 64, 2 * 512 * 256, 2 * 540 * 256)
 
     @classmethod
     def tearDownClass(cls):
@@ -26,7 +26,8 @@ class RingbufferTests(unittest.TestCase):
             process_id=1,
             follower_ids=[],
             image_header_n_bytes=64,
-            image_data_n_bytes=128,
+            raw_image_data_n_bytes=128,
+            assembled_image_data_n_bytes=140,
             bit_depth=16,
             as_reader=False
         )
@@ -37,7 +38,8 @@ class RingbufferTests(unittest.TestCase):
             process_id=2,
             follower_ids=[1],
             image_header_n_bytes=64,
-            image_data_n_bytes=128,
+            raw_image_data_n_bytes=128,
+            assembled_image_data_n_bytes=140,
             bit_depth=16
         )
 
@@ -51,14 +53,14 @@ class RingbufferTests(unittest.TestCase):
 
         sent_data = numpy.random.randint(low=0, high=128, size=64, dtype="uint16")
 
-        write_pointer = rb.get_buffer_slot(writer.rb_dbuffer_id, writer_current_slot)
+        write_pointer = rb.get_buffer_slot(writer.rb_raw_dbuffer_id, writer_current_slot)
         ctypes.memmove(write_pointer, sent_data.ctypes.data, sent_data.nbytes)
         rb.commit_slot(writer.rb_consumer_id, writer_current_slot)
 
         receiver_current_slot = rb.claim_next_slot(receiver.rb_consumer_id)
         self.assertEqual(receiver_current_slot, writer_current_slot, "Slot should be ready for the receiver.")
 
-        receive_pointer = rb.get_buffer_slot(receiver.rb_dbuffer_id, receiver_current_slot)
+        receive_pointer = rb.get_buffer_slot(receiver.rb_raw_dbuffer_id, receiver_current_slot)
         received_data = get_frame_data(receive_pointer, [64])
 
         numpy.testing.assert_array_equal(sent_data, received_data)
