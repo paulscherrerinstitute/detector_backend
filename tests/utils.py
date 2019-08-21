@@ -85,5 +85,8 @@ def cleanup_rb_files():
     if os.path.isfile(config.DEFAULT_RB_IMAGE_HEAD_FILE):
         os.remove(config.DEFAULT_RB_IMAGE_HEAD_FILE)
 
-    if os.path.isfile(config.DEFAULT_RB_IMAGE_DATA_FILE):
-        os.remove(config.DEFAULT_RB_IMAGE_DATA_FILE)
+    if os.path.isfile(config.DEFAULT_RB_RAW_IMAGE_DATA_FILE):
+        os.remove(config.DEFAULT_RB_RAW_IMAGE_DATA_FILE)
+
+    if os.path.isfile(config.DEFAULT_RB_ASSEMBLED_IMAGE_DATA_FILE):
+        os.remove(config.DEFAULT_RB_ASSEMBLED_IMAGE_DATA_FILE)
