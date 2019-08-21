@@ -53,16 +53,25 @@ class RingbufferTests(unittest.TestCase):
         receiver_current_slot = rb.claim_next_slot(receiver.rb_consumer_id)
         self.assertEqual(receiver_current_slot, -1, "The reader should not be able to get the slot yet.")
 
-        sent_data = numpy.random.randint(low=0, high=128, size=64, dtype="uint16")
+        sent_raw_data = numpy.random.randint(low=0, high=128,
+                                             size=jf_test_det.raw_image_data_n_bytes, dtype="uint16")
+        raw_write_pointer = rb.get_buffer_slot(writer.rb_raw_dbuffer_id, writer_current_slot)
+        ctypes.memmove(raw_write_pointer, sent_raw_data.ctypes.data, sent_raw_data.nbytes)
 
-        write_pointer = rb.get_buffer_slot(writer.rb_raw_dbuffer_id, writer_current_slot)
-        ctypes.memmove(write_pointer, sent_data.ctypes.data, sent_data.nbytes)
+        sent_assembled_data = numpy.random.randint(low=0, high=128,
+                                                   size=jf_test_det.image_data_n_bytes, dtype="uint16")
+        assembled_write_pointer = rb.get_buffer_slot(writer.rb_assembled_dbuffer_id, writer_current_slot)
+        ctypes.memmove(assembled_write_pointer, sent_assembled_data.ctypes.data, sent_assembled_data.nbytes)
+
         rb.commit_slot(writer.rb_consumer_id, writer_current_slot)
 
         receiver_current_slot = rb.claim_next_slot(receiver.rb_consumer_id)
         self.assertEqual(receiver_current_slot, writer_current_slot, "Slot should be ready for the receiver.")
 
-        receive_pointer = rb.get_buffer_slot(receiver.rb_raw_dbuffer_id, receiver_current_slot)
-        received_data = get_frame_data(receive_pointer, [64])
+        raw_receive_pointer = rb.get_buffer_slot(receiver.rb_raw_dbuffer_id, receiver_current_slot)
+        raw_received_data = get_frame_data(raw_receive_pointer, [jf_test_det.raw_image_data_n_bytes])
+        numpy.testing.assert_array_equal(sent_raw_data, raw_received_data)
 
-        numpy.testing.assert_array_equal(sent_data, received_data)
+        assembled_receive_pointer = rb.get_buffer_slot(receiver.rb_assembled_dbuffer_id, receiver_current_slot)
+        assembled_received_data = get_frame_data(assembled_receive_pointer, [jf_test_det.image_data_n_bytes])
+        numpy.testing.assert_array_equal(sent_assembled_data, assembled_received_data)
