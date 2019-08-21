@@ -6,6 +6,7 @@ import socket
 import os
 
 from detector_backend import config
+from detector_backend.mpi_ringbuffer import MpiRingBufferClient
 from detector_backend.utils_detectors import get_n_packets_per_frame
 
 _logger = getLogger("udp_receiver")
@@ -68,14 +69,14 @@ def get_c_det_submodule(detector_def, submodule_index):
     return c_det_submodule
 
 
-def get_c_rb_metadata(ringbuffer):
+def get_c_rb_metadata(ringbuffer: MpiRingBufferClient):
     c_rb_meta = CRbMetadata()
 
     c_rb_meta.rb_writer_id = ringbuffer.rb_consumer_id
     c_rb_meta.rb_header_id = ringbuffer.rb_header_id
 
     c_rb_meta.rb_hbuffer_id = ringbuffer.rb_hbuffer_id
-    c_rb_meta.rb_dbuffer_id = ringbuffer.rb_dbuffer_id
+    c_rb_meta.rb_dbuffer_id = ringbuffer.rb_raw_dbuffer_id
 
     return c_rb_meta
 
