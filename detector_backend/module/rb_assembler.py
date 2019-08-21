@@ -22,13 +22,30 @@ class ImageAssembler(object):
         self.assembler_index = assembler_index
         self.n_total_assemblers = n_total_assemblers
 
-        _logger.info("Creating assembler_index=%d out of n_total_assemblers=%d"
-                     % (self.assembler_index, self.n_total_assemblers))
+        _logger.info("Creating assembler_index=%d out of n_total_assemblers=%d",
+                     self.assembler_index, self.n_total_assemblers)
 
         if self.detector_def.detector_size[0] % self.n_total_assemblers != 0:
             raise ValueError("Wrong number of assemblers. "
                              "Assembled image of height=%d is not divisible by n_total_assemblers=%s"
                              % (self.detector_def.detector_size[0], self.n_total_assemblers))
+
+        self.n_bytes_per_move = detector_def.submodule_line_n_bytes
+
+        total_required_moves = detector_def.raw_image_data_n_bytes // self.n_bytes_per_move
+        if total_required_moves % self.n_total_assemblers != 0:
+            raise ValueError("Wrong number of assemblers. "
+                             "The total_required_moves=%d is not divisible by n_total_assemblers=$s"
+                             % (total_required_moves, n_total_assemblers))
+
+        self.n_moves = total_required_moves // self.n_total_assemblers
+
+        self.move_offsets = self._get_move_offsets()
+
+        if len(self.move_offsets) != self.n_moves:
+            raise ValueError("The move offset calculation went wrong."
+                             "The number of n_moves=%s should be the same as the len(move_offsets)=%d"
+                             % (self.n_moves, len(self.move_offsets)))
 
     @staticmethod
     def get_image_assembler_function():
@@ -46,7 +63,7 @@ class ImageAssembler(object):
         except:
             _logger.error("Could not image assembler shared library from %s." % expected_library_location)
 
-    def get_move_offsets(self):
+    def _get_move_offsets(self):
         # TODO: Implement this.
         return []
 
@@ -79,7 +96,7 @@ def start_rb_assembler(name, detector_def: DetectorDefinition, ringbuffer: MpiRi
     # char* source_root, char* destination_root, size_t* dest_move_offsets, uint32_t n_moves, size_t n_bytes_per_move
     assemble_image = image_assembler.get_image_assembler_function()
 
-    dest_move_offsets = image_assembler.get_move_offsets()
+    dest_move_offsets = image_assembler.move_offsets
     n_moves = image_assembler.n_moves
     n_bytes_per_move = image_assembler.n_bytes_per_move
 

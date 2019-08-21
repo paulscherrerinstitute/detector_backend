@@ -36,17 +36,13 @@ class DetectorDefinition(object):
 
         self.detector_model = detector_model
         self.detector_name = detector_name
-
         self.geometry = geometry
         self.bit_depth = bit_depth
-
         self.ignored_modules = [] if ignored_modules is None else ignored_modules
 
         # Detector size without gaps.
         self.detector_size_raw = [detector_model.module_size[0] * self.geometry[0],
                                   detector_model.module_size[1] * self.geometry[1]]
-
-        self.raw_image_data_n_bytes = (self.detector_size_raw[0] * self.detector_size_raw[1] * self.bit_depth) // 8
 
         # Detector size including chip gaps.
         module_size_wgaps = [detector_model.module_size[0] + detector_model.gap_px_chips[0],
@@ -59,10 +55,13 @@ class DetectorDefinition(object):
         self.detector_size = [(self.geometry[0] - 1) * detector_model.gap_px_modules[0] + self.detector_size[0],
                               (self.geometry[1] - 1) * detector_model.gap_px_modules[1] + self.detector_size[1]]
 
+        self.n_submodules_total = self.geometry[0] * self.geometry[1] * detector_model.n_submodules_per_module
+
+        self.image_header_n_bytes = config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES * self.n_submodules_total
+        self.raw_image_data_n_bytes = (self.detector_size_raw[0] * self.detector_size_raw[1] * self.bit_depth) // 8
         self.image_data_n_bytes = (self.detector_size[0] * self.detector_size[1] * self.bit_depth) // 8
 
-        self.n_submodules_total = self.geometry[0] * self.geometry[1] * detector_model.n_submodules_per_module
-        self.image_header_n_bytes = config.IMAGE_HEADER_SUBMODULE_SIZE_BYTES * self.n_submodules_total
+        self.submodule_line_n_bytes = (self.detector_model.submodule_size[1] * self.bit_depth) // 8
 
 
 EIGER = DetectorModel(
