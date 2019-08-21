@@ -9,6 +9,7 @@ logging.basicConfig(level=default_logging_level)
 
 # logging.getLogger("rest_api").setLevel(logging.DEBUG)
 # logging.getLogger("udp_receiver").setLevel(logging.DEBUG)
+# logging.getLogger("rb_assembler").setLevel(logging.DEBUG)
 # logging.getLogger("zmq_sender").setLevel(logging.DEBUG)
 # logging.getLogger("mpi_ringbuffer_master").setLevel(logging.DEBUG)
 # logging.getLogger("mpi_ringbuffer_client").setLevel(logging.DEBUG)
