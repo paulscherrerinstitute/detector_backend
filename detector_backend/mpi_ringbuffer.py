@@ -71,28 +71,33 @@ class MpiRingBufferClient(object):
                  process_id,
                  follower_ids,
                  image_header_n_bytes,
-                 image_data_n_bytes,
+                 raw_image_data_n_bytes,
+                 assembled_image_data_n_bytes,
                  bit_depth,
                  as_reader=True,
                  rb_head_file=config.DEFAULT_RB_HEAD_FILE,
                  rb_image_head_file=config.DEFAULT_RB_IMAGE_HEAD_FILE,
-                 rb_image_data_file=config.DEFAULT_RB_IMAGE_DATA_FILE):
+                 rb_raw_image_data_file=config.DEFAULT_RB_RAW_IMAGE_DATA_FILE,
+                 rb_assembled_image_data_file=config.DEFAULT_RB_ASSEMBLED_IMAGE_DATA_FILE):
 
         self.process_id = process_id
         self.follower_ids = follower_ids
         self.image_header_n_bytes = image_header_n_bytes
-        self.image_data_n_bytes = image_data_n_bytes
+        self.raw_image_data_n_bytes = raw_image_data_n_bytes
+        self.assembled_image_data_n_bytes = assembled_image_data_n_bytes
         self.bit_depth = bit_depth
         self.as_reader = as_reader
 
         self.rb_header_file = rb_head_file
         self.rb_image_head_file = rb_image_head_file
-        self.rb_image_data_file = rb_image_data_file
+        self.rb_raw_image_data_file = rb_raw_image_data_file
+        self.rb_assembled_image_data_file = rb_assembled_image_data_file
 
         self.rb_header_id = None
         self.rb_consumer_id = None
         self.rb_hbuffer_id = None
-        self.rb_dbuffer_id = None
+        self.rb_raw_dbuffer_id = None
+        self.rb_assembled_dbuffer_id = None
 
         self.initialized = False
 
@@ -114,10 +119,13 @@ class MpiRingBufferClient(object):
             raise RuntimeError("RB header file %s not available " % self.rb_header_file)
 
         if not os.path.isfile(self.rb_image_head_file):
-            raise RuntimeError("No image header file %s" % self.rb_image_data_file)
+            raise RuntimeError("No image header file %s" % self.rb_raw_image_data_file)
 
-        if not os.path.isfile(self.rb_image_data_file):
-            raise RuntimeError("No image data file %s" % self.rb_image_data_file)
+        if not os.path.isfile(self.rb_raw_image_data_file):
+            raise RuntimeError("No raw image data file %s" % self.rb_raw_image_data_file)
+
+        if not os.path.isfile(self.rb_assembled_image_data_file):
+            raise RuntimeError("No assembled image data file %s" % self.rb_assembled_image_data_file)
 
         self.rb_header_id = rb.open_header_file(self.rb_header_file)
 
@@ -126,11 +134,18 @@ class MpiRingBufferClient(object):
         else:
             self.rb_consumer_id = rb.create_writer(self.rb_header_id, self.process_id, self.follower_ids)
 
-        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head_file, self.rb_header_id, 0)
-        self.rb_dbuffer_id = rb.attach_buffer_to_header(self.rb_image_data_file, self.rb_header_id, 0)
+        self.rb_hbuffer_id = rb.attach_buffer_to_header(self.rb_image_head_file,
+                                                        self.rb_header_id, 0)
+
+        self.rb_raw_dbuffer_id = rb.attach_buffer_to_header(self.rb_raw_image_data_file,
+                                                            self.rb_header_id, 0)
+
+        self.rb_assembled_dbuffer_id = rb.attach_buffer_to_header(self.rb_assembled_image_data_file,
+                                                                  self.rb_header_id, 0)
 
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.image_header_n_bytes)
-        rb.set_buffer_stride_in_byte(self.rb_dbuffer_id, self.image_data_n_bytes)
+        rb.set_buffer_stride_in_byte(self.rb_raw_dbuffer_id, self.raw_image_data_n_bytes)
+        rb.set_buffer_stride_in_byte(self.rb_assembled_dbuffer_id, self.assembled_image_data_n_bytes)
 
         n_slots = rb.adjust_nslots(self.rb_header_id)
         buffer_slot_type_name = 'c_uint' + str(self.bit_depth)
@@ -139,8 +154,10 @@ class MpiRingBufferClient(object):
         _logger_client.debug("[%d] RB %d slots: %d", self.process_id, self.rb_header_id, n_slots)
         _logger_client.debug("[%d] RB header stride: %d",
                              self.process_id, rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
-        _logger_client.debug("[%d] RB data stride: %d",
-                             self.process_id, rb.get_buffer_stride_in_byte(self.rb_dbuffer_id))
+        _logger_client.debug("[%d] RB raw data stride: %d",
+                             self.process_id, rb.get_buffer_stride_in_byte(self.rb_raw_dbuffer_id))
+        _logger_client.debug("[%d] RB assembled data stride: %d",
+                             self.process_id, rb.get_buffer_stride_in_byte(self.rb_assembled_dbuffer_id))
 
         _logger_client.debug("[%d] RB buffer slot type name: %s", self.process_id, buffer_slot_type_name)
 
