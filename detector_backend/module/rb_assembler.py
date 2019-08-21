@@ -43,7 +43,7 @@ class ImageAssembler(object):
         self.move_offsets = self._get_move_offsets()
 
         if len(self.move_offsets) != self.n_moves:
-            raise ValueError("The move offset calculation went wrong."
+            raise ValueError("The move offset calculation went wrong. "
                              "The number of n_moves=%s should be the same as the len(move_offsets)=%d"
                              % (self.n_moves, len(self.move_offsets)))
 
@@ -65,7 +65,7 @@ class ImageAssembler(object):
 
     def _get_move_offsets(self):
         # TODO: Implement this.
-        return []
+        return [0] * self.n_moves
 
 
 def read_frame(detector_def: DetectorDefinition, metadata_pointer, data_pointer):
