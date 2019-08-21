@@ -6,6 +6,7 @@ from mpi4py import MPI
 
 from detector_backend import config
 import ringbuffer as rb
+from detector_backend.detectors import DetectorDefinition
 
 _logger_master = getLogger("mpi_ringbuffer_master")
 _logger_client = getLogger("mpi_ringbuffer_client")
@@ -70,10 +71,7 @@ class MpiRingBufferClient(object):
     def __init__(self,
                  process_id,
                  follower_ids,
-                 image_header_n_bytes,
-                 raw_image_data_n_bytes,
-                 assembled_image_data_n_bytes,
-                 bit_depth,
+                 detector_def: DetectorDefinition,
                  as_reader=True,
                  rb_head_file=config.DEFAULT_RB_HEAD_FILE,
                  rb_image_head_file=config.DEFAULT_RB_IMAGE_HEAD_FILE,
@@ -82,10 +80,10 @@ class MpiRingBufferClient(object):
 
         self.process_id = process_id
         self.follower_ids = follower_ids
-        self.image_header_n_bytes = image_header_n_bytes
-        self.raw_image_data_n_bytes = raw_image_data_n_bytes
-        self.assembled_image_data_n_bytes = assembled_image_data_n_bytes
-        self.bit_depth = bit_depth
+        self.image_header_n_bytes = detector_def.image_header_n_bytes
+        self.raw_image_data_n_bytes = detector_def.raw_image_data_n_bytes
+        self.assembled_image_data_n_bytes = detector_def.image_data_n_bytes
+        self.bit_depth = detector_def.bit_depth
         self.as_reader = as_reader
 
         self.rb_header_file = rb_head_file

@@ -4,6 +4,7 @@ import unittest
 import numpy
 
 import ringbuffer as rb
+from detector_backend.detectors import DetectorDefinition, JUNGFRAU
 from detector_backend.utils_ringbuffer import create_rb_files, get_frame_data
 from tests.utils import MockRingBufferMaster, cleanup_rb_files, MockRingBufferClient
 
@@ -22,13 +23,17 @@ class RingbufferTests(unittest.TestCase):
         master = MockRingBufferMaster()
         master.create_buffer()
 
+        jf_test_det = DetectorDefinition(
+            detector_name="0.5 JF",
+            detector_model=JUNGFRAU,
+            geometry=[1, 1],
+            bit_depth=16
+        )
+
         writer = MockRingBufferClient(
             process_id=1,
             follower_ids=[],
-            image_header_n_bytes=64,
-            raw_image_data_n_bytes=128,
-            assembled_image_data_n_bytes=140,
-            bit_depth=16,
+            detector_def=jf_test_det,
             as_reader=False
         )
 
@@ -37,10 +42,7 @@ class RingbufferTests(unittest.TestCase):
         receiver = MockRingBufferClient(
             process_id=2,
             follower_ids=[1],
-            image_header_n_bytes=64,
-            raw_image_data_n_bytes=128,
-            assembled_image_data_n_bytes=140,
-            bit_depth=16
+            detector_def=jf_test_det
         )
 
         receiver.init_buffer()

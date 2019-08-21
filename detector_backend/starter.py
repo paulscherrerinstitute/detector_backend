@@ -44,9 +44,7 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
                            ringbuffer=MpiRingBufferClient(
                                process_id=current_process_rank,
                                follower_ids=[sender_rank, preview_rank],
-                               image_header_n_bytes=detector_definition.image_header_n_bytes,
-                               image_data_n_bytes=detector_definition.raw_image_data_n_bytes,
-                               bit_depth=detector_definition.bit_depth,
+                               detector_def=detector_definition,
                                as_reader=False
                            ),
                            control_client=MpiControlClient()
@@ -61,9 +59,7 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
                             ringbuffer=MpiRingBufferClient(
                                 process_id=current_process_rank,
                                 follower_ids=receiver_ranks,
-                                image_header_n_bytes=detector_definition.image_header_n_bytes,
-                                image_data_n_bytes=detector_definition.raw_image_data_n_bytes,
-                                bit_depth=detector_definition.bit_depth
+                                detector_def=detector_definition,
                             ))
 
     elif current_process_rank == preview_rank:
@@ -75,9 +71,7 @@ def start_standard_setup(detector_definition, udp_ip_and_port):
                              ringbuffer=MpiRingBufferClient(
                                  process_id=current_process_rank,
                                  follower_ids=receiver_ranks,
-                                 image_header_n_bytes=detector_definition.image_header_n_bytes,
-                                 image_data_n_bytes=detector_definition.raw_image_data_n_bytes,
-                                 bit_depth=detector_definition.bit_depth
+                                 detector_def=detector_definition,
                              ))
 
     else:

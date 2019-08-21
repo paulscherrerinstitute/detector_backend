@@ -54,10 +54,7 @@ class UdpReceiverTests(unittest.TestCase):
         ringbuffer_client = MockRingBufferClient(
             process_id=0,
             follower_ids=[udp_receiver_rank],
-            image_header_n_bytes=test_eiger.image_header_n_bytes,
-            raw_image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
-            assembled_image_data_n_bytes=test_eiger.image_data_n_bytes,
-            bit_depth=test_eiger.bit_depth,
+            detector_def=test_eiger,
             as_reader=True
         )
         ringbuffer_client.init_buffer()
@@ -66,10 +63,7 @@ class UdpReceiverTests(unittest.TestCase):
             ringbuffer_client_udp = MockRingBufferClient(
                 process_id=udp_receiver_rank,
                 follower_ids=[],
-                image_header_n_bytes=test_eiger.image_header_n_bytes,
-                raw_image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
-                assembled_image_data_n_bytes=test_eiger.image_data_n_bytes,
-                bit_depth=test_eiger.bit_depth,
+                detector_def=test_eiger,
                 as_reader=False
             )
 
@@ -124,10 +118,7 @@ class UdpReceiverTests(unittest.TestCase):
         ringbuffer_client = MockRingBufferClient(
             process_id=4,
             follower_ids=udp_receiver_ranks,
-            image_header_n_bytes=test_eiger.image_header_n_bytes,
-            raw_image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
-            assembled_image_data_n_bytes=test_eiger.image_data_n_bytes,
-            bit_depth=test_eiger.bit_depth,
+            detector_def=test_eiger,
             as_reader=True
         )
         ringbuffer_client.init_buffer()
@@ -136,10 +127,7 @@ class UdpReceiverTests(unittest.TestCase):
             ringbuffer_client_udp = MockRingBufferClient(
                 process_id=process_id,
                 follower_ids=[4],
-                image_header_n_bytes=test_eiger.image_header_n_bytes,
-                raw_image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
-                assembled_image_data_n_bytes=test_eiger.image_data_n_bytes,
-                bit_depth=test_eiger.bit_depth,
+                detector_def=test_eiger,
                 as_reader=False
             )
 
