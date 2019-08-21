@@ -26,7 +26,7 @@ class UdpReceiverTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        create_rb_files(100, 64, 2 * 512 * 256)
+        create_rb_files(100, 64, 2 * 512 * 256, 2 * 540 * 256)
 
     @classmethod
     def tearDownClass(cls):
@@ -55,7 +55,8 @@ class UdpReceiverTests(unittest.TestCase):
             process_id=0,
             follower_ids=[udp_receiver_rank],
             image_header_n_bytes=test_eiger.image_header_n_bytes,
-            image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+            raw_image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+            assembled_image_data_n_bytes=test_eiger.image_data_n_bytes,
             bit_depth=test_eiger.bit_depth,
             as_reader=True
         )
@@ -66,7 +67,8 @@ class UdpReceiverTests(unittest.TestCase):
                 process_id=udp_receiver_rank,
                 follower_ids=[],
                 image_header_n_bytes=test_eiger.image_header_n_bytes,
-                image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+                raw_image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+                assembled_image_data_n_bytes=test_eiger.image_data_n_bytes,
                 bit_depth=test_eiger.bit_depth,
                 as_reader=False
             )
@@ -123,7 +125,8 @@ class UdpReceiverTests(unittest.TestCase):
             process_id=4,
             follower_ids=udp_receiver_ranks,
             image_header_n_bytes=test_eiger.image_header_n_bytes,
-            image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+            raw_image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+            assembled_image_data_n_bytes=test_eiger.image_data_n_bytes,
             bit_depth=test_eiger.bit_depth,
             as_reader=True
         )
@@ -134,7 +137,8 @@ class UdpReceiverTests(unittest.TestCase):
                 process_id=process_id,
                 follower_ids=[4],
                 image_header_n_bytes=test_eiger.image_header_n_bytes,
-                image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+                raw_image_data_n_bytes=test_eiger.raw_image_data_n_bytes,
+                assembled_image_data_n_bytes=test_eiger.image_data_n_bytes,
                 bit_depth=test_eiger.bit_depth,
                 as_reader=False
             )
@@ -217,7 +221,7 @@ class UdpReceiverTests(unittest.TestCase):
             self.assertListEqual(metadata["pulse_id_diff"], [0] * len(udp_port))
             self.assertListEqual(metadata["framenum_diff"], [0] * len(udp_port))
 
-            data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_dbuffer_id, rb_current_slot)
+            data_pointer = rb.get_buffer_slot(ringbuffer_client.rb_raw_dbuffer_id, rb_current_slot)
 
             data_shape = [test_eiger.n_submodules_total] + test_eiger.detector_model.submodule_size
             data = get_frame_data(data_pointer, data_shape)
