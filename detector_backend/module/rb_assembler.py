@@ -15,20 +15,46 @@ from detector_backend.utils_ringbuffer import get_frame_metadata, get_frame_data
 _logger = getLogger("rb_assembler")
 
 
-def get_image_assembler_function():
-    expected_library_location = os.path.dirname(os.path.realpath(__file__)) + "/../../libimageassembler.so"
+class ImageAssembler(object):
+    def __init__(self, detector_def: DetectorDefinition, assembler_index, n_total_assemblers):
+        self.detector_def = detector_def
+        self.assembler_index = assembler_index
+        self.n_total_assemblers = n_total_assemblers
 
-    try:
-        _mod = ctypes.cdll.LoadLibrary(expected_library_location)
+        _logger.info("Creating assembler_index=%d out of n_total_assemblers=%d"
+                     % (self.assembler_index, self.n_total_assemblers))
 
-        assemble_image = _mod.assemble_image
-        assemble_image.argtypes = (ctypes.c_char_p, POINTER(ctypes.c_size_t), ctypes.c_uint32, ctypes.c_size_t)
-        assemble_image.restype = ctypes.c_int
+        if self.detector_def.image_data_n_bytes % self.n_total_assemblers != 0:
+            raise ValueError("Wrong number of assemblers. "
+                             "Assembled image of image_data_n_bytes=%s is not divisible by n_total_assemblers=%s"
+                             % (self.detector_def.image_data_n_bytes, self.n_total_assemblers))
 
-        return assemble_image
+        n_bytes_per_assembler = self.detector_def.image_data_n_bytes // self.n_total_assemblers
+        self.buffer_pointer = ctypes.cast(ctypes.create_string_buffer(n_bytes_per_assembler),
+                                          ctypes.POINTER(ctypes.c_char))
 
-    except:
-        _logger.error("Could not image assembler shared library from %s." % expected_library_location)
+        _logger.debug("Allocated assembler buffer n_bytes_per_assembler=%d (image_data_n_bytes=%d)"
+                      % (n_bytes_per_assembler, self.detector_def.image_data_n_bytes))
+
+    @staticmethod
+    def get_image_assembler_function():
+        expected_library_location = os.path.dirname(os.path.realpath(__file__)) + "/../../libimageassembler.so"
+
+        try:
+            _mod = ctypes.cdll.LoadLibrary(expected_library_location)
+
+            assemble_image = _mod.assemble_image
+            assemble_image.argtypes = (ctypes.c_char_p, POINTER(ctypes.c_size_t), ctypes.c_uint32, ctypes.c_size_t)
+            assemble_image.restype = ctypes.c_int
+
+            return assemble_image
+
+        except:
+            _logger.error("Could not image assembler shared library from %s." % expected_library_location)
+
+    def get_move_offsets(self):
+        # TODO: Implement this.
+        return []
 
 
 def read_frame(detector_def: DetectorDefinition, metadata_pointer, data_pointer):
@@ -40,7 +66,7 @@ def read_frame(detector_def: DetectorDefinition, metadata_pointer, data_pointer)
     return data, metadata
 
 
-def start_rb_assembler(name, detector_def, ringbuffer):
+def start_rb_assembler(name, detector_def: DetectorDefinition, ringbuffer, assembler_index, n_total_assemblers):
 
     _logger.info("Starting assembler with name='%s'." % name)
 
@@ -50,9 +76,18 @@ def start_rb_assembler(name, detector_def, ringbuffer):
 
     mpi_ref_time = time()
 
-    # Function signature
+    image_assembler = ImageAssembler(detector_def=detector_def,
+                                     assembler_index=assembler_index,
+                                     n_total_assemblers=n_total_assemblers)
+
+    # Function signature:
     # char* source_root, char* destination_root, size_t* dest_move_offsets, uint32_t n_moves, size_t n_bytes_per_move
-    image_assembler = get_image_assembler_function()
+    assemble_image = image_assembler.get_image_assembler_function()
+
+    buffer_pointer = image_assembler.buffer_pointer
+    dest_move_offsets = image_assembler.get_move_offsets()
+    n_moves = image_assembler.n_moves
+    n_bytes_per_move = image_assembler.n_bytes_per_move
 
     while True:
 
@@ -71,7 +106,9 @@ def start_rb_assembler(name, detector_def, ringbuffer):
             sleep(config.RB_RETRY_DELAY)
             continue
 
-        # TODO: Do the actual conversion.
+        data_pointer = rb.get_buffer_slot(ringbuffer.rb_dbuffer_id, rb_current_slot)
+
+        assemble_image(data_pointer, buffer_pointer, dest_move_offsets, n_moves, n_bytes_per_move)
 
         if not rb.commit_slot(ringbuffer.rb_reader_id, rb_current_slot):
             error_message = "[%s] Cannot commit rb slot %d." % (name, rb_current_slot)
