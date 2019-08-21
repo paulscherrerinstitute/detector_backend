@@ -87,6 +87,9 @@ class DetectorZMQSender(object):
 
         return False
 
+    def reset(self):
+        self.first_received_frame_number = 0
+
 
 def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
@@ -112,6 +115,7 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
             if control_client.is_message_ready():
                 control_client.get_message()
                 ringbuffer.reset()
+                zmq_sender.reset()
                 _logger.info("[%s] Ringbuffer reset." % name)
 
             mpi_ref_time = time()
