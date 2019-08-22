@@ -33,6 +33,10 @@ class RbAssemblerTests(unittest.TestCase):
                          jf_test_det.raw_image_data_n_bytes / jf_test_det.submodule_line_n_bytes,
                          "All assemblers combined should combine the entire image.")
 
+    def test_ImageAssembler_move_offsets(self):
+        # TODO: Implement this maybe.
+        pass
+
 
 if __name__ == "__main__":
     unittest.main()
