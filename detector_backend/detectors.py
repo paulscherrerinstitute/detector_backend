@@ -11,8 +11,7 @@ class DetectorModel(object):
                  bytes_per_packet,
                  bytes_data_per_packet,
                  gap_px_chips,
-                 gap_px_modules,
-                 column_first_indexing,
+                 gap_px_modules
                  ):
         self.model_name = model_name
 
@@ -26,8 +25,6 @@ class DetectorModel(object):
 
         self.gap_px_chips = gap_px_chips
         self.gap_px_modules = gap_px_modules
-
-        self.column_first_indexing = column_first_indexing
 
 
 class DetectorDefinition(object):
@@ -73,8 +70,7 @@ EIGER = DetectorModel(
     bytes_per_packet=4144,
     bytes_data_per_packet=4096,
     gap_px_chips=[2, 2],
-    gap_px_modules=[36, 8],
-    column_first_indexing=True
+    gap_px_modules=[36, 8]
 )
 
 
@@ -86,6 +82,5 @@ JUNGFRAU = DetectorModel(
     bytes_per_packet=8246,
     bytes_data_per_packet=8192,
     gap_px_chips=[0, 0],
-    gap_px_modules=[0, 0],
-    column_first_indexing=False
+    gap_px_modules=[0, 0]
 )
