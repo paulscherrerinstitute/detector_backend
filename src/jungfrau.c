@@ -31,9 +31,9 @@ barebone_packet interpret_udp_packet (
   return bpacket;
 }
 
-void copy_data (
-  detector det, rb_metadata rb_meta, rb_state rb_current_state, void* packet_data, int line_number)
-{
+//void copy_data (
+//  detector det, rb_metadata rb_meta, rb_state rb_current_state, void* packet_data, int line_number)
+//{
 //  // -1 to convert from 1 based submodule height to 0 based array indexing.
 //  uint32_t submodule_height = det.submodule_size[0] - 1;
 //
@@ -54,4 +54,4 @@ void copy_data (
 //
 //    dest_submodule_line--;
 //  }
-}
+//}

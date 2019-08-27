@@ -26,9 +26,9 @@ barebone_packet interpret_udp_packet (
   return bpacket;
 }
 
-void copy_data (
-  detector det, rb_metadata rb_meta, rb_state rb_current_state, void* packet_data, int line_number)
-{  
+//void copy_data (
+//  detector det, rb_metadata rb_meta, rb_state rb_current_state, void* packet_data, int line_number)
+//{
 //  int reverse;
 //  int reverse_factor;
 //
@@ -73,4 +73,4 @@ void copy_data (
 //    source_offset += rb_meta.n_bytes_per_submodule_line;
 //    dest_line_offset -= reverse * rb_meta.n_bytes_per_frame_line;
 //  }
-}
+//}

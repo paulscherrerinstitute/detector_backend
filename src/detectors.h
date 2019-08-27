@@ -18,19 +18,6 @@ typedef struct Counter{
   uint64_t total_lost_frames;
 } counter;
 
-typedef struct _detector{
-    uint8_t submodule_n;
-    int32_t detector_size[2]; 
-    int32_t module_size[2]; 
-    int32_t submodule_size[2]; 
-    int32_t module_idx[2]; 
-    int32_t submodule_idx[2];
-    uint16_t gap_px_chips[2];
-    uint16_t gap_px_modules[2];
-    uint32_t bytes_per_packet;
-    uint32_t bytes_data_per_packet;
-} detector;
-
 typedef struct _detector_submodule{
     uint16_t submodule_index;
     uint16_t n_packets_per_frame;
@@ -104,6 +91,6 @@ typedef struct _rb_state {
 typedef barebone_packet (*interpret_udp_packet_function)(const char*, const int);
 
 // Signature: detector* det, rb_metadata* rb_meta, void* packet_data, int line_number
-typedef void (*copy_data_function)(detector, rb_metadata, void*, int);
+//typedef void (*copy_data_function)(detector, rb_metadata, void*, int);
 
 #endif

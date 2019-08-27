@@ -26,8 +26,6 @@ class CDetDef(ctypes.Structure):
         ('detector_size', 2 * ctypes.c_int),
         ('module_size', 2 * ctypes.c_int),
         ('submodule_size', 2 * ctypes.c_int),
-        ('module_idx', 2 * ctypes.c_int),
-        ('submodule_idx', 2 * ctypes.c_int),
         ('gap_px_chips', 2 * ctypes.c_uint16),
         ('gap_px_modules', 2 * ctypes.c_uint16),
 
@@ -85,9 +83,6 @@ def get_c_det_def(detector_def, module_id, submodule_id):
 
     c_det_def.gap_px_chips = copy(as_ctypes(array(detector_model.gap_px_chips, dtype="uint16", order="C")))
     c_det_def.gap_px_modules = copy(as_ctypes(array(detector_model.gap_px_modules, dtype="uint16", order="C")))
-
-    c_det_def.module_idx = as_ctypes(get_module_coordinates(detector_def, module_id))
-    c_det_def.submodule_idx = as_ctypes(array(get_submodule_coordinates(submodule_id), dtype="int32", order='C'))
 
     c_det_def.bytes_per_packet = as_ctypes(array(detector_model.bytes_per_packet, dtype="uint32", order='C'))
     c_det_def.bytes_data_per_packet = as_ctypes(array(detector_model.bytes_data_per_packet, dtype="uint32", order='C'))
