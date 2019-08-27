@@ -134,3 +134,20 @@ def get_n_bytes_per_frame_line(detector_def: DetectorDefinition):
 def get_n_bytes_per_submodule_line(detector_def: DetectorDefinition):
     n_bytes = (detector_def.detector_model.submodule_size[1] * detector_def.bit_depth) // 8
     return n_bytes
+
+
+def get_jf_submodule_coordinates_in_image(detector_def: DetectorDefinition, i_submodule: int) -> (int, int):
+    """
+    Calculate the submodule coordinates in the assembled image.
+    :param detector_def: Detector definition.
+    :param i_submodule: Submodule index.
+    :return (y, x): Coordinates of the submodule, coordinates origin: TOP LEFT corner.
+    """
+    y = i_submodule // detector_def.geometry[0]
+    x = i_submodule % detector_def.geometry[0]
+
+    # TODO: Change the numbering of modules in the detector config file.
+    # Invert the y coordinate top/bottom - module numbering starts in BOTTOM LEFT corner
+    y = detector_def.geometry[0] - 1 - y
+
+    return y, x
