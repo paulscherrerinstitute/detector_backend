@@ -62,6 +62,7 @@ class DetectorDefinition(object):
         self.image_data_n_bytes = (self.detector_size[0] * self.detector_size[1] * self.bit_depth) // 8
 
         self.submodule_line_n_bytes = (self.detector_model.submodule_size[1] * self.bit_depth) // 8
+        self.image_line_n_bytes = (self.detector_size[1] * self.bit_depth) // 8
 
 
 EIGER = DetectorModel(
