@@ -48,8 +48,8 @@ def get_udp_receive_function():
 
         return put_data_in_rb
 
-    except:
-        _logger.error("Could not load udp receiver shared library from %s." % expected_library_location)
+    except Exception as e:
+        raise RuntimeError("Could not load udp receiver shared library from %s." % expected_library_location) from e
 
 
 def get_c_det_submodule(detector_def, submodule_index):
