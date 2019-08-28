@@ -37,8 +37,8 @@ class JungfrauAssembler(object):
         Calculate the submodule coordinates in the assembled image.
         :return (y, x): Coordinates of the submodule, coordinates origin: TOP LEFT corner.
         """
-        y = i_submodule // self.detector_def.geometry[0]
-        x = i_submodule % self.detector_def.geometry[0]
+        y = i_submodule // self.detector_def.geometry[1]
+        x = i_submodule % self.detector_def.geometry[1]
 
         # TODO: Change the numbering of modules in the detector config file.
         # Invert the y coordinate top/bottom - module numbering starts in BOTTOM LEFT corner
