@@ -41,7 +41,5 @@ class JungfrauAssembler(object):
         x = i_submodule % self.detector_def.geometry[1]
 
         # TODO: Change the numbering of modules in the detector config file.
-        # Invert the y coordinate top/bottom - module numbering starts in BOTTOM LEFT corner
-        y = self.detector_def.geometry[0] - 1 - y
 
         return y, x
