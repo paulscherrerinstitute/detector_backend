@@ -17,35 +17,39 @@ _logger = getLogger("rb_assembler")
 
 
 class ImageAssembler(object):
-    def __init__(self, detector_def: DetectorDefinition, assembler_index, n_total_assemblers):
-        self.detector_def = detector_def
+    def __init__(self, det_assembler, assembler_index, n_total_assemblers):
+        self.det_assembler = det_assembler
         self.assembler_index = assembler_index
         self.n_total_assemblers = n_total_assemblers
 
         _logger.info("Creating assembler_index=%d out of n_total_assemblers=%d",
                      self.assembler_index, self.n_total_assemblers)
 
-        if self.detector_def.detector_size[0] % self.n_total_assemblers != 0:
-            raise ValueError("Wrong number of assemblers. "
-                             "Assembled image of height=%d is not divisible by n_total_assemblers=%s"
-                             % (self.detector_def.detector_size[0], self.n_total_assemblers))
+        self.n_bytes_per_move = self.det_assembler.detector_def.submodule_line_n_bytes
 
-        self.n_bytes_per_move = detector_def.submodule_line_n_bytes
-
-        total_required_moves = detector_def.raw_image_data_n_bytes // self.n_bytes_per_move
+        total_required_moves = self.det_assembler.detector_def.raw_image_data_n_bytes // self.n_bytes_per_move
         if total_required_moves % self.n_total_assemblers != 0:
             raise ValueError("Wrong number of assemblers. "
-                             "The total_required_moves=%d is not divisible by n_total_assemblers=$s"
+                             "The total_required_moves=%d is not divisible by n_total_assemblers=%s"
                              % (total_required_moves, n_total_assemblers))
 
         self.n_moves = total_required_moves // self.n_total_assemblers
 
-        self.move_offsets = self._get_move_offsets()
+        self.move_offsets = self._get_assembler_move_offsets()
 
         if len(self.move_offsets) != self.n_moves:
             raise ValueError("The move offset calculation went wrong. "
                              "The number of n_moves=%s should be the same as the len(move_offsets)=%d"
                              % (self.n_moves, len(self.move_offsets)))
+
+    def _get_assembler_move_offsets(self):
+        all_offsets = self.det_assembler.get_move_offsets()
+
+        start_offset = self.n_moves * self.assembler_index
+        stop_offset = start_offset + self.n_moves
+
+        return all_offsets[start_offset:stop_offset]
+
 
     @staticmethod
     def get_image_assembler_function():
@@ -62,10 +66,6 @@ class ImageAssembler(object):
 
         except:
             _logger.error("Could not image assembler shared library from %s." % expected_library_location)
-
-    def _get_move_offsets(self):
-        # TODO: Implement this.
-        return [0] * self.n_moves
 
 
 def read_frame(detector_def: DetectorDefinition, metadata_pointer, data_pointer):
@@ -88,7 +88,7 @@ def start_rb_assembler(name, detector_def: DetectorDefinition, ringbuffer: MpiRi
 
     mpi_ref_time = time()
 
-    image_assembler = ImageAssembler(detector_def=detector_def,
+    image_assembler = ImageAssembler(det_assembler=detector_def,
                                      assembler_index=assembler_index,
                                      n_total_assemblers=n_total_assemblers)
 
