@@ -23,11 +23,11 @@ class TestAssemblers(unittest.TestCase):
             self.assertTrue(all((x[1] >= 0 for x in offsets)), "All target offsets should be >= 0.")
 
             for i_offset in range(1, len(offsets)):
-                source_gap = offsets[i_offset][0] - offsets[i_offset-1][0]
+                source_gap = offsets[i_offset][0] - offsets[i_offset - 1][0]
                 self.assertEqual(source_gap, detector_def.submodule_line_n_bytes,
                                  "Source offsets should be line by line.")
 
-                target_gap = offsets[i_offset][1] - offsets[i_offset-1][1]
+                target_gap = offsets[i_offset][1] - offsets[i_offset - 1][1]
                 # We just changed to the next module, which means different offset in target buffer.
                 if i_offset % detector_def.detector_model.submodule_size[0] == 0:
                     pass
@@ -42,12 +42,50 @@ class TestAssemblers(unittest.TestCase):
                             "Max target offset should be smaller than total image size.")
 
         for bit_depth in [8, 16, 32]:
-            for geometry in [[1, 1], [2, 2], [2, 3], [3, 2]]:
+            for geometry in [[1, 1], [2, 2], [2, 3], [3, 2], [9, 1], [1, 9]]:
                 with self.subTest(geometry=geometry, bit_depth=bit_depth):
-
                     test_jf_assembly(DetectorDefinition(
                         detector_name="",
                         detector_model=JUNGFRAU,
                         geometry=geometry,
                         bit_depth=bit_depth
                     ))
+
+    def test_JungfrauAssembler_coordinates(self):
+
+        for bit_depth in [8, 16, 32]:
+            for geometry in [[1, 1], [3, 3], [1, 3], [3, 1], [4, 3], [3, 4]]:
+                with self.subTest(geometry=geometry, bit_depth=bit_depth):
+
+                    assembler = JungfrauAssembler(
+                        detector_def=DetectorDefinition(
+                            detector_name="",
+                            detector_model=JUNGFRAU,
+                            geometry=geometry,
+                            bit_depth=bit_depth
+                        ))
+
+                    i_submodule = 0
+                    for y in range(geometry[0]):
+                        for x in range(geometry[1]):
+
+                            self.assertEqual((y, x),
+                                             assembler._get_submodule_coordinates_in_image(i_submodule),
+                                             "The expected and calculated submodule coordinates are not the same.")
+
+                            i_submodule += 1
+
+    def test_JungfrauAssembler_transparent(self):
+        det_def = DetectorDefinition(
+            detector_name="",
+            detector_model=JUNGFRAU,
+            geometry=[9, 1],
+            bit_depth=16
+        )
+
+        assembler = JungfrauAssembler(detector_def=det_def)
+        offsets = assembler.get_move_offsets()
+
+        for move in offsets:
+            self.assertEqual(move[0], move[1],
+                             "The mapping should be one to one - transparent reconstruction.")
