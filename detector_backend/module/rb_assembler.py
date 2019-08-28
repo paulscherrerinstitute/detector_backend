@@ -22,6 +22,10 @@ class ImageAssembler(object):
         self.assembler_index = assembler_index
         self.n_total_assemblers = n_total_assemblers
 
+        if not (assembler_index < n_total_assemblers):
+            raise ValueError("assembler_index=%d must be smaller than n_total_assemblers=%d"
+                             % (assembler_index, n_total_assemblers))
+
         _logger.info("Creating assembler_index=%d out of n_total_assemblers=%d",
                      self.assembler_index, self.n_total_assemblers)
 
@@ -51,21 +55,21 @@ class ImageAssembler(object):
         return all_offsets[start_offset:stop_offset]
 
 
-    @staticmethod
-    def get_image_assembler_function():
-        expected_library_location = os.path.dirname(os.path.realpath(__file__)) + "/../../libimageassembler.so"
+def get_image_assembler_function():
+    expected_library_location = os.path.dirname(os.path.realpath(__file__)) + "/../../libimageassembler.so"
 
-        try:
-            _mod = ctypes.cdll.LoadLibrary(expected_library_location)
+    try:
+        _mod = ctypes.cdll.LoadLibrary(expected_library_location)
 
-            assemble_image = _mod.assemble_image
-            assemble_image.argtypes = (ctypes.c_char_p, POINTER(ctypes.c_size_t), ctypes.c_uint32, ctypes.c_size_t)
-            assemble_image.restype = ctypes.c_int
+        assemble_image = _mod.assemble_image
+        assemble_image.argtypes = (ctypes.c_char_p, ctypes.c_char_p,
+                                   POINTER(ctypes.c_size_t), ctypes.c_uint32, ctypes.c_size_t)
+        assemble_image.restype = ctypes.c_int
 
-            return assemble_image
+        return assemble_image
 
-        except:
-            _logger.error("Could not image assembler shared library from %s." % expected_library_location)
+    except Exception as e:
+        raise RuntimeError("Could not image assembler shared library from %s." % expected_library_location) from e
 
 
 def read_frame(detector_def: DetectorDefinition, metadata_pointer, data_pointer):
@@ -94,7 +98,7 @@ def start_rb_assembler(name, detector_def: DetectorDefinition, ringbuffer: MpiRi
 
     # Function signature:
     # char* source_root, char* destination_root, size_t* dest_move_offsets, uint32_t n_moves, size_t n_bytes_per_move
-    assemble_image = image_assembler.get_image_assembler_function()
+    assemble_image = get_image_assembler_function()
 
     dest_move_offsets = image_assembler.move_offsets
     n_moves = image_assembler.n_moves
