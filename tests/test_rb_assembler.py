@@ -47,8 +47,33 @@ class RbAssemblerTests(unittest.TestCase):
                         ImageAssembler(JungfrauAssembler(jf_test_det), 0, n_assemblers)
 
     def test_ImageAssembler_move_offsets(self):
-        # TODO: Implement this maybe.
-        pass
+
+        jf_test_det = DetectorDefinition(
+            detector_name="Test JF 4.5M",
+            detector_model=JUNGFRAU,
+            geometry=[3, 9],
+            bit_depth=16
+        )
+
+        jf_assembler = JungfrauAssembler(jf_test_det)
+        total_moves = jf_test_det.raw_image_data_n_bytes // jf_test_det.submodule_line_n_bytes
+
+        for n_assemblers in range(1, 20):
+
+            if n_assemblers % total_moves != 0:
+                continue
+
+            with self.subTest(n_assemblers=n_assemblers):
+                total_moves = []
+
+                for i_assembler in range(n_assemblers):
+                    image_assember = ImageAssembler(JungfrauAssembler(jf_test_det),
+                                                    i_assembler,
+                                                    n_assemblers)
+
+                    total_moves += image_assember.move_offsets
+
+                self.assertListEqual(total_moves, jf_assembler.get_move_offsets())
 
 
 if __name__ == "__main__":
