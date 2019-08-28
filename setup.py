@@ -12,7 +12,7 @@ class MakefileBuilder(Command):
         pass
 
     def run(self):
-        subprocess.check_output(["make", "DETECTOR=JUNGFRAU"])
+        subprocess.check_output(["make", "DETECTOR=EIGER"])
         print("C shared library built successfully.")
 
 
