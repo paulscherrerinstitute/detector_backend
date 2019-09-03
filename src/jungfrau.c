@@ -30,33 +30,3 @@ barebone_packet interpret_udp_packet (
 
   return bpacket;
 }
-
-void copy_data (
-  detector det, rb_metadata rb_meta, void* packet_data, int line_number)
-{
-  // -1 to convert from 1 based submodule height to 0 based array indexing.
-  uint32_t submodule_height = det.submodule_size[0] - 1;
-
-  // Packets are stream from the top to the bottom of the module.
-  // module_line goes from 255..0
-  uint32_t dest_submodule_line = line_number + rb_meta.n_lines_per_packet - 1;
-
-  for (uint32_t packet_line=0; packet_line < rb_meta.n_lines_per_packet; packet_line++)
-  {
-    long dest_offset = (submodule_height - dest_submodule_line) * rb_meta.n_bytes_per_frame_line;
-    long source_offset = packet_line * rb_meta.n_bytes_per_submodule_line;
-    
-    memcpy(
-      (char*)(rb_meta.data_slot_origin) + dest_offset, 
-      (char*)packet_data + source_offset, 
-      rb_meta.n_bytes_per_submodule_line
-    );
-                
-    dest_submodule_line--;
-  }
-}
-
-detector_definition det_definition = {
-  .udp_packet_bytes = sizeof(jungfrau_packet),
-  .data_bytes_per_packet = JUNGFRAU_DATA_BYTES_PER_PACKET
-};

@@ -1,72 +1,54 @@
-# Data acquisition backend
+# Detector backend
 
-# UDP receiver logic
+The detector_backend is used to receive, process and write data coming from high throughput detectors at PSI.
 
-File **src/udp\_receiver.c**
+You can communicate with it via a REST interface, but the detector_backend uses internally MPI calls. It relies on the 
+ringbuffer library (currently not publicly available) to efficiently transfer data between different processes.
 
-```
-  Logic:
-    recv_packets ++
-    if got_pkg == pred_pkg && last_frame == packet.frame:
-      //this is the last packet of the frame
-      tot_frames++
-      recv_packets = 0
-      last_frame = 0 // this will cause getting a new slot afterwards
-      commit_flag = true // for committing the slot later
+**This is currently just a stub. More coming in the next weeks.**
 
-    else if last_frame != packet frame:
-      // this means a new frame arrived
-      if last_frame == 0:
-        // this means prev frame was ok, and no dangling slot exists
-        
-      else:
-        // this means we lost some packets before
-        commit dangling slot
-        do_stats with recv_packets -1
-        recv_packets = 1
+## Table of content
+1. [Quick start](#quick_start)
+2. [Build](#build)
+    1. [Conda setup](#conda_setup)
+    2. [Local build](#local_build)
+3. [Deploy](#depoy)
+4. [Configure](#configure)
+5. [Run](#run)
+6. [REST interface](#rest_api)
+    1. [Python client](#python_client)
+    2. [curl](#curl_client)
+7. Project overview
 
-      last_frame = packet_frame
-      get new slot
-    move p1, ph accordingly
-    copy to memory
-    update counters 
+<a id="quick_start"></a>
+## Quick start
 
-    if commit_flag:
-      // this commits the slot when the frame has been succesfully received
+<a id="build"></a>
+## Build
 
-      commit slot
-      commit_flag = false
-commit_flag
-  Cases:
-    first packet arrives:
-      recv_packets ++
-      last_frame is 0, it is updated
-      new slot is allocated
-      data is copied
-    last packet arrives, no packets loss:
-      recv_packets ++
-      tot_frames++
-      counters resetted
-      last_frame to 0
-      data is copied
-      slot is committed
-    last packet arrives, packets lost:
-      case 2: previous slot is committed, stats updated
-      last frame updated
-      new slot allocated
-      data is copied
-```
+<a id="conda_setup"></a>
+### Conda setup
 
-# Development
+<a id="local_build"></a>
+### Local build
 
-## Running the tests
+<a id="deploy"></a>
+## Deploy
 
-Before each major commit, please run the unittest suite. In order to do so, you do need the ``detector_replay`` package, that can be retrieved here: https://git.psi.ch/HPDI/detector_replay
+<a id="Configure"></a>
+## Configure
 
-Then:
-```
-cd tests
-python -m unittest test_reconstruction
-```
+<a id="run"></a>
+## Run
 
-This should that 1-2 minutes on a laptop.
+<a id="rest_api"></a>
+## REST interface
+
+<a id="python_client"></a>
+### Python client
+
+<a id="curl_client"></a>
+### curl client
+
+<a id="project_overview"></a>
+## Project overview

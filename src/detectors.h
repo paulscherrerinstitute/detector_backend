@@ -2,6 +2,7 @@
 #define DETECTORS_H
 
 #include <inttypes.h>
+#include <stdbool.h>
 
 #define PRINT_STATS_N_FRAMES_MODULO 100
 #define NO_CURRENT_FRAME 0
@@ -17,17 +18,16 @@ typedef struct Counter{
   uint64_t total_lost_frames;
 } counter;
 
-typedef struct _detector{
-    char detector_name[10];
-    uint8_t submodule_n;
-    int32_t detector_size[2]; 
-    int32_t module_size[2]; 
-    int32_t submodule_size[2]; 
-    int32_t module_idx[2]; 
-    int32_t submodule_idx[2];
-    uint16_t gap_px_chips[2];
-    uint16_t gap_px_modules[2];
-} detector;
+typedef struct _detector_submodule{
+    uint16_t submodule_index;
+    uint16_t n_packets_per_frame;
+
+    uint32_t bytes_per_packet;
+    uint32_t bytes_data_per_packet;
+
+    uint64_t submodule_data_slot_offset;
+
+} detector_submodule;
 
 typedef struct _rb_header{
   // Field 0: frame number
@@ -63,7 +63,7 @@ typedef struct _detector_common_packet{
 } detector_common_packet;
 
 // the essential info needed for a packet
-typedef struct _barebone_packet{
+typedef struct _barebone_packet {
   char* data;
   int data_len;
   uint32_t packetnum;
@@ -73,38 +73,24 @@ typedef struct _barebone_packet{
   bool is_valid;
 } barebone_packet;
 
-typedef struct _detector_definition{
-  size_t udp_packet_bytes;
-  size_t data_bytes_per_packet;
-} detector_definition;
-
-typedef struct _rb_metadata
-{
+typedef struct _rb_metadata {
   int rb_writer_id;
   int rb_header_id;
 
   int rb_hbuffer_id;
   int rb_dbuffer_id;
+} rb_metadata;
 
+typedef struct _rb_state {
   int rb_current_slot;
-
   char* data_slot_origin;
   rb_header* header_slot_origin;
-
-  uint32_t mod_origin;
-  int mod_number;
-  int n_lines_per_packet;
-  int n_packets_per_frame;
-  int bit_depth;
-
-  uint32_t n_bytes_per_frame_line;
-  uint32_t n_bytes_per_submodule_line;
-} rb_metadata;
+} rb_state;
 
 // Signature: detector det, int line_number, int n_lines_per_packet, void * p1, void * data, int bit_depth
 typedef barebone_packet (*interpret_udp_packet_function)(const char*, const int);
 
 // Signature: detector* det, rb_metadata* rb_meta, void* packet_data, int line_number
-typedef void (*copy_data_function)(detector, rb_metadata, void*, int);
+//typedef void (*copy_data_function)(detector, rb_metadata, void*, int);
 
 #endif

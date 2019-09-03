@@ -1,26 +1,32 @@
-
-RINGBUFFER=$(PWD)/..
-
 CC=gcc
 
-LIBNAME=libudpreceiver
+RINGBUFFER=..
 LIBDIR=$(RINGBUFFER)/ringbuffer/ringbuffer/lib/
-CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -L$(LIBDIR) -lringbuffer -Wl,-rpath=$(LIBDIR) -Wall
-CFLAGS+=-Wfatal-errors
+CFLAGS=-I$(RINGBUFFER)/ringbuffer/src/ -I${CONDA_PREFIX}/include -L$(LIBDIR) -lringbuffer -Wl,-rpath,$(LIBDIR) -Wall
+CFLAGS+= -Wfatal-errors
 
+all: build_assembler build_receiver
 
-build: src/udp_receiver.c
+build_receiver: src/udp_receiver.c
 	@if [ -z $(DETECTOR) ]; then echo "DETECTOR variable is not set"; exit 1; fi;	
 	
 	@echo "-------------------------------"
 	@echo "Building backend for $(DETECTOR)"
 	@echo "-------------------------------"
 	
-	$(CC) --std=c99 -march=core-avx2 -shared -fPIC -O2 -D$(DETECTOR) $(CFLAGS) -o $(LIBNAME).so $? -lringbuffer 
+	$(CC) --std=c99 -march=core-avx2 -shared -fPIC -O2 -D$(DETECTOR) $(CFLAGS) -o libudpreceiver.so $?
+
+build_assembler: src/image_assembler.c
+	@echo "-------------------------------"
+	@echo "Building assembler"
+	@echo "-------------------------------"
+
+	$(CC) --std=c99 -march=core-avx2 -shared -fPIC -O2 -Wfatal-errors -o libimageassembler.so $?
 
 
 debug: CFLAGS+= -DDEBUG
 debug: build
 
 clean: 
-	rm -f $(LIBNAME).so
+	rm -f libudpreceiver.so
+	rm -f libimageassembler.so
