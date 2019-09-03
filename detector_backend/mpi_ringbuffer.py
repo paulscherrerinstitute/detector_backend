@@ -83,9 +83,9 @@ class MpiRingBufferClient(object):
         self.bit_depth = detector_def.bit_depth
         self.as_reader = as_reader
 
-        self.rb_header_file = rb_folder + config.RB_HEAD_FILE,
-        self.rb_image_head_file = rb_folder + config.RB_IMAGE_HEAD_FILE,
-        self.rb_raw_image_data_file = rb_folder + config.RB_RAW_IMAGE_DATA_FILE,
+        self.rb_header_file = rb_folder + config.RB_HEAD_FILE
+        self.rb_image_head_file = rb_folder + config.RB_IMAGE_HEAD_FILE
+        self.rb_raw_image_data_file = rb_folder + config.RB_RAW_IMAGE_DATA_FILE
         self.rb_assembled_image_data_file = rb_folder + config.RB_ASSEMBLED_IMAGE_DATA_FILE
 
         self.rb_header_id = None
