@@ -26,7 +26,7 @@ class UdpReceiverTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        create_rb_files(100, 64, 2 * 512 * 256, 2 * 540 * 256)
+        create_rb_files(100, 64, 2 * 512 * 256)
 
     @classmethod
     def tearDownClass(cls):
