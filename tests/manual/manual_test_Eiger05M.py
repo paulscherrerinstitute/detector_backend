@@ -17,7 +17,7 @@ logging.basicConfig(level=default_logging_level)
 # logging.getLogger("mpi_control_client").setLevel(logging.DEBUG)
 
 eiger1m = DetectorDefinition(
-    detector_name="Test Eiger 1M",
+    detector_name="Test Eiger 0.5M",
     detector_model=EIGER,
     geometry=[1, 1],
     bit_depth=16
