@@ -13,9 +13,7 @@ def create_rb_files(n_slots,
                     n_header_slot_bytes,
                     n_raw_data_slot_bytes,
                     n_assembled_data_slot_bytes=0,
-                    image_head_file=config.DEFAULT_RB_IMAGE_HEAD_FILE,
-                    raw_image_data_file=config.DEFAULT_RB_RAW_IMAGE_DATA_FILE,
-                    assembled_image_data_file=config.DEFAULT_RB_ASSEMBLED_IMAGE_DATA_FILE):
+                    rb_folder=config.DEFAULT_RB_FOLDER):
 
     def create_file(output_file, block_size, n_blocks):
         _logger.debug("Creating file %s with block_size %d and n_blocks %n",
@@ -29,6 +27,10 @@ def create_rb_files(n_slots,
         if state != 0:
             raise RuntimeError("Could not create file %s with block_size %d and n_blocks %d" %
                                (output_file, block_size, n_blocks))
+
+    image_head_file = rb_folder + config.RB_HEAD_FILE
+    raw_image_data_file = rb_folder + config.RB_RAW_IMAGE_DATA_FILE
+    assembled_image_data_file = rb_folder + config.RB_ASSEMBLED_IMAGE_DATA_FILE
 
     create_file(image_head_file, n_header_slot_bytes, n_slots)
     create_file(raw_image_data_file, n_raw_data_slot_bytes, n_slots)
