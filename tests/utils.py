@@ -78,15 +78,15 @@ def generate_udp_stream(udp_ip, udp_port, message_generator):
     udp_socket.close()
 
 
-def cleanup_rb_files():
-    if os.path.isfile(config.DEFAULT_RB_HEAD_FILE):
-        os.remove(config.DEFAULT_RB_HEAD_FILE)
+def cleanup_rb_files(rb_folder=config.DEFAULT_RB_FOLDER):
+    if os.path.isfile(rb_folder+config.RB_HEAD_FILE):
+        os.remove(rb_folder+config.RB_HEAD_FILE)
 
-    if os.path.isfile(config.DEFAULT_RB_IMAGE_HEAD_FILE):
-        os.remove(config.DEFAULT_RB_IMAGE_HEAD_FILE)
+    if os.path.isfile(rb_folder+config.RB_IMAGE_HEAD_FILE):
+        os.remove(rb_folder+config.RB_IMAGE_HEAD_FILE)
 
-    if os.path.isfile(config.DEFAULT_RB_RAW_IMAGE_DATA_FILE):
-        os.remove(config.DEFAULT_RB_RAW_IMAGE_DATA_FILE)
+    if os.path.isfile(rb_folder+config.RB_RAW_IMAGE_DATA_FILE):
+        os.remove(rb_folder+config.RB_RAW_IMAGE_DATA_FILE)
 
-    if os.path.isfile(config.DEFAULT_RB_ASSEMBLED_IMAGE_DATA_FILE):
-        os.remove(config.DEFAULT_RB_ASSEMBLED_IMAGE_DATA_FILE)
+    if os.path.isfile(rb_folder+config.RB_ASSEMBLED_IMAGE_DATA_FILE):
+        os.remove(rb_folder+config.RB_ASSEMBLED_IMAGE_DATA_FILE)
