@@ -73,6 +73,7 @@ class MpiRingBufferClient(object):
                  follower_ids,
                  detector_def: DetectorDefinition,
                  as_reader=True,
+                 use_assembly_buffer=False,
                  rb_folder=config.DEFAULT_RB_FOLDER):
 
         self.process_id = process_id
@@ -82,6 +83,7 @@ class MpiRingBufferClient(object):
         self.assembled_image_data_n_bytes = detector_def.image_data_n_bytes
         self.bit_depth = detector_def.bit_depth
         self.as_reader = as_reader
+        self.use_assembly_buffer = use_assembly_buffer
 
         self.rb_header_file = rb_folder + config.RB_HEAD_FILE
         self.rb_image_head_file = rb_folder + config.RB_IMAGE_HEAD_FILE
@@ -119,7 +121,7 @@ class MpiRingBufferClient(object):
         if not os.path.isfile(self.rb_raw_image_data_file):
             raise RuntimeError("No raw image data file %s" % self.rb_raw_image_data_file)
 
-        if not os.path.isfile(self.rb_assembled_image_data_file):
+        if self.use_assembly_buffer and not os.path.isfile(self.rb_assembled_image_data_file):
             raise RuntimeError("No assembled image data file %s" % self.rb_assembled_image_data_file)
 
         self.rb_header_id = rb.open_header_file(self.rb_header_file)
@@ -135,12 +137,8 @@ class MpiRingBufferClient(object):
         self.rb_raw_dbuffer_id = rb.attach_buffer_to_header(self.rb_raw_image_data_file,
                                                             self.rb_header_id, 0)
 
-        self.rb_assembled_dbuffer_id = rb.attach_buffer_to_header(self.rb_assembled_image_data_file,
-                                                                  self.rb_header_id, 0)
-
         rb.set_buffer_stride_in_byte(self.rb_hbuffer_id, self.image_header_n_bytes)
         rb.set_buffer_stride_in_byte(self.rb_raw_dbuffer_id, self.raw_image_data_n_bytes)
-        rb.set_buffer_stride_in_byte(self.rb_assembled_dbuffer_id, self.assembled_image_data_n_bytes)
 
         n_slots = rb.adjust_nslots(self.rb_header_id)
         buffer_slot_type_name = 'c_uint' + str(self.bit_depth)
@@ -151,8 +149,15 @@ class MpiRingBufferClient(object):
                              self.process_id, rb.get_buffer_stride_in_byte(self.rb_hbuffer_id))
         _logger_client.debug("[%d] RB raw data stride: %d",
                              self.process_id, rb.get_buffer_stride_in_byte(self.rb_raw_dbuffer_id))
-        _logger_client.debug("[%d] RB assembled data stride: %d",
-                             self.process_id, rb.get_buffer_stride_in_byte(self.rb_assembled_dbuffer_id))
+
+        if self.use_assembly_buffer:
+            self.rb_assembled_dbuffer_id = rb.attach_buffer_to_header(self.rb_assembled_image_data_file,
+                                                                      self.rb_header_id, 0)
+
+            rb.set_buffer_stride_in_byte(self.rb_assembled_dbuffer_id, self.assembled_image_data_n_bytes)
+
+            _logger_client.debug("[%d] RB assembled data stride: %d",
+                                 self.process_id, rb.get_buffer_stride_in_byte(self.rb_assembled_dbuffer_id))
 
         _logger_client.debug("[%d] RB buffer slot type name: %s", self.process_id, buffer_slot_type_name)
 
