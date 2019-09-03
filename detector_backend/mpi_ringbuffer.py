@@ -14,8 +14,8 @@ _logger_client = getLogger("mpi_ringbuffer_client")
 
 class MpiRingBufferMaster(object):
 
-    def __init__(self, rb_header_file=config.DEFAULT_RB_HEAD_FILE):
-        self.rb_header_file = rb_header_file
+    def __init__(self, rb_folder=config.DEFAULT_RB_FOLDER):
+        self.rb_header_file = rb_folder + config.RB_HEAD_FILE
         self.created = False
 
         self.rb_header_id = None
@@ -73,10 +73,7 @@ class MpiRingBufferClient(object):
                  follower_ids,
                  detector_def: DetectorDefinition,
                  as_reader=True,
-                 rb_head_file=config.DEFAULT_RB_HEAD_FILE,
-                 rb_image_head_file=config.DEFAULT_RB_IMAGE_HEAD_FILE,
-                 rb_raw_image_data_file=config.DEFAULT_RB_RAW_IMAGE_DATA_FILE,
-                 rb_assembled_image_data_file=config.DEFAULT_RB_ASSEMBLED_IMAGE_DATA_FILE):
+                 rb_folder=config.DEFAULT_RB_FOLDER):
 
         self.process_id = process_id
         self.follower_ids = follower_ids
@@ -86,10 +83,10 @@ class MpiRingBufferClient(object):
         self.bit_depth = detector_def.bit_depth
         self.as_reader = as_reader
 
-        self.rb_header_file = rb_head_file
-        self.rb_image_head_file = rb_image_head_file
-        self.rb_raw_image_data_file = rb_raw_image_data_file
-        self.rb_assembled_image_data_file = rb_assembled_image_data_file
+        self.rb_header_file = rb_folder + config.RB_HEAD_FILE,
+        self.rb_image_head_file = rb_folder + config.RB_IMAGE_HEAD_FILE,
+        self.rb_raw_image_data_file = rb_folder + config.RB_RAW_IMAGE_DATA_FILE,
+        self.rb_assembled_image_data_file = rb_folder + config.RB_ASSEMBLED_IMAGE_DATA_FILE
 
         self.rb_header_id = None
         self.rb_consumer_id = None
