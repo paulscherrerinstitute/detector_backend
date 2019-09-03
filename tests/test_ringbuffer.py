@@ -34,7 +34,8 @@ class RingbufferTests(unittest.TestCase):
             process_id=1,
             follower_ids=[],
             detector_def=jf_test_det,
-            as_reader=False
+            as_reader=False,
+            use_assembly_buffer=True
         )
 
         writer.init_buffer()
@@ -42,7 +43,8 @@ class RingbufferTests(unittest.TestCase):
         receiver = MockRingBufferClient(
             process_id=2,
             follower_ids=[1],
-            detector_def=jf_test_det
+            detector_def=jf_test_det,
+            use_assembly_buffer=True
         )
 
         receiver.init_buffer()
