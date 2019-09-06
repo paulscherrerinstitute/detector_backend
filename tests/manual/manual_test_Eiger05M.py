@@ -1,6 +1,6 @@
 import logging
 
-from detector_backend.starter import start_standard_setup
+from detector_backend.profile.receive_zmq_preview import receive_zmq_preview
 from detector_backend.detectors import DetectorDefinition, EIGER
 
 
@@ -28,4 +28,4 @@ udp_ip_and_port = [("127.0.0.1", 12000),
                    ("127.0.0.1", 12002),
                    ("127.0.0.1", 12003)]
 
-start_standard_setup(eiger1m, udp_ip_and_port)
+receive_zmq_preview(eiger1m, udp_ip_and_port)
