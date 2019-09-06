@@ -11,6 +11,7 @@ _logger = logging.getLogger("h5_writer")
 IMAGE_DATASET_NAME = "/data/"
 INITIAL_IMAGE_DATASET_SIZE = 1000
 METADATA_DATASET_NAME_FORMAT = "/data/%s/%s"
+DEFAULT_PARAMETERS_VALUE = "not given"
 
 
 # TODO: Do we really need per_module?
@@ -23,7 +24,7 @@ METADATA_MAPPING = {
 
     "missing_packets_1": ("uint64", True),
     "missing_packets_2": ("uint64", True),
-    "daq_recs": ("daq_recs", True),
+    "daq_recs": ("uint64", True),
 
     "pulse_ids": ("uint64", True),
     "framenums": ("uint64", True),
@@ -61,16 +62,20 @@ class H5Writer(object):
     def _prepare_format_datasets(self):
 
         self.file.create_dataset("/general/created",
-                                 data=numpy.string_(self.parameters.get("general/created", "not given")))
+                                 data=numpy.string_(self.parameters.get("general/created",
+                                                                        DEFAULT_PARAMETERS_VALUE)))
 
         self.file.create_dataset("/general/instrument",
-                                 data=numpy.string_(self.parameters.get("general/instrument", "not given")))
+                                 data=numpy.string_(self.parameters.get("general/instrument",
+                                                                        DEFAULT_PARAMETERS_VALUE)))
 
         self.file.create_dataset("/general/process",
-                                 data=numpy.string_(self.parameters.get("general/process", "not given")))
+                                 data=numpy.string_(self.parameters.get("general/process",
+                                                                        DEFAULT_PARAMETERS_VALUE)))
 
         self.file.create_dataset("/general/user",
-                                 data=numpy.string_(self.parameters.get("general/user", "not given")))
+                                 data=numpy.string_(self.parameters.get("general/user",
+                                                                        DEFAULT_PARAMETERS_VALUE)))
 
         self.file.create_dataset("/general/detector_name",
                                  data=numpy.string_(self.detector_def.detector_name))
