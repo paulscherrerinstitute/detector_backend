@@ -1,10 +1,8 @@
-import ctypes
 import unittest
-from _ctypes import POINTER
 
 import numpy
 
-from detector_backend.assemblers import JungfrauAssembler
+from detector_backend.reconstruction.jungfrau import JungfrauAssembler
 from detector_backend.detectors import DetectorDefinition, JUNGFRAU
 from detector_backend.module.rb_assembler import ImageAssembler, get_image_assembler_function
 from detector_backend.utils_ringbuffer import create_rb_files

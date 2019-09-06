@@ -1,6 +1,6 @@
 import unittest
 
-from detector_backend.assemblers import JungfrauAssembler
+from detector_backend.reconstruction.jungfrau import JungfrauAssembler
 from detector_backend.detectors import DetectorDefinition, JUNGFRAU
 
 
