@@ -23,5 +23,6 @@ setup(
     author='PSI DAQ',
     author_email='daq@psi.ch',
     url='',
-    cmdclass={"c_build": MakefileBuilder}
+    cmdclass={"c_build": MakefileBuilder},
+    requires=['h5py', 'numpy', 'bottle', 'pyzmq', 'mpi4py']
 )
