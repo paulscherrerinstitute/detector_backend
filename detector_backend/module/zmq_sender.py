@@ -25,8 +25,6 @@ class DetectorZMQSender(object):
         self.detector_def = detector_def
         self.reset_frame_number = reset_frame_number
 
-        self.n_submodules = detector_def.n_submodules_total
-
         self.first_received_frame_number = 0
 
     def reset(self):
@@ -49,7 +47,7 @@ class DetectorZMQSender(object):
             rb_current_slot=rb_current_slot,
             rb_hbuffer_id=self.ringbuffer.rb_hbuffer_id,
             rb_dbuffer_id=self.ringbuffer.rb_dbuffer_id,
-            n_submodules=self.n_submodules,
+            n_submodules=self.detector_def.n_submodules_total,
             image_size=self.detector_def.detector_size
         )
 
