@@ -8,7 +8,7 @@ from detector_backend.detectors import DetectorDefinition
 _logger = logging.getLogger("h5_writer")
 
 
-IMAGE_DATASET_NAME = "/data/"
+IMAGE_DATASET_NAME = "/data/%s/data"
 INITIAL_IMAGE_DATASET_SIZE = 1000
 METADATA_DATASET_NAME_FORMAT = "/data/%s/%s"
 DEFAULT_PARAMETERS_VALUE = "not given"
@@ -50,7 +50,7 @@ class H5Writer(object):
         self._prepare_format_datasets()
 
         self.image_dataset = self.file.create_dataset(
-            name="/data/%s/data" % self.detector_def.detector_name,
+            name=IMAGE_DATASET_NAME % self.detector_def.detector_name,
             shape=tuple([INITIAL_IMAGE_DATASET_SIZE] + self.detector_def.detector_size),
             maxshape=tuple([None] + self.detector_def.detector_size),
             chunks=tuple([1] + self.detector_def.detector_size),
