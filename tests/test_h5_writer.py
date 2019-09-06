@@ -78,3 +78,7 @@ class H5WriterTests(unittest.TestCase):
             self.assertEqual(images[i].min(), images[i].max())
 
         file.close()
+
+        # TODO: Test metadata length.
+        # TODO: Test non defined parameters
+        # TODO: Test custom datasets in parameters
