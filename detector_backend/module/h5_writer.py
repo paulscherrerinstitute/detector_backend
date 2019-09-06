@@ -12,6 +12,8 @@ IMAGE_DATASET_NAME = "/data/"
 INITIAL_IMAGE_DATASET_SIZE = 1000
 METADATA_DATASET_NAME_FORMAT = "/data/%s/%s"
 
+
+# TODO: Do we really need per_module?
 # metadata_name: (metdata_type, per_module)
 METADATA_MAPPING = {
     "pulse_id": ("uint64", False),
@@ -40,10 +42,10 @@ class H5Writer(object):
                      self.detector_def.detector_name, self.output_file, self.parameters)
 
         self.image_write_index = 0
-        self.image_dataset = None
-
+        # TODO: Add possibility to write to /dev/null
         self.file = h5py.File(output_file, 'w')
 
+        # TODO: Add possiblity to add custom datasets.
         self._prepare_format_datasets()
 
         self.image_dataset = self.file.create_dataset(
@@ -74,6 +76,7 @@ class H5Writer(object):
                                  data=numpy.string_(self.detector_def.detector_name))
 
     def write_image(self, image_bytes):
+        # TODO: Resize dataset.
         self.image_dataset.id.write_direct_chunk((self.image_write_index, 0, 0), image_bytes)
         self.image_write_index += 1
 
