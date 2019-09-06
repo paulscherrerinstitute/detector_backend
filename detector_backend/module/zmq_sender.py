@@ -8,7 +8,7 @@ from time import time, sleep
 from detector_backend import config
 from detector_backend.config import MPI_COMM_DELAY
 from detector_backend.mpi_control import MpiControlClient
-from detector_backend.utils_ringbuffer import get_frame_metadata, get_frame_data
+from detector_backend.utils_ringbuffer import read_data_from_rb
 
 _logger = getLogger("zmq_sender")
 
@@ -45,23 +45,20 @@ class DetectorZMQSender(object):
 
     def read_data(self, rb_current_slot):
 
-        try:
-            metadata_pointer = rb.get_buffer_slot(self.ringbuffer.rb_hbuffer_id, rb_current_slot)
-            metadata = get_frame_metadata(metadata_pointer, self.n_submodules)
+        metadata, data = read_data_from_rb(
+            rb_current_slot=rb_current_slot,
+            rb_hbuffer_id=self.ringbuffer.rb_hbuffer_id,
+            rb_dbuffer_id=self.ringbuffer.rb_dbuffer_id,
+            n_submodules=self.n_submodules,
+            image_size=self.detector_def.detector_size
+        )
 
-            data_pointer = rb.get_buffer_slot(self.ringbuffer.rb_dbuffer_id, rb_current_slot)
-            data = get_frame_data(data_pointer, self.detector_def.detector_size)
+        frame_number = metadata["frame"]
+        pulse_id = metadata["pulse_id"]
 
-            frame_number = metadata["frame"]
-            pulse_id = metadata["pulse_id"]
-
-            _logger.debug("Retrieved data and metadata for frame %d, pulse_id %d.",
-                          frame_number,
-                          pulse_id)
-
-        except:
-            _logger.exception("Could not interpret data from ringbuffer for slot %d." % rb_current_slot)
-            raise RuntimeError
+        _logger.debug("Retrieved data and metadata for frame %d, pulse_id %d.",
+                      frame_number,
+                      pulse_id)
 
         # Reset frame number if the detector does not do this by default (WT-JF?!).
         if self.first_received_frame_number == 0:
@@ -92,7 +89,6 @@ class DetectorZMQSender(object):
 
 
 def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
-
     _logger.info("Starting sender with name='%s', bind_url='%s', zmq_mode='%s'" %
                  (name, bind_url, zmq_mode))
 
