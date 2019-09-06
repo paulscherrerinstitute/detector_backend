@@ -5,7 +5,7 @@ import h5py
 import numpy
 
 from detector_backend.detectors import DetectorDefinition, JUNGFRAU
-from detector_backend.module.h5_writer import H5Writer, DEFAULT_PARAMETERS_VALUE
+from detector_backend.module.h5_writer import H5Writer, DEFAULT_PARAMETERS_VALUE, IMAGE_DATASET_NAME
 
 
 class H5WriterTests(unittest.TestCase):
@@ -41,7 +41,7 @@ class H5WriterTests(unittest.TestCase):
         image_data = numpy.zeros(shape=jf_test_det.detector_size, dtype="uint%d" % jf_test_det.bit_depth)
 
         for i in range(n_images):
-            image_data += i
+            image_data.fill(i)
             writer.write_image(image_data.tobytes())
 
             metadata = {
@@ -67,7 +67,14 @@ class H5WriterTests(unittest.TestCase):
             self.assertEqual(value, file[name][()].decode())
 
         self.assertEqual(file["/general/process"][()].decode(), DEFAULT_PARAMETERS_VALUE)
-        self.assertEqual(file["general/detector_name"][()].decode(), jf_test_det.detector_name)
+        self.assertEqual(file["/general/detector_name"][()].decode(), jf_test_det.detector_name)
+
+        self.assertTrue(IMAGE_DATASET_NAME % jf_test_det.detector_name in file)
+        images = file[IMAGE_DATASET_NAME % jf_test_det.detector_name]
+        self.assertListEqual(list(images.shape), [n_images] + jf_test_det.detector_size)
+
+        for i in range(n_images):
+            self.assertEqual(images[i].min(), i)
+            self.assertEqual(images[i].min(), images[i].max())
 
         file.close()
-
