@@ -93,7 +93,7 @@ class DetectorZMQSender(object):
 
 def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
-    _logger.info("Starting writer with name='%s', bind_url='%s', zmq_mode='%s'" %
+    _logger.info("Starting sender with name='%s', bind_url='%s', zmq_mode='%s'" %
                  (name, bind_url, zmq_mode))
 
     ringbuffer.init_buffer()
