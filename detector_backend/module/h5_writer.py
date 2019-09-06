@@ -36,6 +36,9 @@ class H5Writer(object):
         self.output_file = output_file
         self.parameters = parameters or {}
 
+        _logger.info("Writing detector_name=%s to output_file=%s with parameters %s",
+                     self.detector_def.detector_name, self.output_file, self.parameters)
+
         self.image_write_index = 0
         self.image_dataset = None
 
@@ -99,8 +102,10 @@ class H5Writer(object):
         self._flush_metadata()
 
         self.image_dataset.resize(size=self.image_write_index, axis=0)
+        _logger.debug("Image dataset to image_write_index=%s", self.image_write_index)
 
         self.file.close()
+        _logger.info("Writing completed.")
 
 
 def start_writing():
