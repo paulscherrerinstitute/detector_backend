@@ -93,6 +93,11 @@ class H5Writer(object):
             _logger.info("No metadata in cache. Returning")
 
         for name, value in self.cache.items():
+
+            if name not in METADATA_MAPPING:
+                _logger.warning("Metadata name=%s not in mapping. Will not be written to file.", name)
+                continue
+
             dataset_name = METADATA_DATASET_NAME_FORMAT % (self.detector_def.detector_name, name)
             dtype = METADATA_MAPPING[name][0]
 
