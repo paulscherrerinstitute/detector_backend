@@ -82,3 +82,6 @@ class H5WriterTests(unittest.TestCase):
         # TODO: Test metadata length.
         # TODO: Test non defined parameters
         # TODO: Test custom datasets in parameters
+        
+    def test_H5Writer_from_rb(self):
+        pass
