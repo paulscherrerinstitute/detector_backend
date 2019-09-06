@@ -7,7 +7,7 @@ from detector_backend.mpi_control import MpiControlMaster, MpiControlClient
 from detector_backend.mpi_ringbuffer import MpiRingBufferMaster, MpiRingBufferClient
 
 
-def start_standard_setup(detector_definition, udp_ip_and_port):
+def receive_zmq_preview(detector_definition, udp_ip_and_port):
     current_process_rank = MPI.COMM_WORLD.rank
     total_processes = MPI.COMM_WORLD.size
 
