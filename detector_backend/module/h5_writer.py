@@ -1,9 +1,15 @@
 import logging
+from time import time, sleep
+import ringbuffer as rb
 
 import h5py as h5py
 import numpy
 
+from detector_backend import config
+from detector_backend.config import MPI_COMM_DELAY
 from detector_backend.detectors import DetectorDefinition
+from detector_backend.mpi_control import MpiControlClient
+from detector_backend.utils_ringbuffer import read_data_from_rb
 
 _logger = logging.getLogger("h5_writer")
 
@@ -121,5 +127,50 @@ class H5Writer(object):
         _logger.info("Writing completed.")
 
 
-def start_writing():
-    pass
+def start_h5_writer(name, detector_def, ringbuffer):
+
+    _logger.info("Starting h5 writer with name='%s'" % name)
+
+    ringbuffer.init_buffer()
+
+    writer = H5Writer(detector_def)
+    control_client = MpiControlClient()
+
+    mpi_ref_time = time()
+
+    while True:
+
+        if (time() - mpi_ref_time) > MPI_COMM_DELAY:
+
+            # TODO: Currently the only message is a reset message.
+            if control_client.is_message_ready():
+                control_client.get_message()
+
+                writer.close()
+                writer = H5Writer(detector_def)
+
+                _logger.info("[%s] Ringbuffer reset." % name)
+
+            mpi_ref_time = time()
+
+        rb_current_slot = rb.claim_next_slot(ringbuffer.rb_reader_id)
+        if rb_current_slot == -1:
+            sleep(config.RB_RETRY_DELAY)
+            continue
+
+        metadata, data = read_data_from_rb(
+            rb_current_slot=rb_current_slot,
+            rb_hbuffer_id=ringbuffer.rb_hbuffer_id,
+            rb_dbuffer_id=ringbuffer.rb_dbuffer_id,
+            n_submodules=detector_def.n_submodules_total,
+            image_size=detector_def.detector_size
+        )
+
+        writer.write_image(data.tobytes())
+        writer.write_metadata(metadata)
+
+        if not rb.commit_slot(ringbuffer.rb_reader_id, rb_current_slot):
+            error_message = "[%s] Cannot commit rb slot %d." % (name, rb_current_slot)
+            _logger.error(error_message)
+
+            raise RuntimeError(error_message)
