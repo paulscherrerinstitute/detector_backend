@@ -4,6 +4,7 @@ import subprocess
 
 import numpy as np
 
+import ringbuffer as rb
 from detector_backend import config
 
 _logger = logging.getLogger("utils_ringbuffer")
@@ -79,3 +80,20 @@ def get_frame_metadata(metadata_pointer, n_submodules):
 def get_frame_data(data_pointer, frame_size):
     data = np.ctypeslib.as_array(data_pointer, shape=frame_size)
     return data
+
+
+def read_data_from_rb(rb_current_slot, rb_hbuffer_id, rb_dbuffer_id,
+                      n_submodules, image_size):
+
+    try:
+        metadata_pointer = rb.get_buffer_slot(rb_hbuffer_id, rb_current_slot)
+        metadata = get_frame_metadata(metadata_pointer, n_submodules)
+
+        data_pointer = rb.get_buffer_slot(rb_dbuffer_id, rb_current_slot)
+        data = get_frame_data(data_pointer, image_size)
+
+    except:
+        _logger.exception("Could not interpret data from ringbuffer for slot %d." % rb_current_slot)
+        raise RuntimeError
+
+    return metadata, data
