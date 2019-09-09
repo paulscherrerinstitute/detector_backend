@@ -77,3 +77,7 @@ class RingbufferTests(unittest.TestCase):
         assembled_receive_pointer = rb.get_buffer_slot(receiver.rb_assembled_dbuffer_id, receiver_current_slot)
         assembled_received_data = get_frame_data(assembled_receive_pointer, [jf_test_det.image_data_n_bytes])
         numpy.testing.assert_array_equal(sent_assembled_data, assembled_received_data)
+
+
+if __name__ == "__main__":
+    unittest.main()

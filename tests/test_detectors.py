@@ -31,3 +31,7 @@ class TestDetectors(unittest.TestCase):
                          "Height of the detector should be multiple of the single module size.")
 
         self.assertEqual((det_def.detector_size[1] * det_def.bit_depth)//8, det_def.image_line_n_bytes)
+
+
+if __name__ == "__main__":
+    unittest.main()

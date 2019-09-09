@@ -68,3 +68,7 @@ class UtilsTests(unittest.TestCase):
         self.assertEqual(os.path.getsize(config.RB_RAW_IMAGE_DATA_FILE), n_slots * n_raw_data_slot_bytes)
         self.assertEqual(os.path.getsize(config.RB_ASSEMBLED_IMAGE_DATA_FILE),
                          n_slots * n_assembled_data_slot_bytes)
+
+
+if __name__ == "__main__":
+    unittest.main()

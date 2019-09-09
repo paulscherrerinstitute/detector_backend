@@ -85,3 +85,7 @@ class H5WriterTests(unittest.TestCase):
         
     def test_H5Writer_from_rb(self):
         pass
+
+
+if __name__ == "__main__":
+    unittest.main()

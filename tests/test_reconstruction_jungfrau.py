@@ -89,3 +89,7 @@ class TestAssemblers(unittest.TestCase):
         for move in offsets:
             self.assertEqual(move[0], move[1],
                              "The mapping should be one to one - transparent reconstruction.")
+
+
+if __name__ == "__main__":
+    unittest.main()
