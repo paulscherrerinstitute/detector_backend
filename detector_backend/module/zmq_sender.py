@@ -1,4 +1,9 @@
 from logging import getLogger
+
+from detector_backend.mpi_ringbuffer import MpiRingBufferClient
+
+from detector_backend.detectors import DetectorDefinition
+
 import ringbuffer as rb
 
 import zmq
@@ -86,7 +91,7 @@ class DetectorZMQSender(object):
         self.first_received_frame_number = 0
 
 
-def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
+def start_writer_sender(name, bind_url, zmq_mode, detector_def: DetectorDefinition, ringbuffer: MpiRingBufferClient):
     _logger.info("Starting sender with name='%s', bind_url='%s', zmq_mode='%s'" %
                  (name, bind_url, zmq_mode))
 
@@ -114,7 +119,7 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
             mpi_ref_time = time()
 
-        rb_current_slot = rb.claim_next_slot(ringbuffer.rb_reader_id)
+        rb_current_slot = rb.claim_next_slot(ringbuffer.rb_consumer_id)
         if rb_current_slot == -1:
             sleep(config.RB_RETRY_DELAY)
             continue
@@ -123,7 +128,7 @@ def start_writer_sender(name, bind_url, zmq_mode, detector_def, ringbuffer):
 
         zmq_sender.send_data(metadata, data)
 
-        if not rb.commit_slot(ringbuffer.rb_reader_id, rb_current_slot):
+        if not rb.commit_slot(ringbuffer.rb_consumer_id, rb_current_slot):
             error_message = "[%s] Cannot commit rb slot %d." % (name, rb_current_slot)
             _logger.error(error_message)
 
