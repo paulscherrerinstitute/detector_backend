@@ -29,6 +29,9 @@ def create_rb_files(n_slots,
             raise RuntimeError("Could not create file %s with block_size %d and n_blocks %d" %
                                (output_file, block_size, n_blocks))
 
+    if rb_folder and rb_folder[-1] != "/":
+            rb_folder = rb_folder + "/"
+
     image_head_file = rb_folder + config.RB_IMAGE_HEAD_FILE
     raw_image_data_file = rb_folder + config.RB_RAW_IMAGE_DATA_FILE
     assembled_image_data_file = rb_folder + config.RB_ASSEMBLED_IMAGE_DATA_FILE
