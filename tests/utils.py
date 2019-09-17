@@ -14,6 +14,9 @@ from detector_backend.utils_detectors import CEigerUdpPacket
 
 class MockRingBufferMaster(MpiRingBufferMaster):
 
+    def __init__(self, rb_folder=config.DEFAULT_RB_FOLDER):
+        super(MockRingBufferMaster, self).__init__(rb_folder)
+
     def create_buffer(self):
 
         ret = rb.create_header_file(self.rb_header_file)
