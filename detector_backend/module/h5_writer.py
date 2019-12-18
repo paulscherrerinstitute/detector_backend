@@ -1,4 +1,6 @@
 import logging
+
+from detector_backend.mpi_ringbuffer import MpiRingBufferClient
 from time import time, sleep
 import ringbuffer as rb
 
@@ -127,7 +129,7 @@ class H5Writer(object):
         _logger.info("Writing completed.")
 
 
-def start_h5_writer(name, detector_def, ringbuffer):
+def start_h5_writer(name, detector_def: DetectorDefinition, ringbuffer: MpiRingBufferClient):
 
     _logger.info("Starting h5 writer with name='%s'" % name)
 
@@ -153,7 +155,7 @@ def start_h5_writer(name, detector_def, ringbuffer):
 
             mpi_ref_time = time()
 
-        rb_current_slot = rb.claim_next_slot(ringbuffer.rb_reader_id)
+        rb_current_slot = rb.claim_next_slot(ringbuffer.rb_consumer_id)
         if rb_current_slot == -1:
             sleep(config.RB_RETRY_DELAY)
             continue
@@ -161,7 +163,7 @@ def start_h5_writer(name, detector_def, ringbuffer):
         metadata, data = read_data_from_rb(
             rb_current_slot=rb_current_slot,
             rb_hbuffer_id=ringbuffer.rb_hbuffer_id,
-            rb_dbuffer_id=ringbuffer.rb_dbuffer_id,
+            rb_dbuffer_id=ringbuffer.rb_consumer_id,
             n_submodules=detector_def.n_submodules_total,
             image_size=detector_def.detector_size
         )
@@ -169,8 +171,9 @@ def start_h5_writer(name, detector_def, ringbuffer):
         writer.write_image(data.tobytes())
         writer.write_metadata(metadata)
 
-        if not rb.commit_slot(ringbuffer.rb_reader_id, rb_current_slot):
+        if not rb.commit_slot(ringbuffer.rb_consumer_id, rb_current_slot):
             error_message = "[%s] Cannot commit rb slot %d." % (name, rb_current_slot)
             _logger.error(error_message)
 
             raise RuntimeError(error_message)
+
